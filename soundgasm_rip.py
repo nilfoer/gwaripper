@@ -120,6 +120,7 @@ def get_sub_from_reddit_urls(urllist):
 
 
 def rip_from_links(sglinks):
+    # .copy()?
     sglinkslist = sglinks
     if isinstance(sglinks, str):
         sglinkslist = sglinks.split(",")
@@ -132,12 +133,14 @@ def rip_from_links(sglinks):
         # wird weiter an / geteilt aber nur ein mal und man hat den username
         currentusr = link.split("/u/", 1)[1].split("/", 1)[0]
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
+        downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
         riptuple = rip_link_furl(link.strip(","))
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, True)
+        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True)
         dlcounter = erg[0]
         filestodl = erg[1]
 
 
+# TODO refactor merge with above
 def rip_from_links_reddit(sglinks):
     # anzahl eintraege in der liste ergeben anzahl der zu ladenden dateien
     dlcounter = 0
@@ -148,8 +151,9 @@ def rip_from_links_reddit(sglinks):
         # wird weiter an / geteilt aber nur ein mal und man hat den username
         currentusr = link[0].split("/u/", 1)[1].split("/", 1)[0]
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
+        downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
         riptuple = rip_link_furl(link[0])
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, True, redditurl=link[1])
+        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True, redditurl=link[1])
         dlcounter = erg[0]
         filestodl = erg[1]
 
@@ -161,12 +165,13 @@ def rip_usr_to_files(sgasm_usr_url):
     currentusr = sgasm_usr_url.split("/u/", 1)[1].split("/", 1)[0]
     logger.info("Ripping user %s" % currentusr)
     txtfilename = "sgasm-" + currentusr + "-rip.txt"
+    downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
     dlcounter = 0
     filestodl = len(user_files)
     userrip_string = ""
     for afile in user_files:
         riptuple = rip_link_furl(afile)
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, False, userrip_string)
+        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, False, userrip_string)
         dlcounter = erg[0]
         filestodl = erg[1]
     # falls dateien beim user rip geladen wurden wird der string in die textdatei geschrieben
@@ -211,10 +216,10 @@ def rip_link_furl(sgasmurl):
             logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
 
 
-
-def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr, single=True, usrrip_string="", redditurl=""):
+def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
+             downloaded_urls, single=True, usrrip_string="", redditurl=""):
     if riptuple is not None:
-        if not check_file_for_dl(riptuple[3], txtfilename, currentusr):
+        if not check_file_for_dl(riptuple[3], downloaded_urls, txtfilename, currentusr):
             curfnr += 1
             if single:
                 write_to_txtf("\tAdded: " + time.strftime("%d/%m/%Y %H:%M:%S") + "\n\n\tTitle: " +
@@ -225,6 +230,9 @@ def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
             else:
                 usrrip_string += "\tTitle: " + riptuple[0] + ",\n\t" + "Description: " + riptuple[1] + ",\n\t" + "URL: \"" \
                                  + riptuple[3] + "\",\n\t" + "URLsg: \"" + riptuple[2] + "\",\n"
+
+            # append url to downloaded_urls so we dont miss duplicate urls in the same download session
+            downloaded_urls.append(riptuple[3])
 
             filename = re.sub("[^\w\-_\.,\[\] ]", "_", riptuple[0][0:110]) + ".m4a"
             mypath = os.path.join(ROOTDIR, currentusr)
@@ -265,25 +273,30 @@ def write_to_txtf(wstring, filename, currentusr):
     with open(os.path.join(mypath, filename), "a", encoding="UTF-8") as w:
         w.write(wstring)
 
-
-def check_file_for_dl(m4aurl, txtfilename, currentusr):
-    """Returns True if file was already downloaded
-    :param m4aurl: direct URL to m4a file
-    :param txtfilename: filename of txt containing downloaded urls
-    :param currentusr: string of user that the file belongs to
-    :returns erg: returns true if m4aurl is already in txtfile"""
-    erg = False
-    mypath = os.path.join(ROOTDIR, currentusr)
+def load_downloaded_urls(txtfilename, currentusr):
+    downloaded_urls = []
     if os.path.isfile(os.path.join(mypath, txtfilename)):
         with open(os.path.join(mypath, txtfilename), 'r', encoding="UTF-8") as f:
             read_data = f.read()
             urllist = read_data.split("URL: \"")
             del urllist[0]
             for url in urllist:
-                if m4aurl == url.split("\"", 1)[0]:
-                    erg = True
-                    break
-    return erg
+                downloaded_urls.append(url.split("\"", 1)[0])
+    return downloaded_urls
+
+def check_file_for_dl(m4aurl, downloaded_urls, txtfilename, currentusr):
+    """
+    Returns True if file was already downloaded
+    :param m4aurl: direct URL to m4a file
+    :param downloaded_urls: list of already downloaded m4a urls
+    :param txtfilename: name of txtfile
+    :param currentusr: name of curren user
+    :return: True if m4aurl is in downloaded_urls, else False
+    """
+    if m4aurl in downloaded_urls:
+        return True
+    else:
+        return False
 
 
 def watch_clip(domain):
