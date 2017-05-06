@@ -53,7 +53,8 @@ def main():
     opt = input("Was moechten Sie tun?\n\n 1. Rip/Update Users\n 2. Rip from single links\n "
                 "3. Rip single links from a txt file\n 4. Watch clipboard for sgasm links\n "
                 "5. Watch clipboard for reddit links\n 6. Download sgasm posts from subreddit\n "
-                "7. Rip single reddit links from a txt file\n")
+                "7. Rip single reddit links from a txt file\n 8. Subreddit durchsuchen und Ergebnisse "
+                "herunterladen\n")
     if opt == "1":
         usrurls = input("Enter soundgasm User URLs separated by \",\" - no spaces\n")
         rip_users(usrurls)
@@ -85,6 +86,14 @@ def main():
         llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
         links = parse_submissions_for_links(llist, True)
         rip_from_links_reddit(links)
+        main()
+    elif opt == "8":
+        subname = input("Enter name of subreddit\n")
+        limit = input("Enter limit for found submissions, max 1000 forced by Reddit:\n")
+        searchstring = input("Enter search string:\n")
+        found_subs = search_subreddit(subname, searchstring, limit=limit)
+        links = parse_submissions_for_links(found_subs, True)
+        #rip_from_links_reddit(links)
         main()
 
 
@@ -291,6 +300,22 @@ def watch_clip(domain):
 def parse_subreddit(subreddit, limit):
     sub = reddit_praw.get_subreddit(subreddit)
     return sub.get_hot(limit=limit)
+
+def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
+    # sort: relevance, hot, top, new, comments (default: relevance).
+    # syntax: cloudsearch, lucene, plain (default: lucene)
+    # time_filter – Can be one of: all, day, hour, month, week, year (default: all)
+    subreddit = reddit_praw.get_subreddit(subname)
+
+    found_sub_list = []
+
+    # Returns a generator for submissions that match the search query
+    matching_sub_gen = subreddit.search(searchstring, sort=sort, period="all", limit=limit, **kwargs)
+    # iterate over generator and append found submissions to list
+    for sub in matching_sub_gen:
+        found_sub_list.append(sub)
+    return found_sub_list
+
 
 
 def parse_submissions_for_links(sublist, fromtxt=False):
