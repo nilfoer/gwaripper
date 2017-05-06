@@ -174,6 +174,9 @@ def rip_usr_to_files(sgasm_usr_url):
         erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, False, userrip_string)
         dlcounter = erg[0]
         filestodl = erg[1]
+		# as string is immutable, we cant modify it by passing a reference so we have to return it
+        # and assign it her locally, would be working fine for a mutable type e.g. list
+        userrip_string = erg[2]
     # falls dateien beim user rip geladen wurden wird der string in die textdatei geschrieben
     if dlcounter > 0:
         write_to_txtf("User Rip von " + currentusr + " mit " + str(dlcounter) + " neuen Dateien" + " am " + now +
