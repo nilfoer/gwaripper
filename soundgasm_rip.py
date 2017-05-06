@@ -235,6 +235,7 @@ def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
                                  + riptuple[3] + "\",\n\t" + "URLsg: \"" + riptuple[2] + "\",\n"
 
             # append url to downloaded_urls so we dont miss duplicate urls in the same download session
+            # works since python always passes as reference/name and list is mutable
             downloaded_urls.append(riptuple[3])
 
             filename = re.sub("[^\w\-_\.,\[\] ]", "_", riptuple[0][0:110]) + ".m4a"
@@ -278,6 +279,7 @@ def write_to_txtf(wstring, filename, currentusr):
 
 def load_downloaded_urls(txtfilename, currentusr):
     downloaded_urls = []
+    mypath = os.path.join(ROOTDIR, currentusr)
     if os.path.isfile(os.path.join(mypath, txtfilename)):
         with open(os.path.join(mypath, txtfilename), 'r', encoding="UTF-8") as f:
             read_data = f.read()
