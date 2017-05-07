@@ -76,10 +76,16 @@ def main():
         main()
     elif opt == "6":
         subr = input("Enter subreddit name: \n")
-        limit = input("Enter post-limit: \n")
-        links = parse_submissions_for_links(parse_subreddit(subr, int(limit)))
-        #rip_from_links_reddit(links)
-        #write_last_dltime()
+        limit = input("Enter post-limit:\n\tGood limit for top posts: week -> 25posts, month -> 100posts\n")
+        sort = input("Enter sorting type - 'hot' or 'top':\n")
+        if sort == "top":
+            time = input("Enter time period (week, month, year, all):\n")
+            links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit), time=time))
+        else:
+            # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
+            links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit)), fromtxt=False)
+            write_last_dltime()
+        rip_from_links_reddit(links)
         main()
     elif opt == "7":
         txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
@@ -342,9 +348,25 @@ def watch_clip(domain):
         logger.info("Stopped watching clipboard!")
 
 
-def parse_subreddit(subreddit, limit):
+def parse_subreddit(subreddit, sort, limit, time=None):
     sub = reddit_praw.get_subreddit(subreddit)
-    return sub.get_hot(limit=limit)
+    if sort == "hot":
+        return sub.get_hot(limit=limit)
+    elif sort == "top":
+        if time == "all":
+            return sub.get_top_from_all(limit=limit)
+        elif time == "year":
+            return sub.get_top_from_year(limit=limit)
+        elif time == "month":
+            return sub.get_top_from_month(limit=limit)
+        elif time == "week":
+            return sub.get_top_from_week(limit=limit)
+        else:
+            logger.warning("Time must be either 'all', 'year', 'month' or 'week'!")
+            main()
+    else:
+        logger.warning("Sort must be either 'hot' or 'top'!")
+        main()
 
 def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     # sort: relevance, hot, top, new, comments (default: relevance).
@@ -362,8 +384,8 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     return found_sub_list
 
 
-
-def parse_submissions_for_links(sublist, fromtxt=False):
+# deactivted LASTDLTIME check by default
+def parse_submissions_for_links(sublist, fromtxt=True):
     url_list = []
     lastdltime = get_last_dltime()
     for submission in sublist:
