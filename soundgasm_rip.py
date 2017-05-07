@@ -127,6 +127,7 @@ def rip_from_links(sglinks):
     # anzahl eintraege in der liste ergeben anzahl der zu ladenden dateien
     dlcounter = 0
     filestodl = len(sglinkslist)
+    # TODO refactor mb check if user stays the same so we dont have to load dltxt again
     for link in sglinkslist:
         # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
         # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
@@ -166,17 +167,43 @@ def rip_usr_to_files(sgasm_usr_url):
     logger.info("Ripping user %s" % currentusr)
     txtfilename = "sgasm-" + currentusr + "-rip.txt"
     downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
+
     dlcounter = 0
+    skipped_file_counter = 0
+    # keep track if we alrdy warned the user
+    warned = False
+
     filestodl = len(user_files)
     userrip_string = ""
+
     for afile in user_files:
         riptuple = rip_link_furl(afile)
         erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, False, userrip_string)
         dlcounter = erg[0]
+        # filestodl decreased by one if a file gets skipped
+        if erg[1] != filestodl:
+            skipped_file_counter += 1
+        # if the same -> not consecutive -> set to zero
+        else:
+            skipped_file_counter = 0
         filestodl = erg[1]
         # as string is immutable, we cant modify it by passing a reference so we have to return it
         # and assign it her locally, would be working fine for a mutable type e.g. list
         userrip_string = erg[2]
+
+        # since new audios show up on the top on sgasm user page and rip_usr_links() writes them to a list
+        # from top to bottom -> we can assume the first links we dl are the newest posts
+        # -> too many CONSECUTIVE Files already downloaded -> user_rip is probably up-to-date
+        # ask if we should continue for the offchance of having downloaded >15--25 newer consecutive files
+        # but not the old ones (when using single dl)
+        if not warned and skipped_file_counter > 15:
+            option = input("Over 15 consecutive files already had been downloaded. Should we continue?\n"
+                           "y or n?: ")
+            if option == "n":
+                break
+            else:
+                warned = True
+
     # falls dateien beim user rip geladen wurden wird der string in die textdatei geschrieben
     if dlcounter > 0:
         write_to_txtf("User Rip von " + currentusr + " mit " + str(dlcounter) + " neuen Dateien" + " am " + now +
@@ -254,10 +281,10 @@ def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
                               currentusr)
             else:
                 usrrip_string += "\tLocal filename: \"" + filename + "\"\n\t" + ("___" * 30) + "\n\n\n"
-            try:
-                urllib.request.urlretrieve(riptuple[3], os.path.abspath(os.path.join(mypath, filename)))
-            except urllib.request.HTTPError:
-                logger.warning("HTTP Error 404: Not Found: \"%s\"" % riptuple[3])
+            # try:
+            #     urllib.request.urlretrieve(riptuple[3], os.path.abspath(os.path.join(mypath, filename)))
+            # except urllib.request.HTTPError:
+            #     logger.warning("HTTP Error 404: Not Found: \"%s\"" % riptuple[3])
 
             return curfnr, maxfnr, usrrip_string
         else:
@@ -283,7 +310,7 @@ def load_downloaded_urls(txtfilename, currentusr):
     if os.path.isfile(os.path.join(mypath, txtfilename)):
         with open(os.path.join(mypath, txtfilename), 'r', encoding="UTF-8") as f:
             read_data = f.read()
-            urllist = read_data.split("URL: \"")
+            urllist = read_data.split("\n\tURL: \"")
             del urllist[0]
             for url in urllist:
                 downloaded_urls.append(url.split("\"", 1)[0])
