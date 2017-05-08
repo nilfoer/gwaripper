@@ -6,12 +6,22 @@ import time
 import clipwatcher_single
 import praw
 import bs4
-import logging, logging.handlers
+import logging
+import logging.handlers
 import sys
+import configparser
 
-user_agent = "gwaRipper"
-# changed
-reddit_praw = praw.Reddit(user_agent=user_agent)
+# init ConfigParser instance
+config = configparser.ConfigParser()
+# read config file, ConfigParser pretty much behaves like a dict, sections in in ["Reddit"] is a key that holds
+# another dict with keys(USER_AGENT etc.) and values -> nested dict -> access with config["Reddit"]["USER_AGENT"]
+# !! keys in sections are case-insensitive and stored in lowercase
+config.read("config.ini")
+
+# init Reddit instance
+reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
+                          client_secret=config["Reddit"]["CLIENT_SECRET"],
+                          user_agent=config["Reddit"]["USER_AGENT"])
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
 # removed: "[daddy]", 
@@ -23,7 +33,7 @@ ROOTDIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 # old (os.sep, "home", "m", "Dokumente", "test-sg")
 
 # configure logging
-#logfn = time.strftime("%Y-%m-%d.log")
+# logfn = time.strftime("%Y-%m-%d.log")
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -33,7 +43,7 @@ handler.setLevel(logging.DEBUG)
 
 # create a logging format
 formatter = logging.Formatter("%(asctime)-15s - %(name)-9s - %(levelname)-6s - %(message)s")
-#'%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 handler.setFormatter(formatter)
 
 # add the handlers to the logger
@@ -79,8 +89,8 @@ def main():
         limit = input("Enter post-limit:\n\tGood limit for top posts: week -> 25posts, month -> 100posts\n")
         sort = input("Enter sorting type - 'hot' or 'top':\n")
         if sort == "top":
-            time = input("Enter time period (week, month, year, all):\n")
-            links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit), time=time))
+            time_filter = input("Enter time period (week, month, year, all):\n")
+            links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit), time_filter=time_filter))
         else:
             # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
             links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit)), fromtxt=False)
@@ -99,7 +109,7 @@ def main():
         searchstring = input("Enter search string:\n")
         found_subs = search_subreddit(subname, searchstring, limit=limit)
         links = parse_submissions_for_links(found_subs, True)
-        #rip_from_links_reddit(links)
+        # rip_from_links_reddit(links)
         main()
 
 
@@ -113,15 +123,15 @@ def rip_users(sgusr_urls):
 
 def txt_to_list(path, txtfilename):
     with open(os.path.join(path, txtfilename), "r", encoding="UTF-8") as f:
-            llist = f.read().split()
-            return llist
+        llist = f.read().split()
+        return llist
 
 
 def get_sub_from_reddit_urls(urllist):
     sublist = []
     for url in urllist:
         # changed
-        sublist.append(reddit_praw.get_submission(url=url))
+        sublist.append(reddit_praw.submission(url=url))
     return sublist
 
 
@@ -160,7 +170,8 @@ def rip_from_links_reddit(sglinks):
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
         downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
         riptuple = rip_link_furl(link[0])
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True, redditurl=link[1])
+        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True,
+                       redditurl=link[1])
         dlcounter = erg[0]
         filestodl = erg[1]
 
@@ -243,13 +254,15 @@ def rip_link_furl(sgasmurl):
         site.close()
         nhtml = html.split("aria-label=\"title\">")
         title = nhtml[1].split("</div>", 1)[0]
-        #descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
-        descript = nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[1].split("</p>\r\n", 1)[0]
+        # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
+        descript = \
+        nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[1].split(
+            "</p>\r\n", 1)[0]
         urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
 
         return title, descript, sgasmurl, urlm4a
     except urllib.request.HTTPError:
-            logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
+        logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
 
 
 def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
@@ -264,7 +277,8 @@ def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
                 if redditurl is not None:
                     write_to_txtf("\tredditURL: \"" + redditurl + "\",\n", txtfilename, currentusr)
             else:
-                usrrip_string += "\tTitle: " + riptuple[0] + ",\n\t" + "Description: " + riptuple[1] + ",\n\t" + "URL: \"" \
+                usrrip_string += "\tTitle: " + riptuple[0] + ",\n\t" + "Description: " + riptuple[
+                    1] + ",\n\t" + "URL: \"" \
                                  + riptuple[3] + "\",\n\t" + "URLsg: \"" + riptuple[2] + "\",\n"
 
             # append url to downloaded_urls so we dont miss duplicate urls in the same download session
@@ -310,6 +324,7 @@ def write_to_txtf(wstring, filename, currentusr):
     with open(os.path.join(mypath, filename), "a", encoding="UTF-8") as w:
         w.write(wstring)
 
+
 def load_downloaded_urls(txtfilename, currentusr):
     downloaded_urls = []
     mypath = os.path.join(ROOTDIR, currentusr)
@@ -321,6 +336,7 @@ def load_downloaded_urls(txtfilename, currentusr):
             for url in urllist:
                 downloaded_urls.append(url.split("\"", 1)[0])
     return downloaded_urls
+
 
 def check_file_for_dl(m4aurl, downloaded_urls, txtfilename, currentusr):
     """
@@ -348,41 +364,47 @@ def watch_clip(domain):
         logger.info("Stopped watching clipboard!")
 
 
-def parse_subreddit(subreddit, sort, limit, time=None):
-    sub = reddit_praw.get_subreddit(subreddit)
+def parse_subreddit(subreddit, sort, limit, time_filter=None):
+    sub = reddit_praw.subreddit(subreddit)
     if sort == "hot":
-        return sub.get_hot(limit=limit)
+        return sub.hot(limit=limit)
     elif sort == "top":
-        if time == "all":
-            return sub.get_top_from_all(limit=limit)
-        elif time == "year":
-            return sub.get_top_from_year(limit=limit)
-        elif time == "month":
-            return sub.get_top_from_month(limit=limit)
-        elif time == "week":
-            return sub.get_top_from_week(limit=limit)
-        else:
-            logger.warning("Time must be either 'all', 'year', 'month' or 'week'!")
-            main()
+        return sub.top(time_filter=time_filter, limit=limit)
     else:
         logger.warning("Sort must be either 'hot' or 'top'!")
         main()
 
+
 def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     # sort: relevance, hot, top, new, comments (default: relevance).
-    # syntax: cloudsearch, lucene, plain (default: lucene)
+    # syntax: cloudsearch, lucene, plain (default: lucene) in praw4 cloud
     # time_filter – Can be one of: all, day, hour, month, week, year (default: all)
-    subreddit = reddit_praw.get_subreddit(subname)
+    subreddit = reddit_praw.subreddit(subname)
 
     found_sub_list = []
 
     # Returns a generator for submissions that match the search query
-    matching_sub_gen = subreddit.search(searchstring, sort=sort, period="all", limit=limit, **kwargs)
+    # TODO add way to pass kwargs from input or modify val for time_filter
+    matching_sub_gen = subreddit.search(searchstring, sort=sort, time_filter="all", limit=limit,
+                                        syntax="lucene", **kwargs)
     # iterate over generator and append found submissions to list
     for sub in matching_sub_gen:
         found_sub_list.append(sub)
     return found_sub_list
 
+
+# If you have a PRAW object, e.g., Comment, Message, Redditor, or Submission, and you want to see what
+# attributes are available along with their values, use the built-in vars() function of python
+# import pprint
+#
+# # assume you have a Reddit instance bound to variable `reddit`
+# submission = reddit.submission(id='39zje0') # lazy object -> fewer attributes than expected
+# print(submission.title) # to make it non-lazy
+# pprint.pprint(vars(submission))
+# PRAW uses lazy objects so that network requests to Reddit’s API are only issued when information is needed
+# When we try to print its title, additional information is needed, thus a network request is made, and the
+# instances ceases to be lazy. Outputting all the attributes of a lazy object will result in fewer attributes
+# than expected.
 
 # deactivted LASTDLTIME check by default
 def parse_submissions_for_links(sublist, fromtxt=True):
@@ -461,6 +483,7 @@ def check_submission_time(submission, lastdltime):
     else:
         logger.info("Submission is older than lastdltime")
         return False
+
 
 if __name__ == "__main__":
     main()
