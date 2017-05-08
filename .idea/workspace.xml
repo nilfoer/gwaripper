@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="54fb4884-1be8-4844-933b-610dded367da" name="Default" comment="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser">
+    <list default="true" id="54fb4884-1be8-4844-933b-610dded367da" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/soundgasm_rip.py" afterPath="$PROJECT_DIR$/soundgasm_rip.py" />
     </list>
@@ -20,8 +20,8 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-3013">
-              <caret line="283" column="103" lean-forward="true" selection-start-line="283" selection-start-column="103" selection-end-line="283" selection-end-column="103" />
+            <state relative-caret-position="408">
+              <caret line="306" column="83" lean-forward="true" selection-start-line="306" selection-start-column="83" selection-end-line="306" selection-end-column="83" />
               <folding>
                 <element signature="e#11#32#0" expanded="true" />
               </folding>
@@ -35,9 +35,16 @@
     <findStrings>
       <find>dltim</find>
       <find>subredd</find>
+      <find>permalink</find>
+      <find>short_link</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
+    <option name="PREVIOUS_COMMIT_AUTHORS">
+      <list>
+        <option value="m &lt;mafaf@sagfsg.com&gt;" />
+      </list>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="IdeDocumentHistory">
@@ -258,7 +265,14 @@
       <option name="project" value="LOCAL" />
       <updated>1494245235989</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser">
+      <created>1494245942721</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1494245942721</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TodoView" selected-index="4" />
@@ -306,6 +320,10 @@
   <component name="VcsContentAnnotationSettings">
     <option name="myLimit" value="2678400000" />
   </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser" />
+    <option name="LAST_COMMIT_MESSAGE" value="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser" />
+  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
     <watches-manager />
@@ -345,8 +363,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-3013">
-          <caret line="283" column="103" lean-forward="true" selection-start-line="283" selection-start-column="103" selection-end-line="283" selection-end-column="103" />
+        <state relative-caret-position="408">
+          <caret line="306" column="83" lean-forward="true" selection-start-line="306" selection-start-column="83" selection-end-line="306" selection-end-column="83" />
           <folding>
             <element signature="e#11#32#0" expanded="true" />
           </folding>

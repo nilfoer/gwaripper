@@ -107,9 +107,9 @@ def main():
         subname = input("Enter name of subreddit\n")
         limit = input("Enter limit for found submissions, max 1000 forced by Reddit:\n")
         searchstring = input("Enter search string:\n")
-        found_subs = search_subreddit(subname, searchstring, limit=limit)
+        found_subs = search_subreddit(subname, searchstring, limit=int(limit))
         links = parse_submissions_for_links(found_subs, True)
-        # rip_from_links_reddit(links)
+        rip_from_links_reddit(links)
         main()
 
 
@@ -435,10 +435,10 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                             check_new_redditor(link["href"], str(submission.author))
                             uchecked = True
             else:
-                logger.info("No soundgsam link in \"" + submission.short_link + "\"")
+                logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
-                    w.write("<h3><a href=\"" + submission.permalink + "\">" + submission.title + "</a><br/>by " +
+                    w.write("<h3><a href=\"https://reddit.com" + submission.permalink + "\">" + submission.title + "</a><br/>by " +
                             str(submission.author) + "</h3>\n")
     return url_list
 
@@ -460,7 +460,7 @@ def check_submission_banned_tags(submission, keywordlist):
     # returns True if it finds a match
     for keyword in keywordlist:
         if keyword in submission.title.lower():
-            logger.info("Banned keyword in: " + submission.title.lower() + "\n\t slink: " + submission.short_link)
+            logger.info("Banned keyword in: " + submission.title.lower() + "\n\t slink: " + submission.shortlink)
             return True
 
 
