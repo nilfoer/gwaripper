@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="54fb4884-1be8-4844-933b-610dded367da" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/dltxt_to_csv.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/dltxt_to_csv.py" afterPath="$PROJECT_DIR$/dltxt_to_csv.py" />
     </list>
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -20,8 +20,8 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="238">
-              <caret line="428" column="57" lean-forward="false" selection-start-line="428" selection-start-column="54" selection-end-line="428" selection-end-column="57" />
+            <state relative-caret-position="114">
+              <caret line="127" column="0" lean-forward="true" selection-start-line="127" selection-start-column="0" selection-end-line="127" selection-end-column="0" />
               <folding>
                 <element signature="e#11#32#0" expanded="true" />
               </folding>
@@ -32,8 +32,8 @@
       <file leaf-file-name="dltxt_to_csv.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="489">
-              <caret line="100" column="43" lean-forward="false" selection-start-line="100" selection-start-column="43" selection-end-line="100" selection-end-column="43" />
+            <state relative-caret-position="234">
+              <caret line="130" column="11" lean-forward="true" selection-start-line="130" selection-start-column="11" selection-end-line="130" selection-end-column="11" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -57,6 +57,9 @@
       <find>permalink</find>
       <find>short_link</find>
       <find>re.</find>
+      <find>open</find>
+      <find>read</find>
+      <find>utf</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -319,7 +322,14 @@
       <option name="project" value="LOCAL" />
       <updated>1494246752993</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Converter for dltxt to csv">
+      <created>1494257118932</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1494257118932</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TodoView" selected-index="4" />
@@ -370,13 +380,18 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser" />
     <MESSAGE value="Fixed search and use of short_link -&gt; shortlink in PRAW4" />
-    <option name="LAST_COMMIT_MESSAGE" value="Fixed search and use of short_link -&gt; shortlink in PRAW4" />
+    <MESSAGE value="Converter for dltxt to csv" />
+    <option name="LAST_COMMIT_MESSAGE" value="Converter for dltxt to csv" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="5" />
+      <option name="time" value="7" />
     </breakpoint-manager>
-    <watches-manager />
+    <watches-manager>
+      <configuration name="PythonConfigurationType">
+        <watch expression="users_to_parse" />
+      </configuration>
+    </watches-manager>
   </component>
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
@@ -411,10 +426,18 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://C:/python3.5/Lib/encodings/cp1252.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="374">
+          <caret line="22" column="0" lean-forward="false" selection-start-line="22" selection-start-column="0" selection-end-line="22" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="238">
-          <caret line="428" column="57" lean-forward="false" selection-start-line="428" selection-start-column="54" selection-end-line="428" selection-end-column="57" />
+        <state relative-caret-position="114">
+          <caret line="127" column="0" lean-forward="true" selection-start-line="127" selection-start-column="0" selection-end-line="127" selection-end-column="0" />
           <folding>
             <element signature="e#11#32#0" expanded="true" />
           </folding>
@@ -423,8 +446,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="489">
-          <caret line="100" column="43" lean-forward="false" selection-start-line="100" selection-start-column="43" selection-end-line="100" selection-end-column="43" />
+        <state relative-caret-position="234">
+          <caret line="130" column="11" lean-forward="true" selection-start-line="130" selection-start-column="11" selection-end-line="130" selection-end-column="11" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>
