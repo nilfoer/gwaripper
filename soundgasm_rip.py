@@ -145,32 +145,55 @@ class AudioDownload:
         self.title = None
         self.filename_local = None
         self.descr = None
+        # @Temporary
+        # when we got reddit info get sgasm info even if this file was already downloaded b4
+        # then write missing info to df and write selftext to file
+        if reddit_info:
+            logger.info("Filling in missing reddit info: TEMPORARY")
+            self.set_sgasm_info()
+            self.fill_in_missing_reddit()
+            self.write_selftext_file()
 
     def set_sgasm_info(self):
-        logger.info("Getting soundgasm info of: %s" % self.sgasm_url)
-        try:
-            site = urllib.request.urlopen(self.sgasm_url)
-            html = site.read().decode('utf-8')
-            site.close()
-            nhtml = html.split("aria-label=\"title\">")
-            title = nhtml[1].split("</div>", 1)[0]
-            # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
-            descript = \
-                nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[
-                    1].split(
-                    "</p>\r\n", 1)[0]
-            urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
-            # set instance values
-            self.url_to_file = urlm4a
-            self.title = title
-            self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", title[0:110]) + ".m4a"
-            self.descr = descript
-        except urllib.request.HTTPError:
-            logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.sgasm_url)
+        # @Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
+        # in missing information in the df
+        if not self.url_to_file:
+            logger.info("Getting soundgasm info of: %s" % self.sgasm_url)
+            try:
+                site = urllib.request.urlopen(self.sgasm_url)
+                html = site.read().decode('utf-8')
+                site.close()
+                nhtml = html.split("aria-label=\"title\">")
+                title = nhtml[1].split("</div>", 1)[0]
+                # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
+                descript = \
+                    nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[
+                        1].split(
+                        "</p>\r\n", 1)[0]
+                urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
+                # set instance values
+                self.url_to_file = urlm4a
+                self.title = title
+                self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", title[0:110]) + ".m4a"
+                self.descr = descript
+            except urllib.request.HTTPError:
+                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.sgasm_url)
+
+    def fill_in_missing_reddit(self, df):
+        pass
 
     def write_selftext_file(self):
         if self.reddit_info["selftext"]:
-            write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.sgasm_usr)
+            # write_to_txtf uses append mode, but we'd have the selftext several times in the file since
+            # there are reddit posts with multiple sgasm files
+            # write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.sgasm_usr)
+            mypath = os.path.join(ROOTDIR, self.sgasm_usr)
+            if not os.path.exists(mypath):
+                os.makedirs(mypath)
+            # if selftext file doesnt already exists
+            if not os.path.isfile(os.path.join(mypath, self.filename_local + ".txt")):
+                with open(os.path.join(mypath, self.filename_local + ".txt"), "w", encoding="UTF-8") as w:
+                    w.write(self.reddit_info["selftext"])
 
 
 def rip_users(sgusr_urls):
@@ -325,7 +348,6 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
         i = 0
         if os.path.isfile(os.path.join(mypath, filename)):
             if check_direct_url_for_dl(audio_dl.url_to_file, currentusr):
-                # TODO insert URLsg etc.
                 set_missing_values_df(df, audio_dl)
                 logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
                                "--> not renaming --> SKIPPING")
@@ -394,6 +416,8 @@ def set_missing_values_df(dframe, audiodl_obj):
     else:
         logger.warning("Field not set since it wasnt empty when trying to set Local filename "
                        "on row for {}[{}]".format(audiodl_obj.title, index))
+
+
     # also set reddit info if available
     if audiodl_obj.reddit_info:
         if cell_null_bool["redditURL"]:
@@ -448,8 +472,8 @@ def check_direct_url_for_dl(m4aurl, current_usr=None):
     """
     Returns True if file was already downloaded
     :param m4aurl: direct URL to m4a file
-    :param downloaded_urls: list of already downloaded m4a urls
-    :return: True if m4aurl is in downloaded_urls, else False
+    :param current_usr: User when doing full user rip
+    :return: True if m4aurl is in df in col URL, else False
     """
     if current_usr:
         try:
@@ -471,7 +495,6 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # OLD when passing 2pair tuples, unpack tuples in dl_list into two lists
     # url_list, title = zip(*dl_list)
     # filter dupes
-    # TODO doesnt keep order, only relevant for user rip
     unique_urls = set(dl_dict.keys())
     if currentusr:
         try:
@@ -573,7 +596,9 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 # deactivted LASTDLTIME check by default
 def parse_submissions_for_links(sublist, fromtxt=True):
     dl_list = []
-    lastdltime = get_last_dltime()
+    # get new lastdltime from cfg
+    reload_config()
+    lastdltime = config["Time"]["LAST_DL_TIME"]
     for submission in sublist:
         if (not check_submission_banned_tags(submission, KEYWORDLIST) and
                 (fromtxt or check_submission_time(submission, lastdltime))):
@@ -639,15 +664,14 @@ def check_submission_banned_tags(submission, keywordlist):
 
 
 def write_last_dltime():
-    if not os.path.exists(ROOTDIR):
-        os.makedirs(ROOTDIR)
-    with open(os.path.join(ROOTDIR, "LASTDLTIME.TXT"), "w") as w:
-        w.write(str(time.time()))
+    # create dict if it doesnt exist
+    config["Time"] = {"LAST_DL_TIME": str(time.time())}
+    with open("config.ini", "w") as config_file:
+        config.write(config_file)
 
 
-def get_last_dltime():
-    with open(os.path.join(ROOTDIR, "LASTDLTIME.TXT"), "r") as w:
-        return float(w.read())
+def reload_config():
+    config.read("config.ini")
 
 
 def check_submission_time(submission, lastdltime):
