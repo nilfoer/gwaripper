@@ -125,12 +125,37 @@ def main():
         txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
         llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
         links = parse_submissions_for_links(llist, True)
-        rip_from_links_reddit(links)
+        rip_from_links_reddit_t(links)
 
-        filter_alrdy_downloaded(l, "BadGirlUK")
+        #filter_alrdy_downloaded(l, "BadGirlUK")
         main()
 
+class AudioDownload:
+    def __init__(self, sgasm_url, reddit_info=None):
+        self.sgasm_url = sgasm_url
+        self.reddit_info = reddit_info
+        self._set_sgasm_info(self.sgasm_url)
 
+    def _set_sgasm_info(self, sgasmurl):
+        logger.info("Getting soundgasm info of: %s" % sgasmurl)
+        try:
+            site = urllib.request.urlopen(sgasmurl)
+            html = site.read().decode('utf-8')
+            site.close()
+            nhtml = html.split("aria-label=\"title\">")
+            title = nhtml[1].split("</div>", 1)[0]
+            # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
+            descript = \
+                nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[
+                    1].split(
+                    "</p>\r\n", 1)[0]
+            urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
+            # set instance values
+            self.url_to_file = urlm4a
+            self.title = title
+            self.descr = descript
+        except urllib.request.HTTPError:
+            logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
 
 def rip_users(sgusr_urls):
     # trennt user url string an den kommas
@@ -194,24 +219,28 @@ def rip_from_links_reddit(sglinks):
         dlcounter = erg[0]
         filestodl = erg[1]
 
-def rip_from_links_reddit_(sglinks):
-    # anzahl eintraege in der liste ergeben anzahl der zu ladenden dateien
+def rip_from_links_reddit_t(dlinfo_dict):
+    # when assigning instance Attributs of classes like self.url
+    # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
+    # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
+    # could just work with dicts instead since theres no perf loss, but using classes may be easier to
+    # implement new featueres
+
+    #dl_info[riptuple[3]] = riptuple[0:3]
+    # key of dl_info dict are the urls to m4a that are used to identify dupe DLs
+    new_dls = filter_alrdy_downloaded([], dlinfo_dict)
+    filestodl = len(new_dls)
+
     dlcounter = 0
-    filestodl = len(sglinks)
-    for link in sglinks:
-        riptuple = rip_link_furl(link[0]) # TODO
-    for link in sglinks:
+    for link in new_dls:
         # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
         # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
         # wird weiter an / geteilt aber nur ein mal und man hat den username
-        currentusr = link[0].split("/u/", 1)[1].split("/", 1)[0]
+        currentusr = dl_info[link][0].split("/u/", 1)[1].split("/", 1)[0]
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
-        downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
-
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True,
+        erg = rip_file(link, riptuple, txtfilename, currentusr, dlcounter, filestodl, True,
                        redditurl=link[1])
-        dlcounter = erg[0]
-        filestodl = erg[1]
+        dlcounter = erg
 
 
 def rip_usr_to_files(sgasm_usr_url):
@@ -282,25 +311,6 @@ def rip_usr_links(sgasm_usr_url):
     filestodl = len(user_files)
     logger.info("Found " + str(filestodl) + " Files!!")
     return user_files
-
-
-def rip_link_furl(sgasmurl):
-    logger.info("Ripping %s" % sgasmurl)
-    try:
-        site = urllib.request.urlopen(sgasmurl)
-        html = site.read().decode('utf-8')
-        site.close()
-        nhtml = html.split("aria-label=\"title\">")
-        title = nhtml[1].split("</div>", 1)[0]
-        # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
-        descript = \
-            nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[1].split(
-                "</p>\r\n", 1)[0]
-        urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
-
-        return title, descript, sgasmurl, urlm4a
-    except urllib.request.HTTPError:
-        logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
 
 
 def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
@@ -389,11 +399,11 @@ def check_file_for_dl(m4aurl, downloaded_urls):
         return False
 
 
-def filter_alrdy_downloaded(dl_list, currentusr=None):
-    # unpack tuples in dl_list into two lists
-    url_list, title = zip(*dl_list)
+def filter_alrdy_downloaded(dl_list, dl_info, currentusr=None):
+    # OLD when passing 2pair tuples, unpack tuples in dl_list into two lists
+    # url_list, title = zip(*dl_list)
     # filter dupes
-    unique_urls = set(url_list)
+    unique_urls = set(dl_list)
     if currentusr:
         duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URL"].values)
     else:
@@ -401,6 +411,7 @@ def filter_alrdy_downloaded(dl_list, currentusr=None):
         duplicate = unique_urls.intersection(df["URL"].values)
 
     dup_titles = ""
+    # OLD when passing 2pair tuples -> create dict from it, NOW passing ref to dict
     # next -> Retrieve the next item from the iterator by calling its next() method.
     # iterates over list till it finds match, list comprehension would iterate over whole list
     # timeit: 0.4678
@@ -411,9 +422,9 @@ def filter_alrdy_downloaded(dl_list, currentusr=None):
 
     # dl_list is list of 2-tuples (2elements) -> basically key-value-pairs
     # -> turn into dict with dict(), this method(same string concat): 0.4478
-    d = dict(dl_list)
+    # d = dict(dl_list)
     for dup in duplicate:
-        dup_titles += d[dup] + "\n"
+        dup_titles += dl_info[dup][0] + "\n"
 
     logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 
@@ -488,13 +499,14 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 
 # deactivted LASTDLTIME check by default
 def parse_submissions_for_links(sublist, fromtxt=True):
-    url_list = []
+    dl_list = []
     lastdltime = get_last_dltime()
     for submission in sublist:
         if (not check_submission_banned_tags(submission, KEYWORDLIST) and
                 (fromtxt or check_submission_time(submission, lastdltime))):
+            found_urls = []
             if "soundgasm.net" in submission.url:
-                url_list.append((submission.url, str(submission.permalink)))
+                found_urls.append(submission.url)
                 logger.info("Link found in URL of: " + submission.title)
                 check_new_redditor(submission.url, str(submission.author))
             elif (submission.selftext_html is not None) and ("soundgasm.net" in submission.selftext_html):
@@ -509,7 +521,7 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                     usrcheck = re.compile("/u/.+/.+", re.IGNORECASE)
                     if usrcheck.search(link["href"]):
                         # appends href-attribute of tag object link
-                        url_list.append((link["href"], str(submission.permalink)))
+                        found_urls.append(link["href"])
                         logger.info("SGASM link found in text, in submission: " + submission.title)
                         if not uchecked:
                             check_new_redditor(link["href"], str(submission.author))
@@ -521,7 +533,15 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                     w.write(
                         "<h3><a href=\"https://reddit.com" + submission.permalink + "\">" + submission.title + "</a><br/>by " +
                         str(submission.author) + "</h3>\n")
-    return url_list
+            reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
+                           "selftext": submission.selftext, "r_user": submission.author.name,
+                           "created_utc": submission.created_utc, "id": submission.id,
+                           "subreddit": submission.subreddit.display_name, "r_post_url": submission.url}
+            # create AudioDownload from found_urls
+            for url in found_urls:
+                dl_list.append(AudioDownload(url, reddit_info=reddit_info))
+
+    return dl_list
 
 
 def check_new_redditor(url, username):
@@ -529,7 +549,7 @@ def check_new_redditor(url, username):
     filename = "reddit_u_" + username + ".txt"
     # check for reddit_u_USERNAME.txt
     # if os.path.isfile(ROOTDIR, currentusr, #FILENAME)
-    if os.path.exists(os.path.join(ROOTDIR, currentusr)):
+    if os.path.isfile(os.path.join(ROOTDIR, currentusr, filename)):
         return True
     else:
         write_to_txtf(username, filename, currentusr)

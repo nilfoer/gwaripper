@@ -3,9 +3,9 @@
   <component name="ChangeListManager">
     <list default="true" id="54fb4884-1be8-4844-933b-610dded367da" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/dltxt_to_csv.py" afterPath="$PROJECT_DIR$/dltxt_to_csv.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/soundgasm_rip.py" afterPath="$PROJECT_DIR$/soundgasm_rip.py" />
     </list>
+    <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -21,10 +21,26 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="200">
-              <caret line="201" column="48" lean-forward="false" selection-start-line="201" selection-start-column="48" selection-end-line="201" selection-end-column="48" />
+            <state relative-caret-position="260">
+              <caret line="230" column="54" lean-forward="true" selection-start-line="230" selection-start-column="54" selection-end-line="230" selection-end-column="54" />
               <folding>
                 <element signature="e#11#32#0" expanded="true" />
+                <element signature="e#6802#7055#0" expanded="false" />
+                <element signature="e#7098#7223#0" expanded="false" />
+                <element signature="e#7269#7398#0" expanded="false" />
+                <element signature="e#7434#8437#0" expanded="false" />
+                <element signature="e#8510#9336#0" expanded="false" />
+                <element signature="e#10608#12904#0" expanded="false" />
+                <element signature="e#12945#13579#0" expanded="false" />
+                <element signature="e#13726#16393#0" expanded="false" />
+                <element signature="e#16450#16655#0" expanded="false" />
+                <element signature="e#16713#17154#0" expanded="false" />
+                <element signature="e#17209#17521#0" expanded="false" />
+                <element signature="e#17592#19426#0" expanded="false" />
+                <element signature="e#19457#19789#0" expanded="false" />
+                <element signature="e#19859#20127#0" expanded="false" />
+                <element signature="e#20212#20976#0" expanded="false" />
+                <element signature="e#20979#21081#0" expanded="false" />
               </folding>
             </state>
           </provider>
@@ -33,8 +49,8 @@
       <file leaf-file-name="dltxt_to_csv.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1908">
-              <caret line="4" column="64" lean-forward="true" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
+            <state relative-caret-position="34">
+              <caret line="4" column="64" lean-forward="false" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -62,6 +78,8 @@
       <find>read</find>
       <find>utf</find>
       <find>ilter_</find>
+      <find>submi</find>
+      <find>parse</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -101,6 +119,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scratches" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -115,7 +134,6 @@
           </PATH>
         </subPane>
       </pane>
-      <pane id="Scratches" />
       <pane id="Scope" />
     </panes>
   </component>
@@ -302,6 +320,9 @@
   <component name="ShelveChangesManager" show_recycled="false">
     <option name="remove_strategy" value="false" />
   </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
   <component name="TaskManager">
     <task id="LOCAL-00001" summary="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser">
       <created>1494245235989</created>
@@ -338,7 +359,21 @@
       <option name="project" value="LOCAL" />
       <updated>1494283771611</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="Read in df, check for downloaded files working but not replaced in old code">
+      <created>1494293923410</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1494293923410</updated>
+    </task>
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="54fb4884-1be8-4844-933b-610dded367da" name="Default" comment="" />
+      <created>1494323971529</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1494323971529</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TodoView" selected-index="4" />
@@ -349,19 +384,19 @@
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24973656" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
-      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
+      <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Inspection" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
       <window_info id="Hierarchy" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="2" side_tool="false" content_ui="combo" />
+      <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
     </layout>
   </component>
@@ -391,11 +426,12 @@
     <MESSAGE value="Fixed search and use of short_link -&gt; shortlink in PRAW4" />
     <MESSAGE value="Converter for dltxt to csv" />
     <MESSAGE value="Converter for dltxt to csv, working" />
-    <option name="LAST_COMMIT_MESSAGE" value="Converter for dltxt to csv, working" />
+    <MESSAGE value="Read in df, check for downloaded files working but not replaced in old code" />
+    <option name="LAST_COMMIT_MESSAGE" value="Read in df, check for downloaded files working but not replaced in old code" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="12" />
+      <option name="time" value="15" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
@@ -412,24 +448,64 @@
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
             <element signature="e#11#32#0" expanded="true" />
+            <element signature="e#6802#7055#0" expanded="false" />
+            <element signature="e#7098#7223#0" expanded="false" />
+            <element signature="e#7269#7398#0" expanded="false" />
+            <element signature="e#7434#8437#0" expanded="false" />
+            <element signature="e#8510#9336#0" expanded="false" />
+            <element signature="e#10608#12904#0" expanded="false" />
+            <element signature="e#12945#13579#0" expanded="false" />
+            <element signature="e#13726#16393#0" expanded="false" />
+            <element signature="e#16450#16655#0" expanded="false" />
+            <element signature="e#16713#17154#0" expanded="false" />
+            <element signature="e#17209#17521#0" expanded="false" />
+            <element signature="e#17592#19426#0" expanded="false" />
+            <element signature="e#19457#19789#0" expanded="false" />
+            <element signature="e#19859#20127#0" expanded="false" />
+            <element signature="e#20212#20976#0" expanded="false" />
+            <element signature="e#20979#21081#0" expanded="false" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://C:/python3.5/Lib/site-packages/praw/objects.py">
+    <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="197">
-          <caret line="1573" column="18" lean-forward="true" selection-start-line="1573" selection-start-column="18" selection-end-line="1573" selection-end-column="18" />
+        <state relative-caret-position="68">
+          <caret line="4" column="64" lean-forward="true" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
+          <folding>
+            <element signature="e#0#9#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://C:/python3.5/Lib/site-packages/praw/internal.py">
+    <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="350">
-          <caret line="86" column="42" lean-forward="true" selection-start-line="86" selection-start-column="42" selection-end-line="86" selection-end-column="42" />
+        <state relative-caret-position="0">
+          <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding>
+            <element signature="e#11#32#0" expanded="true" />
+            <element signature="e#6802#7055#0" expanded="false" />
+            <element signature="e#7098#7223#0" expanded="false" />
+            <element signature="e#7269#7398#0" expanded="false" />
+            <element signature="e#7434#8437#0" expanded="false" />
+            <element signature="e#8510#9336#0" expanded="false" />
+            <element signature="e#10608#12904#0" expanded="false" />
+            <element signature="e#12945#13579#0" expanded="false" />
+            <element signature="e#13726#16393#0" expanded="false" />
+            <element signature="e#16450#16655#0" expanded="false" />
+            <element signature="e#16713#17154#0" expanded="false" />
+            <element signature="e#17209#17521#0" expanded="false" />
+            <element signature="e#17592#19426#0" expanded="false" />
+            <element signature="e#19457#19789#0" expanded="false" />
+            <element signature="e#19859#20127#0" expanded="false" />
+            <element signature="e#20212#20976#0" expanded="false" />
+            <element signature="e#20979#21081#0" expanded="false" />
+          </folding>
         </state>
       </provider>
     </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/praw/objects.py" />
+    <entry file="file://C:/python3.5/Lib/site-packages/praw/internal.py" />
     <entry file="file://C:/python3.5/Lib/site-packages/praw/__init__.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-466">
@@ -442,26 +518,73 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="374">
           <caret line="22" column="0" lean-forward="false" selection-start-line="22" selection-start-column="0" selection-end-line="22" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1908">
-          <caret line="4" column="64" lean-forward="true" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
+        <state relative-caret-position="34">
+          <caret line="4" column="64" lean-forward="false" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/praw/models/reddit/submission.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="838">
+          <caret line="77" column="23" lean-forward="true" selection-start-line="77" selection-start-column="23" selection-end-line="77" selection-end-column="23" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/praw/reddit.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="407">
+          <caret line="462" column="29" lean-forward="true" selection-start-line="462" selection-start-column="29" selection-end-line="462" selection-end-column="29" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$APPLICATION_HOME_DIR$/helpers/pydev/_pydev_imps/_pydev_execfile.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="289">
+          <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://C:/python3.5/Lib/urllib/request.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="456" column="0" lean-forward="false" selection-start-line="456" selection-start-column="0" selection-end-line="456" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="200">
-          <caret line="201" column="48" lean-forward="false" selection-start-line="201" selection-start-column="48" selection-end-line="201" selection-end-column="48" />
+        <state relative-caret-position="260">
+          <caret line="230" column="54" lean-forward="true" selection-start-line="230" selection-start-column="54" selection-end-line="230" selection-end-column="54" />
           <folding>
             <element signature="e#11#32#0" expanded="true" />
+            <element signature="e#6802#7055#0" expanded="false" />
+            <element signature="e#7098#7223#0" expanded="false" />
+            <element signature="e#7269#7398#0" expanded="false" />
+            <element signature="e#7434#8437#0" expanded="false" />
+            <element signature="e#8510#9336#0" expanded="false" />
+            <element signature="e#10608#12904#0" expanded="false" />
+            <element signature="e#12945#13579#0" expanded="false" />
+            <element signature="e#13726#16393#0" expanded="false" />
+            <element signature="e#16450#16655#0" expanded="false" />
+            <element signature="e#16713#17154#0" expanded="false" />
+            <element signature="e#17209#17521#0" expanded="false" />
+            <element signature="e#17592#19426#0" expanded="false" />
+            <element signature="e#19457#19789#0" expanded="false" />
+            <element signature="e#19859#20127#0" expanded="false" />
+            <element signature="e#20212#20976#0" expanded="false" />
+            <element signature="e#20979#21081#0" expanded="false" />
           </folding>
         </state>
       </provider>
