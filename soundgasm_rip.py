@@ -64,7 +64,10 @@ logger.addHandler(stdohandler)
 
 # load dataframe
 df = pd.read_csv("../test.csv", sep=";", encoding="utf-8", index_col=0)
+# @Temporary
+df["redditTitle"] = None
 grped_df = df.groupby("sgasm_user")
+# TODO write afer finish and reload when starting main again
 
 
 def main():
@@ -138,13 +141,15 @@ class AudioDownload:
         self.sgasm_url = sgasm_url
         self.sgasm_usr = self.sgasm_url.split("/u/", 1)[1].split("/", 1)[0]
         self.reddit_info = reddit_info
-        self._set_sgasm_info(self.sgasm_url)
+        self.url_to_file = None
+        self.title = None
+        self.filename_local = None
+        self.descr = None
 
-    # TODO refactor only check for DL with sgasm url?
-    def _set_sgasm_info(self, sgasmurl):
-        logger.info("Getting soundgasm info of: %s" % sgasmurl)
+    def set_sgasm_info(self):
+        logger.info("Getting soundgasm info of: %s" % self.sgasm_url)
         try:
-            site = urllib.request.urlopen(sgasmurl)
+            site = urllib.request.urlopen(self.sgasm_url)
             html = site.read().decode('utf-8')
             site.close()
             nhtml = html.split("aria-label=\"title\">")
@@ -161,7 +166,7 @@ class AudioDownload:
             self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", title[0:110]) + ".m4a"
             self.descr = descript
         except urllib.request.HTTPError:
-            logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
+            logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.sgasm_url)
 
     def write_selftext_file(self):
         if self.reddit_info["selftext"]:
@@ -221,7 +226,7 @@ def rip_audio_dls(dl_list, current_usr=None):
     # create dict that has direct links to files as keys and AudioDownload instances as values
     dl_dict = {}
     for audio in dl_list:
-        dl_dict[audio.url_to_file] = audio
+        dl_dict[audio.sgasm_url] = audio
 
     # returns list of new downloads, dl_dict still holds all of them
     new_dls = filter_alrdy_downloaded(dl_dict, current_usr)
@@ -231,6 +236,8 @@ def rip_audio_dls(dl_list, current_usr=None):
 
     for url in new_dls:
         audio_dl = dl_dict[url]
+        # get direct url, sgasm title etc.
+        audio_dl.set_sgasm_info()
         # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
         # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
         # wird weiter an / geteilt aber nur ein mal und man hat den username
@@ -317,15 +324,21 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
             os.makedirs(mypath)
         i = 0
         if os.path.isfile(os.path.join(mypath, filename)):
-            logger.info("FILE ALREADY EXISTS - RENAMING:")
-            # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag or the ending is
-            # different (since fname got cut off, so we dont exceed win path limit)
-            # count up i till file doesnt exist anymore
-            while os.path.isfile(os.path.join(mypath, filename)):
-                i += 1
-                filename = audio_dl.filename_local[:-8] + "_" + str(i).zfill(3) + ".m4a"
-            # set filename on AudioDownload instance
-            audio_dl.filename_local = filename
+            if check_direct_url_for_dl(audio_dl.url_to_file, currentusr):
+                # TODO insert URLsg etc.
+                set_missing_values_df(df, audio_dl)
+                logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
+                               "--> not renaming --> SKIPPING")
+            else:
+                logger.info("FILE ALREADY EXISTS - RENAMING:")
+                # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag or the ending is
+                # different (since fname got cut off, so we dont exceed win path limit)
+                # count up i till file doesnt exist anymore
+                while os.path.isfile(os.path.join(mypath, filename)):
+                    i += 1
+                    filename = audio_dl.filename_local[:-8] + "_" + str(i).zfill(3) + ".m4a"
+                # set filename on AudioDownload instance
+                audio_dl.filename_local = filename
 
         logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
 
@@ -342,6 +355,8 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
                                            ("redditURL", audio_dl.reddit_info["permalink"]),
                                            ("redditTitle", audio_dl.reddit_info["title"]), ("end", "")),
                           txtfilename, currentusr)
+            # also write reddit selftext in txtfile with same name as audio
+            audio_dl.write_selftext_file()
         # TODO keep updating txtfile or just use csv?
         elif single and not audio_dl.reddit_info:
             write_to_txtf(gen_dl_txtstring(("Added", time.strftime("%d/%m/%Y %H:%M:%S")), ("Title", audio_dl.title),
@@ -357,6 +372,40 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
     else:
         logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
         return curfnr, usrrip_string
+
+
+def set_missing_values_df(dframe, audiodl_obj):
+    # get index of matching direct url in dframe
+    index = dframe[dframe["URL"] == audiodl_obj.url_to_file].index[0]
+    # fill_dict = {"Local filename": audiodl_obj.filename_local, "URLsg": audiodl_obj.sgasm_url}
+    # dframe.iloc[index, :].fillna(fill_dict, inplace=True)
+    # isnull on row iloc[index] returns Series with True for null values
+    # only np.nan pd.NaT or None are considered null by isnull()
+    cell_null_bool = dframe.iloc[index].isnull()
+    # if field isnull()
+    if cell_null_bool["URLsg"]:
+        # dframe["URLsg"][index] = audiodl_obj.sgasm_url
+        dframe.set_value(index, "URLsg", audiodl_obj.sgasm_url)
+    else:
+        logger.warning("Field not set since it wasnt empty when trying to set "
+                       "URLsg on row[{}] for {}".format(index, audiodl_obj.title))
+    if cell_null_bool["Local_filename"]:
+        dframe.set_value(index, "Local_filename", audiodl_obj.filename_local)
+    else:
+        logger.warning("Field not set since it wasnt empty when trying to set Local filename "
+                       "on row for {}[{}]".format(audiodl_obj.title, index))
+    # also set reddit info if available
+    if audiodl_obj.reddit_info:
+        if cell_null_bool["redditURL"]:
+            dframe.set_value(index, "redditURL", audiodl_obj.reddit_info["permalink"])
+        else:
+            logger.warning("Field not set since it wasnt empty when trying to set redditURL "
+                           "on row for {}[{}]".format(audiodl_obj.title, index))
+        if cell_null_bool["redditTitle"]:
+            dframe.set_value(index, "redditTitle", audiodl_obj.reddit_info["title"])
+        else:
+            logger.warning("Field not set since it wasnt empty when trying to set redditTitle "
+                           "on row for {}[{}]".format(audiodl_obj.title, index))
 
 
 def gen_dl_txtstring(*args):
@@ -395,17 +444,27 @@ def load_downloaded_urls(txtfilename, currentusr):
     return downloaded_urls
 
 
-def check_file_for_dl_user(m4aurl, downloaded_urls):
+def check_direct_url_for_dl(m4aurl, current_usr=None):
     """
     Returns True if file was already downloaded
     :param m4aurl: direct URL to m4a file
     :param downloaded_urls: list of already downloaded m4a urls
     :return: True if m4aurl is in downloaded_urls, else False
     """
-    if m4aurl in downloaded_urls:
-        return True
+    if current_usr:
+        try:
+            if m4aurl in grped_df.get_group(current_usr)["URL"].values:
+                return True
+            else:
+                return False
+        except KeyError:
+            logger.info("User '{}' not yet in databas!".format(current_usr))
+            return False
     else:
-        return False
+        if m4aurl in df["URL"].values:
+            return True
+        else:
+            return False
 
 
 def filter_alrdy_downloaded(dl_dict, currentusr=None):
@@ -416,13 +475,13 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     unique_urls = set(dl_dict.keys())
     if currentusr:
         try:
-            duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URL"].values)
+            duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URLsg"].values)
         except KeyError:
             logger.info("User '{}' not yet in databas!".format(currentusr))
             duplicate = set()
     else:
         # timeit 1000: 0.19
-        duplicate = unique_urls.intersection(df["URL"].values)
+        duplicate = unique_urls.intersection(df["URLsg"].values)
 
     dup_titles = ""
     # OLD when passing 2pair tuples -> create dict from it, NOW passing ref to dict
@@ -438,7 +497,7 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # -> turn into dict with dict(), this method(same string concat): 0.4478
     # d = dict(dl_list)
     for dup in duplicate:
-        dup_titles += dl_dict[dup].title + "\n"
+        dup_titles += " ".join(dl_dict[dup].sgasm_url[24:].split("-")) + "\n"
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 
