@@ -4,6 +4,7 @@
     <list default="true" id="54fb4884-1be8-4844-933b-610dded367da" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/dltxt_to_csv.py" afterPath="$PROJECT_DIR$/dltxt_to_csv.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/soundgasm_rip.py" afterPath="$PROJECT_DIR$/soundgasm_rip.py" />
     </list>
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -17,11 +18,11 @@
   <component name="ExecutionTargetManager" SELECTED_TARGET="default_target" />
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="false">
+      <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="114">
-              <caret line="127" column="0" lean-forward="true" selection-start-line="127" selection-start-column="0" selection-end-line="127" selection-end-column="0" />
+            <state relative-caret-position="200">
+              <caret line="201" column="48" lean-forward="false" selection-start-line="201" selection-start-column="48" selection-end-line="201" selection-end-column="48" />
               <folding>
                 <element signature="e#11#32#0" expanded="true" />
               </folding>
@@ -29,11 +30,11 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="dltxt_to_csv.py" pinned="false" current-in-tab="true">
+      <file leaf-file-name="dltxt_to_csv.py" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="234">
-              <caret line="130" column="11" lean-forward="true" selection-start-line="130" selection-start-column="11" selection-end-line="130" selection-end-column="11" />
+            <state relative-caret-position="-1908">
+              <caret line="4" column="64" lean-forward="true" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -60,6 +61,7 @@
       <find>open</find>
       <find>read</find>
       <find>utf</find>
+      <find>ilter_</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -73,8 +75,8 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/soundgasm_rip.py" />
         <option value="$PROJECT_DIR$/dltxt_to_csv.py" />
+        <option value="$PROJECT_DIR$/soundgasm_rip.py" />
       </list>
     </option>
   </component>
@@ -117,7 +119,7 @@
       <pane id="Scope" />
     </panes>
   </component>
-  <component name="RunManager" selected="Python.dltxt_to_csv">
+  <component name="RunManager" selected="Python.soundgasm_rip">
     <configuration default="false" name="soundgasm_rip" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -292,8 +294,8 @@
     </list>
     <recent_temporary>
       <list size="2">
-        <item index="0" class="java.lang.String" itemvalue="Python.dltxt_to_csv" />
-        <item index="1" class="java.lang.String" itemvalue="Python.soundgasm_rip" />
+        <item index="0" class="java.lang.String" itemvalue="Python.soundgasm_rip" />
+        <item index="1" class="java.lang.String" itemvalue="Python.dltxt_to_csv" />
       </list>
     </recent_temporary>
   </component>
@@ -329,7 +331,14 @@
       <option name="project" value="LOCAL" />
       <updated>1494257118932</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Converter for dltxt to csv, working">
+      <created>1494283771611</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1494283771611</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TodoView" selected-index="4" />
@@ -381,15 +390,18 @@
     <MESSAGE value="Switched to PRAW4, needed client_id and secret which are stored in separate ini and read in by module configparser" />
     <MESSAGE value="Fixed search and use of short_link -&gt; shortlink in PRAW4" />
     <MESSAGE value="Converter for dltxt to csv" />
-    <option name="LAST_COMMIT_MESSAGE" value="Converter for dltxt to csv" />
+    <MESSAGE value="Converter for dltxt to csv, working" />
+    <option name="LAST_COMMIT_MESSAGE" value="Converter for dltxt to csv, working" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="7" />
+      <option name="time" value="12" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
         <watch expression="users_to_parse" />
+        <watch expression="url_list" />
+        <watch expression="result" />
       </configuration>
     </watches-manager>
   </component>
@@ -434,22 +446,22 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
+    <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="114">
-          <caret line="127" column="0" lean-forward="true" selection-start-line="127" selection-start-column="0" selection-end-line="127" selection-end-column="0" />
+        <state relative-caret-position="-1908">
+          <caret line="4" column="64" lean-forward="true" selection-start-line="4" selection-start-column="64" selection-end-line="4" selection-end-column="64" />
           <folding>
-            <element signature="e#11#32#0" expanded="true" />
+            <element signature="e#0#9#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
+    <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="234">
-          <caret line="130" column="11" lean-forward="true" selection-start-line="130" selection-start-column="11" selection-end-line="130" selection-end-column="11" />
+        <state relative-caret-position="200">
+          <caret line="201" column="48" lean-forward="false" selection-start-line="201" selection-start-column="48" selection-end-line="201" selection-end-column="48" />
           <folding>
-            <element signature="e#0#9#0" expanded="true" />
+            <element signature="e#11#32#0" expanded="true" />
           </folding>
         </state>
       </provider>

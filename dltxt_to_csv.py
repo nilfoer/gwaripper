@@ -2,7 +2,7 @@ import os
 import re
 import pandas as pd
 
-ROOT_DIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir, os.pardir))
+ROOT_DIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 
 # using re.compile() and saving the resulting regular expression object for reuse is more efficient when
 # the expression will be used several times in a single program

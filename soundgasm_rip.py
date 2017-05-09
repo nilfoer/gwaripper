@@ -10,6 +10,8 @@ import logging
 import logging.handlers
 import sys
 import configparser
+import pandas as pd
+import timeit
 
 # init ConfigParser instance
 config = configparser.ConfigParser()
@@ -58,13 +60,17 @@ formatterstdo = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "
 stdohandler.setFormatter(formatterstdo)
 logger.addHandler(stdohandler)
 
+# load dataframe
+df = pd.read_csv("../test.csv", sep=";", encoding="utf-8", index_col=0)
+grped_df = df.groupby("sgasm_user")
+
 
 def main():
     opt = input("Was moechten Sie tun?\n\n 1. Rip/Update Users\n 2. Rip from single links\n "
                 "3. Rip single links from a txt file\n 4. Watch clipboard for sgasm links\n "
                 "5. Watch clipboard for reddit links\n 6. Download sgasm posts from subreddit\n "
                 "7. Rip single reddit links from a txt file\n 8. Subreddit durchsuchen und Ergebnisse "
-                "herunterladen\n")
+                "herunterladen\n 9. Test\n")
     if opt == "1":
         usrurls = input("Enter soundgasm User URLs separated by \",\" - no spaces\n")
         rip_users(usrurls)
@@ -111,6 +117,19 @@ def main():
         links = parse_submissions_for_links(found_subs, True)
         rip_from_links_reddit(links)
         main()
+    elif opt == "9":
+        # print(timeit.timeit('filter_alrdy_downloaded(l)',
+        #               setup="from __main__ import filter_alrdy_downloaded, txt_to_list, ROOTDIR, l; import os",
+        #               number=10000))
+        # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
+        txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
+        llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
+        links = parse_submissions_for_links(llist, True)
+        rip_from_links_reddit(links)
+
+        filter_alrdy_downloaded(l, "BadGirlUK")
+        main()
+
 
 
 def rip_users(sgusr_urls):
@@ -170,6 +189,25 @@ def rip_from_links_reddit(sglinks):
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
         downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
         riptuple = rip_link_furl(link[0])
+        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True,
+                       redditurl=link[1])
+        dlcounter = erg[0]
+        filestodl = erg[1]
+
+def rip_from_links_reddit_(sglinks):
+    # anzahl eintraege in der liste ergeben anzahl der zu ladenden dateien
+    dlcounter = 0
+    filestodl = len(sglinks)
+    for link in sglinks:
+        riptuple = rip_link_furl(link[0]) # TODO
+    for link in sglinks:
+        # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
+        # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
+        # wird weiter an / geteilt aber nur ein mal und man hat den username
+        currentusr = link[0].split("/u/", 1)[1].split("/", 1)[0]
+        txtfilename = "sgasm-" + currentusr + "-rip.txt"
+        downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
+
         erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True,
                        redditurl=link[1])
         dlcounter = erg[0]
@@ -256,8 +294,8 @@ def rip_link_furl(sgasmurl):
         title = nhtml[1].split("</div>", 1)[0]
         # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
         descript = \
-        nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[1].split(
-            "</p>\r\n", 1)[0]
+            nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[1].split(
+                "</p>\r\n", 1)[0]
         urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
 
         return title, descript, sgasmurl, urlm4a
@@ -268,7 +306,7 @@ def rip_link_furl(sgasmurl):
 def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
              downloaded_urls, single=True, usrrip_string="", redditurl=""):
     if riptuple is not None:
-        if not check_file_for_dl(riptuple[3], downloaded_urls, txtfilename, currentusr):
+        if not check_file_for_dl(riptuple[3], downloaded_urls):
             curfnr += 1
             if single:
                 write_to_txtf("\tAdded: " + time.strftime("%d/%m/%Y %H:%M:%S") + "\n\n\tTitle: " +
@@ -338,19 +376,61 @@ def load_downloaded_urls(txtfilename, currentusr):
     return downloaded_urls
 
 
-def check_file_for_dl(m4aurl, downloaded_urls, txtfilename, currentusr):
+def check_file_for_dl(m4aurl, downloaded_urls):
     """
     Returns True if file was already downloaded
     :param m4aurl: direct URL to m4a file
     :param downloaded_urls: list of already downloaded m4a urls
-    :param txtfilename: name of txtfile
-    :param currentusr: name of curren user
     :return: True if m4aurl is in downloaded_urls, else False
     """
     if m4aurl in downloaded_urls:
         return True
     else:
         return False
+
+
+def filter_alrdy_downloaded(dl_list, currentusr=None):
+    # unpack tuples in dl_list into two lists
+    url_list, title = zip(*dl_list)
+    # filter dupes
+    unique_urls = set(url_list)
+    if currentusr:
+        duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URL"].values)
+    else:
+        # timeit 1000: 0.19
+        duplicate = unique_urls.intersection(df["URL"].values)
+
+    dup_titles = ""
+    # next -> Retrieve the next item from the iterator by calling its next() method.
+    # iterates over list till it finds match, list comprehension would iterate over whole list
+    # timeit: 0.4678
+    # for a, b in dl_list -> iterates over dl_list unpacking the tuples
+    # returns b if a == url
+    # for url in duplicate:
+    #     dup_titles += next(b for a, b in dl_list if a == url) + "\n"
+
+    # dl_list is list of 2-tuples (2elements) -> basically key-value-pairs
+    # -> turn into dict with dict(), this method(same string concat): 0.4478
+    d = dict(dl_list)
+    for dup in duplicate:
+        dup_titles += d[dup] + "\n"
+
+    logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
+
+    # set.symmetric_difference()
+    # Return a new set with elements in either the set or other but not both.
+    # -> duplicates will get removed from unique_urls
+    result = list(unique_urls.symmetric_difference(duplicate))
+    # str.contains accepts regex patter, join url strings with | -> htt..m4a|htt...m4a etc
+    # returns Series/array of boolean values, .any() True if any element is True
+    # timeit 1000: 1.129
+    # mask = df["URL"].str.contains('|'.join(url_list))
+    # isin also works
+    # timeit 1000: 0.29
+    #mask = df["URL"].isin(unique_urls)
+    # print(df["URL"][mask])
+
+    return result
 
 
 def watch_clip(domain):
@@ -438,8 +518,9 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                 logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
-                    w.write("<h3><a href=\"https://reddit.com" + submission.permalink + "\">" + submission.title + "</a><br/>by " +
-                            str(submission.author) + "</h3>\n")
+                    w.write(
+                        "<h3><a href=\"https://reddit.com" + submission.permalink + "\">" + submission.title + "</a><br/>by " +
+                        str(submission.author) + "</h3>\n")
     return url_list
 
 
