@@ -26,9 +26,10 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
                           user_agent=config["Reddit"]["USER_AGENT"])
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
-# removed: "[daddy]", 
-KEYWORDLIST = ["[m4", "[m]", "[request]", "[script offer]", "[cbt]",
-               "[ce]", "[cei]", "[cuck]", "[f4f]"]
+# removed: "[daddy]",
+# load from config ini, split at comma, strip whitespaces
+KEYWORDLIST = [x.strip() for x in config["Settings"]["tag_filter"].split(",")]
+
 # path to dir where the soundfiles will be stored in subfolders
 ROOTDIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 # old os.path.join("N:", os.sep, "_archive", "test", "soundgasmNET")
@@ -67,6 +68,8 @@ df = pd.read_csv("../test.csv", sep=";", encoding="utf-8", index_col=0)
 # @Temporary
 df["redditTitle"] = df["created_utc"] = df["redditID"] = df["subredditName"] = df["rPostUrl"] = None
 grped_df = df.groupby("sgasm_user")
+
+
 # TODO write afer finish and reload when starting main again
 
 
@@ -120,7 +123,22 @@ def main():
         subname = input("Enter name of subreddit\n")
         limit = input("Enter limit for found submissions, max 1000 forced by Reddit:\n")
         searchstring = input("Enter search string:\n")
-        found_subs = search_subreddit(subname, searchstring, limit=int(limit))
+
+        kw_inp = input("Enter additional kwargs to search func e.g. 'time_filter' (all, year, month..)\n"
+                       "(kwarg,value;kwarg,value;..): ")
+        kwargs = {}
+        for kw in kw_inp.split(";"):
+            kw_v = kw.split(",")
+            kwargs[kw_v[0]] = kw_v[1]
+
+        # if i have a function def test(pospar, kwarg1=Default, kwarg2=Default2)
+        # and i pass a dict with kwargs=  {"kwarg1": "value", "kwarg2": "passed"} to func with test(0, **kwargs)
+        # then i get (when test prints the kwarg1 and 2): "value" "passed"
+        # if theres one func before that def t(n, **kwargs) that just calls test(0, **kwargs)
+        # we get the same result so the kwargs were pass through that function to the other
+        # also works when def t(n, kwargs) and t is called like t(0, kwargs) -> WITHOUT ** otherwise error
+        # but then kwargs is a positional param unless you assign a def value like t(n, kwargs={})
+        found_subs = search_subreddit(subname, searchstring, limit=int(limit), **kwargs)
         adl_list = parse_submissions_for_links(found_subs, True)
         rip_audio_dls(adl_list)
         main()
@@ -234,7 +252,7 @@ def rip_audio_dls(dl_list, current_usr=None):
     # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
     # implement new featueres
-    # TODO refactor better way? or just check for dl with other url/fname etc -> sgasm_url /u/USER/Title.. better
+
     # create dict that has direct links to files as keys and AudioDownload instances as values
     dl_dict = {}
     for audio in dl_list:
@@ -565,10 +583,8 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     subreddit = reddit_praw.subreddit(subname)
 
     found_sub_list = []
-
     # Returns a generator for submissions that match the search query
-    # TODO add way to pass kwargs from input or modify val for time_filter
-    matching_sub_gen = subreddit.search(searchstring, sort=sort, time_filter="all", limit=limit,
+    matching_sub_gen = subreddit.search(searchstring, sort=sort, limit=limit,
                                         syntax="lucene", **kwargs)
     # iterate over generator and append found submissions to list
     for sub in matching_sub_gen:
