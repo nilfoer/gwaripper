@@ -34,6 +34,8 @@ ROOTDIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 # old os.path.join("N:", os.sep, "_archive", "test", "soundgasmNET")
 # old (os.sep, "home", "m", "Dokumente", "test-sg")
 
+DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
+
 # configure logging
 # logfn = time.strftime("%Y-%m-%d.log")
 logger = logging.getLogger(__name__)
@@ -124,18 +126,19 @@ def main():
         # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
         txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
         llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
-        links = parse_submissions_for_links(llist, True)
-        rip_from_links_reddit_t(links)
-
+        dl_list = parse_submissions_for_links(llist, True)
+        rip_audio_dls(dl_list)
         #filter_alrdy_downloaded(l, "BadGirlUK")
         main()
 
 class AudioDownload:
     def __init__(self, sgasm_url, reddit_info=None):
         self.sgasm_url = sgasm_url
+        self.sgasm_usr = self.sgasm_url.split("/u/", 1)[1].split("/", 1)[0]
         self.reddit_info = reddit_info
         self._set_sgasm_info(self.sgasm_url)
 
+    # TODO refactor only check for DL with sgasm url?
     def _set_sgasm_info(self, sgasmurl):
         logger.info("Getting soundgasm info of: %s" % sgasmurl)
         try:
@@ -153,9 +156,14 @@ class AudioDownload:
             # set instance values
             self.url_to_file = urlm4a
             self.title = title
+            self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", title[0:110]) + ".m4a"
             self.descr = descript
         except urllib.request.HTTPError:
             logger.warning("HTTP Error 404: Not Found: \"%s\"" % sgasmurl)
+
+    def write_selftext_file(self):
+        if self.reddit_info["selftext"]:
+            write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.sgasm_usr)
 
 def rip_users(sgusr_urls):
     # trennt user url string an den kommas
@@ -219,28 +227,38 @@ def rip_from_links_reddit(sglinks):
         dlcounter = erg[0]
         filestodl = erg[1]
 
-def rip_from_links_reddit_t(dlinfo_dict):
+def rip_audio_dls(dl_list):
+    userrip_str = ""
     # when assigning instance Attributs of classes like self.url
     # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
     # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
     # implement new featueres
+    # TODO refactor better way? or just check for dl with other url/fname etc
+    # create dict that has direct links to files as keys and AudioDownload instances as values
+    dl_dict = {}
+    for audio in dl_list:
+        dl_dict[audio.url_to_file] = audio
 
-    #dl_info[riptuple[3]] = riptuple[0:3]
-    # key of dl_info dict are the urls to m4a that are used to identify dupe DLs
-    new_dls = filter_alrdy_downloaded([], dlinfo_dict)
+    # returns list of new downloads, dl_dict still holds all of them
+    new_dls = filter_alrdy_downloaded(dl_dict)
+
     filestodl = len(new_dls)
-
     dlcounter = 0
-    for link in new_dls:
+
+    for url in new_dls:
+        audio_dl = dl_dict[url]
         # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
         # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
         # wird weiter an / geteilt aber nur ein mal und man hat den username
-        currentusr = dl_info[link][0].split("/u/", 1)[1].split("/", 1)[0]
+        currentusr = audio_dl.sgasm_usr
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
-        erg = rip_file(link, riptuple, txtfilename, currentusr, dlcounter, filestodl, True,
-                       redditurl=link[1])
-        dlcounter = erg
+        erg = rip_file(audio_dl, txtfilename, currentusr, dlcounter, filestodl, single=True)
+        dlcounter = erg[0]
+        userrip_str = erg[1]
+
+    return userrip_str
+
 
 
 def rip_usr_to_files(sgasm_usr_url):
@@ -313,56 +331,72 @@ def rip_usr_links(sgasm_usr_url):
     return user_files
 
 
-def rip_file(riptuple, txtfilename, currentusr, curfnr, maxfnr,
-             downloaded_urls, single=True, usrrip_string="", redditurl=""):
-    if riptuple is not None:
-        if not check_file_for_dl(riptuple[3], downloaded_urls):
-            curfnr += 1
-            if single:
-                write_to_txtf("\tAdded: " + time.strftime("%d/%m/%Y %H:%M:%S") + "\n\n\tTitle: " +
-                              riptuple[0] + ",\n\tDescription: " + riptuple[1] + ",\n\tURL: \"" +
-                              riptuple[3] + "\",\n\tURLsg: \"" + riptuple[2] + "\",\n", txtfilename, currentusr)
-                if redditurl is not None:
-                    write_to_txtf("\tredditURL: \"" + redditurl + "\",\n", txtfilename, currentusr)
-            else:
-                usrrip_string += "\tTitle: " + riptuple[0] + ",\n\t" + "Description: " + riptuple[
-                    1] + ",\n\t" + "URL: \"" \
-                                 + riptuple[3] + "\",\n\t" + "URLsg: \"" + riptuple[2] + "\",\n"
+def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usrrip_string=""):
+    if audio_dl.url_to_file is not None:
+        curfnr += 1
 
-            # append url to downloaded_urls so we dont miss duplicate urls in the same download session
-            # works since python always passes as reference/name and list is mutable
-            downloaded_urls.append(riptuple[3])
-
-            filename = re.sub("[^\w\-_\.,\[\] ]", "_", riptuple[0][0:110]) + ".m4a"
-            mypath = os.path.join(ROOTDIR, currentusr)
-            if not os.path.exists(mypath):
-                os.makedirs(mypath)
-            i = 0
-            if os.path.isfile(os.path.join(mypath, filename)):
-                logger.info("FILE ALREADY EXISTS - RENAMING:")
+        filename = audio_dl.filename_local
+        mypath = os.path.join(ROOTDIR, currentusr)
+        if not os.path.exists(mypath):
+            os.makedirs(mypath)
+        i = 0
+        if os.path.isfile(os.path.join(mypath, filename)):
+            logger.info("FILE ALREADY EXISTS - RENAMING:")
+            # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag or the ending is
+            # different (since fname got cut off, so we dont exceed win path limit)
+            # count up i till file doesnt exist anymore, assign to filename after so we dont have to access
+            # filename_local and use regex to compile new name every time
             while os.path.isfile(os.path.join(mypath, filename)):
                 i += 1
-                filename = re.sub("[^\w\-_\.,\[\] ]", "_", riptuple[0][0:106]) + "_" + str(i).zfill(3) + ".m4a"
-            logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
-            if single:
-                write_to_txtf("\tLocal filename: \"" + filename + "\"\n\t" + ("___" * 30) + "\n\n\n", txtfilename,
-                              currentusr)
-            else:
-                usrrip_string += "\tLocal filename: \"" + filename + "\"\n\t" + ("___" * 30) + "\n\n\n"
-            # try:
-            #     urllib.request.urlretrieve(riptuple[3], os.path.abspath(os.path.join(mypath, filename)))
-            # except urllib.request.HTTPError:
-            #     logger.warning("HTTP Error 404: Not Found: \"%s\"" % riptuple[3])
+            filename = audio_dl.filename_local[:-8] + "_" + str(i).zfill(3) + ".m4a"
+            # set filename on AudioDownload instance
+            audio_dl.filename_local = filename
 
-            return curfnr, maxfnr, usrrip_string
+        # single -> no user rip
+        if single and audio_dl.reddit_info:
+            write_to_txtf(gen_dl_txtstring(("Added", time.strftime("%d/%m/%Y %H:%M:%S")), ("Title", audio_dl.title),
+                                           ("Description", audio_dl.descr), ("URL", audio_dl.url_to_file),
+                                           ("URLsg", audio_dl.sgasm_url), ("Local filename", filename),
+                                           ("redditURL", audio_dl.reddit_info["permalink"]),
+                                           ("redditTitle", audio_dl.reddit_info["title"]), ("end", "")),
+                          txtfilename, currentusr)
+        # TODO keep updating txtfile or just use csv?
+        elif single and not audio_dl.reddit_info:
+            write_to_txtf(gen_dl_txtstring(("Added", time.strftime("%d/%m/%Y %H:%M:%S")), ("Title", audio_dl.title),
+                                           ("Description", audio_dl.descr), ("URL", audio_dl.url_to_file),
+                                           ("URLsg", audio_dl.sgasm_url), ("Local filename", filename),
+                                           ("end", "")), txtfilename, currentusr)
         else:
-            maxfnr -= 1
-            logger.info("File already downloaded - Skipping: " + riptuple[0])
-            return curfnr, maxfnr, usrrip_string
+            usrrip_string += gen_dl_txtstring(("Title", audio_dl.title), ("Description", audio_dl.descr),
+                                              ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
+                                              ("Local filename", filename), ("end", ""))
+
+
+        logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
+
+        try:
+            urllib.request.urlretrieve(audio_dl.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
+        except urllib.request.HTTPError:
+            logger.warning("HTTP Error 404: Not Found: \"%s\"" % audio_dl.url_to_file)
+
+        return curfnr, usrrip_string
     else:
-        maxfnr -= 1
         logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
-        return curfnr, maxfnr, usrrip_string
+        return curfnr, usrrip_string
+
+def gen_dl_txtstring(*args):
+    # args is tuple of tuples
+    result_string = ""
+    for name, value in args:
+        if name == "end":
+            result_string += DLTXT_ENTRY_END
+        elif name == "Added":
+            result_string += "\t{}: {},\n\n".format(name, value)
+        elif ("http" in value) or (value.endswith(".m4a")):
+            result_string += "\t{}: \"{}\",\n\n".format(name, value)
+        else:
+            result_string += "\t{}: {},\n".format(name, value)
+    return result_string
 
 
 def write_to_txtf(wstring, filename, currentusr):
@@ -399,11 +433,11 @@ def check_file_for_dl(m4aurl, downloaded_urls):
         return False
 
 
-def filter_alrdy_downloaded(dl_list, dl_info, currentusr=None):
+def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # OLD when passing 2pair tuples, unpack tuples in dl_list into two lists
     # url_list, title = zip(*dl_list)
     # filter dupes
-    unique_urls = set(dl_list)
+    unique_urls = set(dl_dict.keys())
     if currentusr:
         duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URL"].values)
     else:
@@ -424,7 +458,7 @@ def filter_alrdy_downloaded(dl_list, dl_info, currentusr=None):
     # -> turn into dict with dict(), this method(same string concat): 0.4478
     # d = dict(dl_list)
     for dup in duplicate:
-        dup_titles += dl_info[dup][0] + "\n"
+        dup_titles += dl_dict[dup].title + "\n"
 
     logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 
