@@ -65,7 +65,7 @@ logger.addHandler(stdohandler)
 # load dataframe
 df = pd.read_csv("../test.csv", sep=";", encoding="utf-8", index_col=0)
 # @Temporary
-df["redditTitle"] = None
+df["redditTitle"] = df["created_utc"] = df["redditID"] = df["subredditName"] = df["rPostUrl"] = None
 grped_df = df.groupby("sgasm_user")
 # TODO write afer finish and reload when starting main again
 
@@ -145,14 +145,6 @@ class AudioDownload:
         self.title = None
         self.filename_local = None
         self.descr = None
-        # @Temporary
-        # when we got reddit info get sgasm info even if this file was already downloaded b4
-        # then write missing info to df and write selftext to file
-        if reddit_info:
-            logger.info("Filling in missing reddit info: TEMPORARY")
-            self.set_sgasm_info()
-            self.fill_in_missing_reddit()
-            self.write_selftext_file()
 
     def set_sgasm_info(self):
         # @Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
@@ -178,9 +170,6 @@ class AudioDownload:
                 self.descr = descript
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.sgasm_url)
-
-    def fill_in_missing_reddit(self, df):
-        pass
 
     def write_selftext_file(self):
         if self.reddit_info["selftext"]:
@@ -417,19 +406,18 @@ def set_missing_values_df(dframe, audiodl_obj):
         logger.warning("Field not set since it wasnt empty when trying to set Local filename "
                        "on row for {}[{}]".format(audiodl_obj.title, index))
 
-
     # also set reddit info if available
     if audiodl_obj.reddit_info:
-        if cell_null_bool["redditURL"]:
-            dframe.set_value(index, "redditURL", audiodl_obj.reddit_info["permalink"])
-        else:
-            logger.warning("Field not set since it wasnt empty when trying to set redditURL "
-                           "on row for {}[{}]".format(audiodl_obj.title, index))
-        if cell_null_bool["redditTitle"]:
-            dframe.set_value(index, "redditTitle", audiodl_obj.reddit_info["title"])
-        else:
-            logger.warning("Field not set since it wasnt empty when trying to set redditTitle "
-                           "on row for {}[{}]".format(audiodl_obj.title, index))
+        set_helper = (("redditTitle", "title"), ("redditURL", "permalink"), ("reddit_user", "r_user"),
+                      ("created_utc", "created_utc"), ("redditID", "id"), ("subredditName", "subreddit"),
+                      ("rPostUrl", "r_post_url"))
+        # iterate over set_helper unpacking col name and dictkey of audiodl_obj.reddit_info
+        for col, dictkey in set_helper:
+            if cell_null_bool[col]:
+                dframe.set_value(index, col, audiodl_obj.reddit_info[dictkey])
+            else:
+                logger.warning("Field not set since it wasnt empty when trying to set {} "
+                               "on row for {}[{}]".format(col, audiodl_obj.title, index))
 
 
 def gen_dl_txtstring(*args):
@@ -521,6 +509,14 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # d = dict(dl_list)
     for dup in duplicate:
         dup_titles += " ".join(dl_dict[dup].sgasm_url[24:].split("-")) + "\n"
+        # @Temporary
+        # when we got reddit info get sgasm info even if this file was already downloaded b4
+        # then write missing info to df and write selftext to file
+        if dl_dict[dup].reddit_info:
+            logger.info("Filling in missing reddit info: TEMPORARY")
+            dl_dict[dup].set_sgasm_info()
+            set_missing_values_df(df, dl_dict[dup])
+            dl_dict[dup].write_selftext_file()
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 

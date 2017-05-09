@@ -21,36 +21,36 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-1293">
-              <caret line="182" column="12" lean-forward="false" selection-start-line="182" selection-start-column="12" selection-end-line="182" selection-end-column="12" />
+            <state relative-caret-position="379">
+              <caret line="518" column="0" lean-forward="false" selection-start-line="518" selection-start-column="0" selection-end-line="518" selection-end-column="0" />
               <folding>
-                <element signature="e#2468#5635#0" expanded="false" />
-                <element signature="e#8869#8994#0" expanded="false" />
-                <element signature="e#9040#9169#0" expanded="false" />
-                <element signature="e#9281#9395#0" expanded="false" />
-                <element signature="e#9448#11617#0" expanded="false" />
-                <element signature="e#13409#14043#0" expanded="false" />
-                <element signature="e#14146#17582#0" expanded="false" />
-                <element signature="e#19490#19981#0" expanded="false" />
-                <element signature="e#20038#20243#0" expanded="false" />
-                <element signature="e#20301#20742#0" expanded="false" />
-                <element signature="e#20804#21438#0" expanded="false" />
-                <element signature="e#21500#23549#0" expanded="false" />
-                <element signature="e#23580#23912#0" expanded="false" />
-                <element signature="e#23982#24250#0" expanded="false" />
-                <element signature="e#24335#25099#0" expanded="false" />
-                <element signature="e#26005#28705#0" expanded="false" />
-                <element signature="e#28751#29117#0" expanded="false" />
+                <element signature="e#8204#8457#0" expanded="false" />
+                <element signature="e#8500#8625#0" expanded="false" />
+                <element signature="e#8671#8800#0" expanded="false" />
+                <element signature="e#8912#9026#0" expanded="false" />
+                <element signature="e#9079#11248#0" expanded="false" />
+                <element signature="e#11292#12058#0" expanded="false" />
+                <element signature="e#13040#13674#0" expanded="false" />
+                <element signature="e#13777#17213#0" expanded="false" />
+                <element signature="e#17268#19155#0" expanded="false" />
+                <element signature="e#19191#19682#0" expanded="false" />
+                <element signature="e#19739#19944#0" expanded="false" />
+                <element signature="e#20002#20443#0" expanded="false" />
+                <element signature="e#20505#21139#0" expanded="false" />
+                <element signature="e#23709#24041#0" expanded="false" />
+                <element signature="e#24111#24379#0" expanded="false" />
+                <element signature="e#24464#25228#0" expanded="false" />
+                <element signature="e#28880#29246#0" expanded="false" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="configparser.py" pinned="false" current-in-tab="false">
-        <entry file="file://C:/python3.5/Lib/configparser.py">
+      <file leaf-file-name="base.py" pinned="false" current-in-tab="false">
+        <entry file="file://C:/python3.5/Lib/site-packages/pandas/indexes/base.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="175">
-              <caret line="955" column="0" lean-forward="false" selection-start-line="955" selection-start-column="0" selection-end-line="955" selection-end-column="0" />
+            <state relative-caret-position="328">
+              <caret line="1422" column="31" lean-forward="true" selection-start-line="1422" selection-start-column="31" selection-end-line="1422" selection-end-column="31" />
               <folding />
             </state>
           </provider>
@@ -410,13 +410,20 @@
       <option name="project" value="LOCAL" />
       <updated>1494360580682</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="Started implementing automatically filling in missing reddit info">
+      <created>1494363543279</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1494363543279</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TodoView" selected-index="4" />
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
-    <editor active="true" />
+    <editor active="false" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24973656" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -428,7 +435,7 @@
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -468,25 +475,34 @@
     <MESSAGE value="Modified rip_file and rip_from_.. to work with new dlcheck and class AudioDownload&#10;&#10;not working" />
     <MESSAGE value="Single rip working, user rip working mostly,  still not updating pandas/csv" />
     <MESSAGE value="Checking sgasm_url instead of direct url now, when file exists check direct urls first and if match is found skip it and write missing data (URLsg, redditURL, etc.) to df" />
-    <option name="LAST_COMMIT_MESSAGE" value="Checking sgasm_url instead of direct url now, when file exists check direct urls first and if match is found skip it and write missing data (URLsg, redditURL, etc.) to df" />
+    <MESSAGE value="Started implementing automatically filling in missing reddit info" />
+    <option name="LAST_COMMIT_MESSAGE" value="Started implementing automatically filling in missing reddit info" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
-      <option name="time" value="37" />
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/soundgasm_rip.py</url>
+          <line>173</line>
+          <option name="timeStamp" value="39" />
+        </line-breakpoint>
+      </breakpoints>
+      <option name="time" value="40" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
-        <watch expression="users_to_parse" />
-        <watch expression="url_list" />
-        <watch expression="result" />
-        <watch expression="cell_null_bool" />
         <watch expression="df.URL[153]" language="Python" />
         <watch expression="df[&quot;URLsg&quot;][153]" language="Python" />
         <watch expression="df[&quot;Local_filename&quot;][153]" language="Python" />
         <watch expression="df[&quot;redditURL&quot;][0]" language="Python" />
         <watch expression="df[&quot;redditTitle&quot;][0]" language="Python" />
+        <watch expression="df[&quot;reddit_user&quot;][0]" language="Python" />
+        <watch expression="df[&quot;created_utc&quot;][0]" language="Python" />
+        <watch expression="df[&quot;redditID&quot;][0]" language="Python" />
+        <watch expression="df[&quot;subredditName&quot;][0]" language="Python" />
+        <watch expression="df[&quot;rPostUrl&quot;][0]" language="Python" />
         <watch expression="df" />
-        <watch expression="config[&quot;Time&quot;][&quot;LAST_DL_TIME&quot;]" language="Python" />
+        <watch expression="self" />
       </configuration>
     </watches-manager>
   </component>
@@ -496,23 +512,23 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#2468#5635#0" expanded="false" />
-            <element signature="e#8869#8994#0" expanded="false" />
-            <element signature="e#9040#9169#0" expanded="false" />
-            <element signature="e#9281#9395#0" expanded="false" />
-            <element signature="e#9448#11617#0" expanded="false" />
-            <element signature="e#13409#14043#0" expanded="false" />
-            <element signature="e#14146#17582#0" expanded="false" />
-            <element signature="e#19490#19981#0" expanded="false" />
-            <element signature="e#20038#20243#0" expanded="false" />
-            <element signature="e#20301#20742#0" expanded="false" />
-            <element signature="e#20804#21438#0" expanded="false" />
-            <element signature="e#21500#23549#0" expanded="false" />
-            <element signature="e#23580#23912#0" expanded="false" />
-            <element signature="e#23982#24250#0" expanded="false" />
-            <element signature="e#24335#25099#0" expanded="false" />
-            <element signature="e#26005#28705#0" expanded="false" />
-            <element signature="e#28751#29117#0" expanded="false" />
+            <element signature="e#8204#8457#0" expanded="false" />
+            <element signature="e#8500#8625#0" expanded="false" />
+            <element signature="e#8671#8800#0" expanded="false" />
+            <element signature="e#8912#9026#0" expanded="false" />
+            <element signature="e#9079#11248#0" expanded="false" />
+            <element signature="e#11292#12058#0" expanded="false" />
+            <element signature="e#13040#13674#0" expanded="false" />
+            <element signature="e#13777#17213#0" expanded="false" />
+            <element signature="e#17268#19155#0" expanded="false" />
+            <element signature="e#19191#19682#0" expanded="false" />
+            <element signature="e#19739#19944#0" expanded="false" />
+            <element signature="e#20002#20443#0" expanded="false" />
+            <element signature="e#20505#21139#0" expanded="false" />
+            <element signature="e#23709#24041#0" expanded="false" />
+            <element signature="e#24111#24379#0" expanded="false" />
+            <element signature="e#24464#25228#0" expanded="false" />
+            <element signature="e#28880#29246#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -530,23 +546,23 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#2468#5635#0" expanded="false" />
-            <element signature="e#8869#8994#0" expanded="false" />
-            <element signature="e#9040#9169#0" expanded="false" />
-            <element signature="e#9281#9395#0" expanded="false" />
-            <element signature="e#9448#11617#0" expanded="false" />
-            <element signature="e#13409#14043#0" expanded="false" />
-            <element signature="e#14146#17582#0" expanded="false" />
-            <element signature="e#19490#19981#0" expanded="false" />
-            <element signature="e#20038#20243#0" expanded="false" />
-            <element signature="e#20301#20742#0" expanded="false" />
-            <element signature="e#20804#21438#0" expanded="false" />
-            <element signature="e#21500#23549#0" expanded="false" />
-            <element signature="e#23580#23912#0" expanded="false" />
-            <element signature="e#23982#24250#0" expanded="false" />
-            <element signature="e#24335#25099#0" expanded="false" />
-            <element signature="e#26005#28705#0" expanded="false" />
-            <element signature="e#28751#29117#0" expanded="false" />
+            <element signature="e#8204#8457#0" expanded="false" />
+            <element signature="e#8500#8625#0" expanded="false" />
+            <element signature="e#8671#8800#0" expanded="false" />
+            <element signature="e#8912#9026#0" expanded="false" />
+            <element signature="e#9079#11248#0" expanded="false" />
+            <element signature="e#11292#12058#0" expanded="false" />
+            <element signature="e#13040#13674#0" expanded="false" />
+            <element signature="e#13777#17213#0" expanded="false" />
+            <element signature="e#17268#19155#0" expanded="false" />
+            <element signature="e#19191#19682#0" expanded="false" />
+            <element signature="e#19739#19944#0" expanded="false" />
+            <element signature="e#20002#20443#0" expanded="false" />
+            <element signature="e#20505#21139#0" expanded="false" />
+            <element signature="e#23709#24041#0" expanded="false" />
+            <element signature="e#24111#24379#0" expanded="false" />
+            <element signature="e#24464#25228#0" expanded="false" />
+            <element signature="e#28880#29246#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -606,14 +622,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://C:/python3.5/Lib/codecs.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="379">
-          <caret line="331" column="0" lean-forward="false" selection-start-line="331" selection-start-column="0" selection-end-line="331" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="-850">
@@ -630,28 +638,44 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://C:/python3.5/Lib/codecs.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="209">
+          <caret line="310" column="0" lean-forward="false" selection-start-line="310" selection-start-column="0" selection-end-line="310" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/pandas/indexes/base.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="328">
+          <caret line="1422" column="31" lean-forward="true" selection-start-line="1422" selection-start-column="31" selection-end-line="1422" selection-end-column="31" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1293">
-          <caret line="182" column="12" lean-forward="false" selection-start-line="182" selection-start-column="12" selection-end-line="182" selection-end-column="12" />
+        <state relative-caret-position="379">
+          <caret line="518" column="0" lean-forward="false" selection-start-line="518" selection-start-column="0" selection-end-line="518" selection-end-column="0" />
           <folding>
-            <element signature="e#2468#5635#0" expanded="false" />
-            <element signature="e#8869#8994#0" expanded="false" />
-            <element signature="e#9040#9169#0" expanded="false" />
-            <element signature="e#9281#9395#0" expanded="false" />
-            <element signature="e#9448#11617#0" expanded="false" />
-            <element signature="e#13409#14043#0" expanded="false" />
-            <element signature="e#14146#17582#0" expanded="false" />
-            <element signature="e#19490#19981#0" expanded="false" />
-            <element signature="e#20038#20243#0" expanded="false" />
-            <element signature="e#20301#20742#0" expanded="false" />
-            <element signature="e#20804#21438#0" expanded="false" />
-            <element signature="e#21500#23549#0" expanded="false" />
-            <element signature="e#23580#23912#0" expanded="false" />
-            <element signature="e#23982#24250#0" expanded="false" />
-            <element signature="e#24335#25099#0" expanded="false" />
-            <element signature="e#26005#28705#0" expanded="false" />
-            <element signature="e#28751#29117#0" expanded="false" />
+            <element signature="e#8204#8457#0" expanded="false" />
+            <element signature="e#8500#8625#0" expanded="false" />
+            <element signature="e#8671#8800#0" expanded="false" />
+            <element signature="e#8912#9026#0" expanded="false" />
+            <element signature="e#9079#11248#0" expanded="false" />
+            <element signature="e#11292#12058#0" expanded="false" />
+            <element signature="e#13040#13674#0" expanded="false" />
+            <element signature="e#13777#17213#0" expanded="false" />
+            <element signature="e#17268#19155#0" expanded="false" />
+            <element signature="e#19191#19682#0" expanded="false" />
+            <element signature="e#19739#19944#0" expanded="false" />
+            <element signature="e#20002#20443#0" expanded="false" />
+            <element signature="e#20505#21139#0" expanded="false" />
+            <element signature="e#23709#24041#0" expanded="false" />
+            <element signature="e#24111#24379#0" expanded="false" />
+            <element signature="e#24464#25228#0" expanded="false" />
+            <element signature="e#28880#29246#0" expanded="false" />
           </folding>
         </state>
       </provider>
