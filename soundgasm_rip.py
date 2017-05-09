@@ -78,13 +78,15 @@ def main():
         rip_users(usrurls)
         main()
     elif opt == "2":
-        links = input("Enter soundgasm post URLs separated by \",\" - no spaces\n")
-        rip_from_links(links)
+        adl_list = input("Enter soundgasm post URLs separated by \",\" - no spaces\n")
+        llist = gen_audiodl_from_sglink(adl_list.split(","))
+        rip_audio_dls(llist)
         main()
     elif opt == "3":
         txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
         mypath = os.path.join(ROOTDIR, "_linkcol")
-        rip_from_links(txt_to_list(mypath, txtfn))
+
+        rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, txtfn)))
         main()
     elif opt == "4":
         watch_clip("sgasm")
@@ -98,38 +100,38 @@ def main():
         sort = input("Enter sorting type - 'hot' or 'top':\n")
         if sort == "top":
             time_filter = input("Enter time period (week, month, year, all):\n")
-            links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit), time_filter=time_filter))
+            adl_list = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit), time_filter=time_filter))
         else:
             # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
-            links = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit)), fromtxt=False)
+            adl_list = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit)), fromtxt=False)
             write_last_dltime()
-        rip_from_links_reddit(links)
+        rip_audio_dls(adl_list)
         main()
     elif opt == "7":
         txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
         llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
-        links = parse_submissions_for_links(llist, True)
-        rip_from_links_reddit(links)
+        adl_list = parse_submissions_for_links(llist, True)
+        rip_audio_dls(adl_list)
         main()
     elif opt == "8":
         subname = input("Enter name of subreddit\n")
         limit = input("Enter limit for found submissions, max 1000 forced by Reddit:\n")
         searchstring = input("Enter search string:\n")
         found_subs = search_subreddit(subname, searchstring, limit=int(limit))
-        links = parse_submissions_for_links(found_subs, True)
-        rip_from_links_reddit(links)
+        adl_list = parse_submissions_for_links(found_subs, True)
+        rip_audio_dls(adl_list)
         main()
     elif opt == "9":
         # print(timeit.timeit('filter_alrdy_downloaded(l)',
         #               setup="from __main__ import filter_alrdy_downloaded, txt_to_list, ROOTDIR, l; import os",
         #               number=10000))
         # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
-        txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
-        llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
-        dl_list = parse_submissions_for_links(llist, True)
-        rip_audio_dls(dl_list)
-        #filter_alrdy_downloaded(l, "BadGirlUK")
+
+        mypath = os.path.join(ROOTDIR, "_linkcol")
+
+        rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, "test2.txt")))
         main()
+
 
 class AudioDownload:
     def __init__(self, sgasm_url, reddit_info=None):
@@ -165,6 +167,7 @@ class AudioDownload:
         if self.reddit_info["selftext"]:
             write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.sgasm_usr)
 
+
 def rip_users(sgusr_urls):
     # trennt user url string an den kommas
     sgusr_urllist = sgusr_urls.split(",")
@@ -187,61 +190,41 @@ def get_sub_from_reddit_urls(urllist):
     return sublist
 
 
-def rip_from_links(sglinks):
-    # .copy()?
-    sglinkslist = sglinks
-    if isinstance(sglinks, str):
-        sglinkslist = sglinks.split(",")
-    # anzahl eintraege in der liste ergeben anzahl der zu ladenden dateien
-    dlcounter = 0
-    filestodl = len(sglinkslist)
-    # TODO refactor mb check if user stays the same so we dont have to load dltxt again
-    for link in sglinkslist:
-        # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
-        # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
-        # wird weiter an / geteilt aber nur ein mal und man hat den username
-        currentusr = link.split("/u/", 1)[1].split("/", 1)[0]
-        txtfilename = "sgasm-" + currentusr + "-rip.txt"
-        downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
-        riptuple = rip_link_furl(link.strip(","))
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True)
-        dlcounter = erg[0]
-        filestodl = erg[1]
-
-
-# TODO refactor merge with above
-def rip_from_links_reddit(sglinks):
-    # anzahl eintraege in der liste ergeben anzahl der zu ladenden dateien
-    dlcounter = 0
-    filestodl = len(sglinks)
+# avoid too many function calls since they are expensive in python
+def gen_audiodl_from_sglink(sglinks):
+    dl_list = []
     for link in sglinks:
-        # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
-        # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
-        # wird weiter an / geteilt aber nur ein mal und man hat den username
-        currentusr = link[0].split("/u/", 1)[1].split("/", 1)[0]
-        txtfilename = "sgasm-" + currentusr + "-rip.txt"
-        downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
-        riptuple = rip_link_furl(link[0])
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, True,
-                       redditurl=link[1])
-        dlcounter = erg[0]
-        filestodl = erg[1]
+        a = AudioDownload(link)
+        dl_list.append(a)
+    return dl_list
 
-def rip_audio_dls(dl_list):
+
+def rip_audio_dls(dl_list, current_usr=None):
+    """
+    Accepts list of AudioDownload instances and filters them for new downloads and saves them to disk by
+    calling rip_file
+    :param dl_list: List of AudioDownload instances
+    :param current_usr: name of user when called from rip_usr_to_files
+    :return: User rip string when downloading sgasm user
+    """
+    single = True
+    if current_usr:
+        single = False
+
     userrip_str = ""
     # when assigning instance Attributs of classes like self.url
     # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
     # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
     # implement new featueres
-    # TODO refactor better way? or just check for dl with other url/fname etc
+    # TODO refactor better way? or just check for dl with other url/fname etc -> sgasm_url /u/USER/Title.. better
     # create dict that has direct links to files as keys and AudioDownload instances as values
     dl_dict = {}
     for audio in dl_list:
         dl_dict[audio.url_to_file] = audio
 
     # returns list of new downloads, dl_dict still holds all of them
-    new_dls = filter_alrdy_downloaded(dl_dict)
+    new_dls = filter_alrdy_downloaded(dl_dict, current_usr)
 
     filestodl = len(new_dls)
     dlcounter = 0
@@ -253,64 +236,57 @@ def rip_audio_dls(dl_list):
         # wird weiter an / geteilt aber nur ein mal und man hat den username
         currentusr = audio_dl.sgasm_usr
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
-        erg = rip_file(audio_dl, txtfilename, currentusr, dlcounter, filestodl, single=True)
+        erg = rip_file(audio_dl, txtfilename, currentusr, dlcounter, filestodl,
+                       single=single, usrrip_string=userrip_str)
         dlcounter = erg[0]
+        # as string is immutable, we cant modify it by passing a reference so we have to return it
+        # and assign it her locally, would be working fine for a mutable type e.g. list
         userrip_str = erg[1]
 
-    return userrip_str
-
+    return userrip_str, dlcounter
 
 
 def rip_usr_to_files(sgasm_usr_url):
-    user_files = rip_usr_links(sgasm_usr_url)
-    # zeit bei anfang des dl in variable schreiben
-    now = time.strftime("%d/%m/%Y %H:%M:%S")
     currentusr = sgasm_usr_url.split("/u/", 1)[1].split("/", 1)[0]
     logger.info("Ripping user %s" % currentusr)
+
+    dl_list = gen_audiodl_from_sglink(rip_usr_links(sgasm_usr_url))
+    # zeit bei anfang des dl in variable schreiben
+    now = time.strftime("%d/%m/%Y %H:%M:%S")
+
     txtfilename = "sgasm-" + currentusr + "-rip.txt"
-    downloaded_urls = load_downloaded_urls(txtfilename, currentusr)
 
-    dlcounter = 0
-    skipped_file_counter = 0
-    # keep track if we alrdy warned the user
-    warned = False
-
-    filestodl = len(user_files)
-    userrip_string = ""
-
-    for afile in user_files:
-        riptuple = rip_link_furl(afile)
-        erg = rip_file(riptuple, txtfilename, currentusr, dlcounter, filestodl, downloaded_urls, False, userrip_string)
-        dlcounter = erg[0]
-        # filestodl decreased by one if a file gets skipped
-        if erg[1] != filestodl:
-            skipped_file_counter += 1
-        # if the same -> not consecutive -> set to zero
-        else:
-            skipped_file_counter = 0
-        filestodl = erg[1]
-        # as string is immutable, we cant modify it by passing a reference so we have to return it
-        # and assign it her locally, would be working fine for a mutable type e.g. list
-        userrip_string = erg[2]
-
-        # since new audios show up on the top on sgasm user page and rip_usr_links() writes them to a list
-        # from top to bottom -> we can assume the first links we dl are the newest posts
-        # -> too many CONSECUTIVE Files already downloaded -> user_rip is probably up-to-date
-        # ask if we should continue for the offchance of having downloaded >15--25 newer consecutive files
-        # but not the old ones (when using single dl)
-        if not warned and skipped_file_counter > 15:
-            option = input("Over 15 consecutive files already had been downloaded. Should we continue?\n"
-                           "y or n?: ")
-            if option == "n":
-                break
-            else:
-                warned = True
+    userrip_string, dlcount = rip_audio_dls(dl_list, currentusr)
 
     # falls dateien beim user rip geladen wurden wird der string in die textdatei geschrieben
-    if dlcounter > 0:
-        write_to_txtf("User Rip von " + currentusr + " mit " + str(dlcounter) + " neuen Dateien" + " am " + now +
-                      "\n\n" + userrip_string, txtfilename, currentusr)
+    if userrip_string:
+        write_to_txtf("User Rip von {} mit {} neuen Dateien am {}\n\n{}".format(currentusr, dlcount,
+                                                                                now, userrip_string),
+                      txtfilename, currentusr)
 
+
+# # keep track if we alrdy warned the user
+# warned = False
+#
+# # filestodl decreased by one if a file gets skipped
+# if erg[1] != filestodl:
+#     skipped_file_counter += 1
+# # if the same -> not consecutive -> set to zero
+# else:
+#     skipped_file_counter = 0
+#
+# # since new audios show up on the top on sgasm user page and rip_usr_links() writes them to a list
+# # from top to bottom -> we can assume the first links we dl are the newest posts
+# # -> too many CONSECUTIVE Files already downloaded -> user_rip is probably up-to-date
+# # ask if we should continue for the offchance of having downloaded >15--25 newer consecutive files
+# # but not the old ones (when using single dl)
+# if not warned and skipped_file_counter > 15:
+#     option = input("Over 15 consecutive files already had been downloaded. Should we continue?\n"
+#                    "y or n?: ")
+#     if option == "n":
+#         break
+#     else:
+#         warned = True
 
 def rip_usr_links(sgasm_usr_url):
     site = urllib.request.urlopen(sgasm_usr_url)
@@ -344,15 +320,21 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
             logger.info("FILE ALREADY EXISTS - RENAMING:")
             # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag or the ending is
             # different (since fname got cut off, so we dont exceed win path limit)
-            # count up i till file doesnt exist anymore, assign to filename after so we dont have to access
-            # filename_local and use regex to compile new name every time
+            # count up i till file doesnt exist anymore
             while os.path.isfile(os.path.join(mypath, filename)):
                 i += 1
-            filename = audio_dl.filename_local[:-8] + "_" + str(i).zfill(3) + ".m4a"
+                filename = audio_dl.filename_local[:-8] + "_" + str(i).zfill(3) + ".m4a"
             # set filename on AudioDownload instance
             audio_dl.filename_local = filename
 
-        # single -> no user rip
+        logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
+
+        # try:
+        #     urllib.request.urlretrieve(audio_dl.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
+        # except urllib.request.HTTPError:
+        #     logger.warning("HTTP Error 404: Not Found: \"%s\"" % audio_dl.url_to_file)
+
+        # single -> no user rip; write afer dl so when we get interrupted we can atleast dl the file by renaming it
         if single and audio_dl.reddit_info:
             write_to_txtf(gen_dl_txtstring(("Added", time.strftime("%d/%m/%Y %H:%M:%S")), ("Title", audio_dl.title),
                                            ("Description", audio_dl.descr), ("URL", audio_dl.url_to_file),
@@ -371,18 +353,11 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
                                               ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
                                               ("Local filename", filename), ("end", ""))
 
-
-        logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
-
-        try:
-            urllib.request.urlretrieve(audio_dl.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
-        except urllib.request.HTTPError:
-            logger.warning("HTTP Error 404: Not Found: \"%s\"" % audio_dl.url_to_file)
-
         return curfnr, usrrip_string
     else:
         logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
         return curfnr, usrrip_string
+
 
 def gen_dl_txtstring(*args):
     # args is tuple of tuples
@@ -392,8 +367,8 @@ def gen_dl_txtstring(*args):
             result_string += DLTXT_ENTRY_END
         elif name == "Added":
             result_string += "\t{}: {},\n\n".format(name, value)
-        elif ("http" in value) or (value.endswith(".m4a")):
-            result_string += "\t{}: \"{}\",\n\n".format(name, value)
+        elif ("http" in value) or (value.endswith(".m4a")) or ("URL" in name):
+            result_string += "\t{}: \"{}\",\n".format(name, value)
         else:
             result_string += "\t{}: {},\n".format(name, value)
     return result_string
@@ -420,7 +395,7 @@ def load_downloaded_urls(txtfilename, currentusr):
     return downloaded_urls
 
 
-def check_file_for_dl(m4aurl, downloaded_urls):
+def check_file_for_dl_user(m4aurl, downloaded_urls):
     """
     Returns True if file was already downloaded
     :param m4aurl: direct URL to m4a file
@@ -437,9 +412,14 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # OLD when passing 2pair tuples, unpack tuples in dl_list into two lists
     # url_list, title = zip(*dl_list)
     # filter dupes
+    # TODO doesnt keep order, only relevant for user rip
     unique_urls = set(dl_dict.keys())
     if currentusr:
-        duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URL"].values)
+        try:
+            duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URL"].values)
+        except KeyError:
+            logger.info("User '{}' not yet in databas!".format(currentusr))
+            duplicate = set()
     else:
         # timeit 1000: 0.19
         duplicate = unique_urls.intersection(df["URL"].values)
@@ -459,8 +439,8 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # d = dict(dl_list)
     for dup in duplicate:
         dup_titles += dl_dict[dup].title + "\n"
-
-    logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
+    if dup_titles:
+        logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 
     # set.symmetric_difference()
     # Return a new set with elements in either the set or other but not both.
@@ -472,7 +452,7 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # mask = df["URL"].str.contains('|'.join(url_list))
     # isin also works
     # timeit 1000: 0.29
-    #mask = df["URL"].isin(unique_urls)
+    # mask = df["URL"].isin(unique_urls)
     # print(df["URL"][mask])
 
     return result
