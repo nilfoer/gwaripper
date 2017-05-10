@@ -63,14 +63,12 @@ formatterstdo = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "
 stdohandler.setFormatter(formatterstdo)
 logger.addHandler(stdohandler)
 
+# we dont have to re-load while still running since it gets appended and then reassigned and
+# SGR_DF survives main() starting again
+
 # load dataframe
-df = pd.read_csv("../test.csv", sep=";", encoding="utf-8", index_col=0)
-# @Temporary
-df["redditTitle"] = df["created_utc"] = df["redditID"] = df["subredditName"] = df["rPostUrl"] = None
-grped_df = df.groupby("sgasm_user")
-
-
-# TODO write afer finish and reload when starting main again
+SGR_DF = pd.read_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8", index_col=0)
+GRPED_DF = SGR_DF.groupby("sgasm_user")
 
 
 def main():
@@ -163,10 +161,12 @@ class AudioDownload:
         self.title = None
         self.filename_local = None
         self.descr = None
+        self.date = None
+        self.time = None
 
     def set_sgasm_info(self):
         # @Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
-        # in missing information in the df
+        # in missing information in the SGR_DF
         if not self.url_to_file:
             logger.info("Getting soundgasm info of: %s" % self.sgasm_url)
             try:
@@ -280,7 +280,54 @@ def rip_audio_dls(dl_list, current_usr=None):
         # and assign it her locally, would be working fine for a mutable type e.g. list
         userrip_str = erg[1]
 
+    # write info of new downloads to SGR_DF
+    append_new_info_downloaded(new_dls, dl_dict)
+
     return userrip_str, dlcounter
+
+
+def append_new_info_downloaded(new_dl_list, dl_dict):
+    # filenr missing
+    df_append_dict = {"Date": [], "Time": [], "Local_filename": [], "Description": [], "Title": [], "URL": [],
+                      "URLsg": [], "sgasm_user": [], "redditURL": [], "reddit_user": [], "redditTitle": [],
+                      "created_utc": [], "redditID": [], "subredditName": [], "rPostUrl": []}
+
+    reddit_set_helper = (("redditTitle", "title"), ("redditURL", "permalink"), ("reddit_user", "r_user"),
+                         ("created_utc", "created_utc"), ("redditID", "id"), ("subredditName", "subreddit"),
+                         ("rPostUrl", "r_post_url"))
+
+    for url in new_dl_list:
+        audio_dl = dl_dict[url]
+
+        df_append_dict["Date"].append(audio_dl.date)
+        df_append_dict["Time"].append(audio_dl.time)
+        df_append_dict["Local_filename"].append(audio_dl.filename_local)
+        df_append_dict["Description"].append(audio_dl.descr)
+        df_append_dict["Title"].append(audio_dl.title)
+        df_append_dict["URL"].append(audio_dl.url_to_file)
+        df_append_dict["URLsg"].append(audio_dl.sgasm_url)
+        df_append_dict["sgasm_user"].append(audio_dl.sgasm_usr)
+
+        # append all the reddit info
+        for col, r_dkey in reddit_set_helper:
+            df_append_dict[col].append(audio_dl.reddit_info[r_dkey])
+
+    # check if lists have equal length -> NOT -> ABORT!!
+    # store length of one list in var to avoid overhead if accessing it in loop
+    len_first = len(df_append_dict["Date"]) if df_append_dict else None
+    # all returns true if all elements of iterable are true
+    # dict.values() returns new view of dicts values, iter() returns an iterator over those items,
+    # also works without iter()
+    if not all(len(i) == len_first for i in iter(df_append_dict.values())):
+        logger.error("ABORT !! Lists of append dict ARE NOT THE SAME SIZE !! ABORT !!")
+        return
+
+    df_dict = pd.DataFrame.from_dict(df_append_dict)
+    # append to global SGR_DF
+    global SGR_DF
+    SGR_DF = SGR_DF.append(df_dict, ignore_index=True, verify_integrity=True)
+    SGR_DF.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
+    SGR_DF.to_json("../sgasm_rip_db.json")
 
 
 def rip_usr_to_files(sgasm_usr_url):
@@ -355,7 +402,7 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
         i = 0
         if os.path.isfile(os.path.join(mypath, filename)):
             if check_direct_url_for_dl(audio_dl.url_to_file, currentusr):
-                set_missing_values_df(df, audio_dl)
+                set_missing_values_df(SGR_DF, audio_dl)
                 logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
                                "--> not renaming --> SKIPPING")
             else:
@@ -370,7 +417,8 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
                 audio_dl.filename_local = filename
 
         logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
-
+        audio_dl.date = time.strftime("%d/%m/%Y")
+        audio_dl.time = time.strftime("%H:%M:%S")
         # try:
         #     urllib.request.urlretrieve(audio_dl.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
         # except urllib.request.HTTPError:
@@ -378,9 +426,10 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
 
         # single -> no user rip; write afer dl so when we get interrupted we can atleast dl the file by renaming it
         if single and audio_dl.reddit_info:
-            write_to_txtf(gen_dl_txtstring(("Added", time.strftime("%d/%m/%Y %H:%M:%S")), ("Title", audio_dl.title),
-                                           ("Description", audio_dl.descr), ("URL", audio_dl.url_to_file),
-                                           ("URLsg", audio_dl.sgasm_url), ("Local filename", filename),
+            write_to_txtf(gen_dl_txtstring(("Added", "{} {}".format(audio_dl.date, audio_dl.time)),
+                                           ("Title", audio_dl.title), ("Description", audio_dl.descr),
+                                           ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
+                                           ("Local filename", filename),
                                            ("redditURL", audio_dl.reddit_info["permalink"]),
                                            ("redditTitle", audio_dl.reddit_info["title"]), ("end", "")),
                           txtfilename, currentusr)
@@ -388,10 +437,10 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
             audio_dl.write_selftext_file()
         # TODO keep updating txtfile or just use csv?
         elif single and not audio_dl.reddit_info:
-            write_to_txtf(gen_dl_txtstring(("Added", time.strftime("%d/%m/%Y %H:%M:%S")), ("Title", audio_dl.title),
-                                           ("Description", audio_dl.descr), ("URL", audio_dl.url_to_file),
-                                           ("URLsg", audio_dl.sgasm_url), ("Local filename", filename),
-                                           ("end", "")), txtfilename, currentusr)
+            write_to_txtf(gen_dl_txtstring(("Added", "{} {}".format(audio_dl.date, audio_dl.time)),
+                                           ("Title", audio_dl.title), ("Description", audio_dl.descr),
+                                           ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
+                                           ("Local filename", filename), ("end", "")), txtfilename, currentusr)
         else:
             usrrip_string += gen_dl_txtstring(("Title", audio_dl.title), ("Description", audio_dl.descr),
                                               ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
@@ -461,6 +510,7 @@ def write_to_txtf(wstring, filename, currentusr):
         w.write(wstring)
 
 
+# @Cleanup not used anymore
 def load_downloaded_urls(txtfilename, currentusr):
     downloaded_urls = []
     mypath = os.path.join(ROOTDIR, currentusr)
@@ -479,11 +529,11 @@ def check_direct_url_for_dl(m4aurl, current_usr=None):
     Returns True if file was already downloaded
     :param m4aurl: direct URL to m4a file
     :param current_usr: User when doing full user rip
-    :return: True if m4aurl is in df in col URL, else False
+    :return: True if m4aurl is in SGR_DF in col URL, else False
     """
     if current_usr:
         try:
-            if m4aurl in grped_df.get_group(current_usr)["URL"].values:
+            if m4aurl in GRPED_DF.get_group(current_usr)["URL"].values:
                 return True
             else:
                 return False
@@ -491,7 +541,7 @@ def check_direct_url_for_dl(m4aurl, current_usr=None):
             logger.info("User '{}' not yet in databas!".format(current_usr))
             return False
     else:
-        if m4aurl in df["URL"].values:
+        if m4aurl in SGR_DF["URL"].values:
             return True
         else:
             return False
@@ -504,13 +554,13 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     unique_urls = set(dl_dict.keys())
     if currentusr:
         try:
-            duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URLsg"].values)
+            duplicate = unique_urls.intersection(GRPED_DF.get_group(currentusr)["URLsg"].values)
         except KeyError:
             logger.info("User '{}' not yet in databas!".format(currentusr))
             duplicate = set()
     else:
         # timeit 1000: 0.19
-        duplicate = unique_urls.intersection(df["URLsg"].values)
+        duplicate = unique_urls.intersection(SGR_DF["URLsg"].values)
 
     dup_titles = ""
     # OLD when passing 2pair tuples -> create dict from it, NOW passing ref to dict
@@ -529,11 +579,11 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
         dup_titles += " ".join(dl_dict[dup].sgasm_url[24:].split("-")) + "\n"
         # @Temporary
         # when we got reddit info get sgasm info even if this file was already downloaded b4
-        # then write missing info to df and write selftext to file
+        # then write missing info to SGR_DF and write selftext to file
         if dl_dict[dup].reddit_info:
             logger.info("Filling in missing reddit info: TEMPORARY")
             dl_dict[dup].set_sgasm_info()
-            set_missing_values_df(df, dl_dict[dup])
+            set_missing_values_df(SGR_DF, dl_dict[dup])
             dl_dict[dup].write_selftext_file()
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
@@ -545,11 +595,11 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # str.contains accepts regex patter, join url strings with | -> htt..m4a|htt...m4a etc
     # returns Series/array of boolean values, .any() True if any element is True
     # timeit 1000: 1.129
-    # mask = df["URL"].str.contains('|'.join(url_list))
+    # mask = SGR_DF["URL"].str.contains('|'.join(url_list))
     # isin also works
     # timeit 1000: 0.29
-    # mask = df["URL"].isin(unique_urls)
-    # print(df["URL"][mask])
+    # mask = SGR_DF["URL"].isin(unique_urls)
+    # print(SGR_DF["URL"][mask])
 
     return result
 
@@ -591,7 +641,6 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
         found_sub_list.append(sub)
     return found_sub_list
 
-
 # If you have a PRAW object, e.g., Comment, Message, Redditor, or Submission, and you want to see what
 # attributes are available along with their values, use the built-in vars() function of python
 # import pprint
@@ -604,6 +653,7 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 # When we try to print its title, additional information is needed, thus a network request is made, and the
 # instances ceases to be lazy. Outputting all the attributes of a lazy object will result in fewer attributes
 # than expected.
+
 
 # deactivted LASTDLTIME check by default
 def parse_submissions_for_links(sublist, fromtxt=True):
@@ -640,9 +690,9 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                 logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
-                    w.write(
-                        "<h3><a href=\"https://reddit.com" + submission.permalink + "\">" + submission.title + "</a><br/>by " +
-                        str(submission.author) + "</h3>\n")
+                    w.write("<h3><a href=\"https://reddit.com{}\">{}</a><br/>by {}</h3>\n".format(submission.permalink,
+                                                                                                  submission.title,
+                                                                                                  submission.author))
             reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
                            "selftext": submission.selftext, "r_user": submission.author.name,
                            "created_utc": submission.created_utc, "id": submission.id,

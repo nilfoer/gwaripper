@@ -130,7 +130,7 @@ def gen_dict_from_dltxt(fullpath, user, r_user):
 
 def main():
     users_to_parse = get_files_to_parse()
-    # creat first df that other will be appended to
+    # creat first SGR_DF that other will be appended to
     # unpack list into args
     df = gen_dict_from_dltxt(*users_to_parse.pop(0))
 
@@ -140,7 +140,11 @@ def main():
         # over several datasets, use a list comprehension.
         df = df.append(gen_dict_from_dltxt(*usr), ignore_index=True)
 
-    df.to_csv("../test.csv", sep=";", encoding="utf-8")
+    # create new empty cols
+    df["redditTitle"] = df["created_utc"] = df["redditID"] = df["subredditName"] = df["rPostUrl"] = None
+
+    df.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
+    df.to_json("../sgasm_rip_db.json")
 
 if __name__ == "__main__":
     main()
