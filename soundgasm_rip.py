@@ -419,6 +419,7 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
                 set_missing_values_df(SGR_DF, audio_dl)
                 logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
                                "--> not renaming --> SKIPPING")
+                return curfnr, usrrip_string
             else:
                 logger.info("FILE ALREADY EXISTS - RENAMING:")
                 # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag or the ending is
