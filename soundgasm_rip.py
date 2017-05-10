@@ -315,9 +315,14 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
         df_append_dict["URLsg"].append(audio_dl.sgasm_url)
         df_append_dict["sgasm_user"].append(audio_dl.sgasm_usr)
 
-        # append all the reddit info
-        for col, r_dkey in reddit_set_helper:
-            df_append_dict[col].append(audio_dl.reddit_info[r_dkey])
+        # append all the reddit info if set
+        if audio_dl.reddit_info:
+            for col, r_dkey in reddit_set_helper:
+                df_append_dict[col].append(audio_dl.reddit_info[r_dkey])
+        # make sure we write all the columns -> append "" or none as reddit info
+        else:
+            for col, r_dkey in reddit_set_helper:
+                df_append_dict[col].append("")
 
     # check if lists have equal length -> NOT -> ABORT!!
     # store length of one list in var to avoid overhead if accessing it in loop
