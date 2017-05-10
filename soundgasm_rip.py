@@ -130,11 +130,12 @@ def main():
         searchstring = input("Enter search string:\n")
 
         kw_inp = input("Enter additional kwargs to search func e.g. 'time_filter' (all, year, month..)\n"
-                       "(kwarg,value;kwarg,value;..): ")
+                       "(kwarg,value;kwarg,value;..):\n")
         kwargs = {}
-        for kw in kw_inp.split(";"):
-            kw_v = kw.split(",")
-            kwargs[kw_v[0]] = kw_v[1]
+        if kwargs:
+            for kw in kw_inp.split(";"):
+                kw_v = kw.split(",")
+                kwargs[kw_v[0]] = kw_v[1]
 
         # if i have a function def test(pospar, kwarg1=Default, kwarg2=Default2)
         # and i pass a dict with kwargs=  {"kwarg1": "value", "kwarg2": "passed"} to func with test(0, **kwargs)
@@ -287,8 +288,9 @@ def rip_audio_dls(dl_list, current_usr=None):
         # and assign it her locally, would be working fine for a mutable type e.g. list
         userrip_str = erg[1]
 
-    # write info of new downloads to SGR_DF
-    append_new_info_downloaded(new_dls, dl_dict)
+    if new_dls:
+        # write info of new downloads to SGR_DF
+        append_new_info_downloaded(new_dls, dl_dict)
 
     return userrip_str, dlcounter
 
@@ -431,10 +433,10 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
         logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
         audio_dl.date = time.strftime("%d/%m/%Y")
         audio_dl.time = time.strftime("%H:%M:%S")
-        # try:
-        #     urllib.request.urlretrieve(audio_dl.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
-        # except urllib.request.HTTPError:
-        #     logger.warning("HTTP Error 404: Not Found: \"%s\"" % audio_dl.url_to_file)
+        try:
+            urllib.request.urlretrieve(audio_dl.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
+        except urllib.request.HTTPError:
+            logger.warning("HTTP Error 404: Not Found: \"%s\"" % audio_dl.url_to_file)
 
         # single -> no user rip; write afer dl so when we get interrupted we can atleast dl the file by renaming it
         if single and audio_dl.reddit_info:
