@@ -291,6 +291,13 @@ def rip_audio_dls(dl_list, current_usr=None):
     if new_dls:
         # write info of new downloads to SGR_DF
         append_new_info_downloaded(new_dls, dl_dict)
+    elif dl_list[0].reddit_info:
+        # @Temporary we might have set missing info on already downloaded files so new_dls might
+        # be None even if we added info to df so always safe it to be sure
+        # or do elif dl_list[0].reddit_info -> ripping from reddit links so we wrote missing info
+        # if we didnt dl sth new
+        SGR_DF.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
+        SGR_DF.to_json("../sgasm_rip_db.json")
 
     return userrip_str, dlcounter
 
