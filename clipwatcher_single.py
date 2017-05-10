@@ -3,7 +3,7 @@ import os
 
 import pyperclip
 
-WRITETO = os.path.join("N:", os.sep, "_archive", "test", "soundgasmNET", "_linkcol")
+WRITETO = os.path.abspath(os.path.join(os.getcwd(), os.pardir, "_linkcol"))
 # windows (os.sep, "home", "m", "Dokumente", "test-sg", "_linkcol")
 
 def is_sgasm_url(url):
@@ -24,11 +24,11 @@ def print_to_stdout(clipboard_content):
     print("Found url: %s" % str(clipboard_content))
 
 
-def print_write_to_txtf(wstring):
+def print_write_to_txtf(wstring, txtname):
     print_to_stdout(wstring)
     if not os.path.exists(WRITETO):
         os.makedirs(WRITETO)
-    with open(os.path.join(WRITETO, time.strftime("%Y-%m-%d_%Hh.txt")), 'a', encoding="UTF-8") as w:
+    with open(os.path.join(WRITETO, txtname), 'a', encoding="UTF-8") as w:
         w.write(wstring + "\n")
 
 
@@ -47,6 +47,9 @@ class ClipboardWatcher:
         self._callback = callback
         self._pause = pause
         self._stopping = False
+        self.txtname = time.strftime("%Y-%m-%d_%Hh.txt")
+        self.found = []
+
 
     def run(self):
         recent_value = ""
@@ -54,8 +57,12 @@ class ClipboardWatcher:
             tmp_value = pyperclip.paste()
             if tmp_value != recent_value:
                 recent_value = tmp_value
+                # if predicate is met
                 if self._predicate(recent_value):
-                    self._callback(recent_value)
+                    # call callback
+                    self._callback(recent_value, self.txtname)
+                    # append to found list so we can return it when closing clipwatcher
+                    self.found.append(recent_value)
             time.sleep(self._pause)
 
     def stop(self):
@@ -73,6 +80,8 @@ def main():
     except KeyboardInterrupt:
         watcher.stop()
         print("Stopped watching clipboard!")
+        print("URLs were saved in: {}\n".format(watcher.txtname))
+
 
 
 if __name__ == "__main__":

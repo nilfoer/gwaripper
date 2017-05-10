@@ -93,10 +93,17 @@ def main():
         rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, txtfn)))
         main()
     elif opt == "4":
-        watch_clip("sgasm")
+        found = watch_clip("sgasm")
+        if found:
+            llist = gen_audiodl_from_sglink(found)
+            rip_audio_dls(llist)
         main()
     elif opt == "5":
-        watch_clip("reddit")
+        found = watch_clip("reddit")
+        if found:
+            llist = get_sub_from_reddit_urls(found)
+            adl_list = parse_submissions_for_links(llist, True)
+            rip_audio_dls(adl_list)
         main()
     elif opt == "6":
         subr = input("Enter subreddit name: \n")
@@ -605,6 +612,8 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
 
 
 def watch_clip(domain):
+    # function is_domain_url will be predicate
+    # eval: string -> python code
     dm = eval("clipwatcher_single.is_" + domain + "_url")
     watcher = clipwatcher_single.ClipboardWatcher(dm, clipwatcher_single.print_write_to_txtf, 0.1)
     try:
@@ -613,6 +622,13 @@ def watch_clip(domain):
     except KeyboardInterrupt:
         watcher.stop()
         logger.info("Stopped watching clipboard!")
+        logger.info("URLs were saved in: {}\n".format(watcher.txtname))
+        yn = input("Do you want to download found URLs directly? (yes/no):\n")
+        if yn == "yes":
+            # dont return ref so watcher can die
+            return watcher.found.copy()
+        else:
+            return
 
 
 def parse_subreddit(subreddit, sort, limit, time_filter=None):
