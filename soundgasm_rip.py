@@ -76,7 +76,7 @@ def main():
                 "3. Rip single links from a txt file\n 4. Watch clipboard for sgasm links\n "
                 "5. Watch clipboard for reddit links\n 6. Download sgasm posts from subreddit\n "
                 "7. Rip single reddit links from a txt file\n 8. Subreddit durchsuchen und Ergebnisse "
-                "herunterladen\n 9. Test\n")
+                "herunterladen\n 9. Rip from Redditor\n 0. Test\n")
     if opt == "1":
         usrurls = input("Enter soundgasm User URLs separated by \",\" - no spaces\n")
         rip_users(usrurls)
@@ -149,15 +149,31 @@ def main():
         rip_audio_dls(adl_list)
         main()
     elif opt == "9":
+        r_u_name = input("Enter name of redditor: ")
+        get_sort = input("Get hot, top or new posts?: ")
+        limit = int(input("Enter number of posts: "))
+        redditor = reddit_praw.redditor(r_u_name)
+        if get_sort == "hot":
+            sublist = redditor.submissions.hot(limit=limit)
+        elif get_sort == "top":
+            sublist = redditor.submissions.top(limit=limit, time_filter="all")
+        else: # just get new posts if input doesnt match hot or top
+            sublist = redditor.submissions.new(limit=limit)
+        # @Refactor check if subreddit is gwa or pta first?
+        adl_list = parse_submissions_for_links(sublist)
+        rip_audio_dls(adl_list)
+        main()
+    elif opt == "0":
         # print(timeit.timeit('filter_alrdy_downloaded(l)',
         #               setup="from __main__ import filter_alrdy_downloaded, txt_to_list, ROOTDIR, l; import os",
         #               number=10000))
         # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
-
-        mypath = os.path.join(ROOTDIR, "_linkcol")
-
-        rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, "test2.txt")))
+        # new(), hot(), top(time_filter="all")
+        belle = reddit_praw.redditor("Belle_in_the_woods")
+        sub = reddit_praw.submission("69w2ha")
+        print(check_submission_banned_tags(sub, KEYWORDLIST))
         main()
+
 
 
 class AudioDownload:
@@ -750,10 +766,19 @@ def check_new_redditor(url, username):
 def check_submission_banned_tags(submission, keywordlist):
     # checks submissions title for banned words contained in keywordlist
     # returns True if it finds a match
+    subtitle = submission.title.lower()
     for keyword in keywordlist:
-        if keyword in submission.title.lower():
-            logger.info("Banned keyword in: " + submission.title.lower() + "\n\t slink: " + submission.shortlink)
+        if keyword in subtitle:
+            logger.info("Banned keyword '{}' in: {}\n\t slink: {}".format(keyword, subtitle, submission.shortlink))
             return True
+    # @Refactor Hardcoding this is bad if someone else wants to use this script
+    if ("[f4f]" in subtitle) and not ("4m]" in subtitle):
+        logger.info("Banned keyword: no '4m]' in title where '[f4f]' is in: {}\n\t "
+                    "slink: {}".format(subtitle, submission.shortlink))
+        return True
+    else:
+        return False
+
 
 
 def write_last_dltime():
