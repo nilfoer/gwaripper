@@ -26,14 +26,11 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
                           user_agent=config["Reddit"]["USER_AGENT"])
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
-# removed: "[daddy]",
 # load from config ini, split at comma, strip whitespaces
 KEYWORDLIST = [x.strip() for x in config["Settings"]["tag_filter"].split(",")]
 
 # path to dir where the soundfiles will be stored in subfolders
 ROOTDIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
-# old os.path.join("N:", os.sep, "_archive", "test", "soundgasmNET")
-# old (os.sep, "home", "m", "Dokumente", "test-sg")
 
 DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
 
@@ -67,6 +64,7 @@ logger.addHandler(stdohandler)
 # SGR_DF survives main() starting again
 
 # load dataframe
+# SGR_DF = pd.read_json("../sgasm_rip_db.json", orient="columns")
 SGR_DF = pd.read_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8", index_col=0)
 GRPED_DF = SGR_DF.groupby("sgasm_user")
 
@@ -157,7 +155,7 @@ def main():
             sublist = redditor.submissions.hot(limit=limit)
         elif get_sort == "top":
             sublist = redditor.submissions.top(limit=limit, time_filter="all")
-        else: # just get new posts if input doesnt match hot or top
+        else:  # just get new posts if input doesnt match hot or top
             sublist = redditor.submissions.new(limit=limit)
         # @Refactor check if subreddit is gwa or pta first?
         adl_list = parse_submissions_for_links(sublist)
@@ -169,11 +167,7 @@ def main():
         #               number=10000))
         # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
         # new(), hot(), top(time_filter="all")
-        belle = reddit_praw.redditor("Belle_in_the_woods")
-        sub = reddit_praw.submission("69w2ha")
-        print(check_submission_banned_tags(sub, KEYWORDLIST))
         main()
-
 
 
 class AudioDownload:
@@ -242,9 +236,9 @@ def txt_to_list(path, txtfilename):
 
 
 def get_sub_from_reddit_urls(urllist):
+    urls_unique = set(urllist)
     sublist = []
-    for url in urllist:
-        # changed
+    for url in urls_unique:
         sublist.append(reddit_praw.submission(url=url))
     return sublist
 
@@ -778,7 +772,6 @@ def check_submission_banned_tags(submission, keywordlist):
         return True
     else:
         return False
-
 
 
 def write_last_dltime():

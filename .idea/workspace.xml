@@ -7,6 +7,7 @@
     </list>
     <ignored mask="*.log" />
     <ignored path="config.ini" />
+    <ignored path="chirbit_info.txt" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -23,33 +24,31 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="232">
-              <caret line="160" column="59" lean-forward="true" selection-start-line="160" selection-start-column="59" selection-end-line="160" selection-end-column="59" />
+            <state relative-caret-position="311">
+              <caret line="168" column="46" lean-forward="false" selection-start-line="168" selection-start-column="46" selection-end-line="168" selection-end-column="46" />
               <folding>
-                <element signature="e#10366#10619#0" expanded="false" />
-                <element signature="e#10662#10787#0" expanded="false" />
-                <element signature="e#10833#10962#0" expanded="false" />
-                <element signature="e#11074#11188#0" expanded="false" />
-                <element signature="e#16376#17142#0" expanded="false" />
-                <element signature="e#18124#18758#0" expanded="false" />
-                <element signature="e#22555#24442#0" expanded="false" />
-                <element signature="e#24478#24969#0" expanded="false" />
-                <element signature="e#25026#25234#0" expanded="false" />
-                <element signature="e#25317#25758#0" expanded="false" />
-                <element signature="e#25820#26462#0" expanded="false" />
-                <element signature="e#29056#29766#0" expanded="false" />
-                <element signature="e#30189#30858#0" expanded="false" />
-                <element signature="e#34647#35013#0" expanded="false" />
+                <element signature="e#10121#10374#0" expanded="false" />
+                <element signature="e#10417#10542#0" expanded="false" />
+                <element signature="e#10846#10960#0" expanded="false" />
+                <element signature="e#16148#16914#0" expanded="false" />
+                <element signature="e#17896#18530#0" expanded="false" />
+                <element signature="e#24250#24741#0" expanded="false" />
+                <element signature="e#24798#25006#0" expanded="false" />
+                <element signature="e#25089#25530#0" expanded="false" />
+                <element signature="e#25592#26234#0" expanded="false" />
+                <element signature="e#28828#29538#0" expanded="false" />
+                <element signature="e#29961#30630#0" expanded="false" />
+                <element signature="e#34419#34785#0" expanded="false" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="base.py" pinned="false" current-in-tab="false">
-        <entry file="file://C:/python3.5/Lib/site-packages/praw/models/reddit/base.py">
+      <file leaf-file-name="dltxt_to_csv.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="175">
-              <caret line="33" column="0" lean-forward="false" selection-start-line="33" selection-start-column="0" selection-end-line="33" selection-end-column="0" />
+            <state relative-caret-position="356">
+              <caret line="160" column="63" lean-forward="true" selection-start-line="160" selection-start-column="63" selection-end-line="160" selection-end-column="63" />
               <folding />
             </state>
           </provider>
@@ -79,6 +78,7 @@
       <find>parse</find>
       <find>rip_from_links</find>
       <find>Hypnosis and HFO</find>
+      <find>TEMPORARY</find>
     </findStrings>
     <replaceStrings>
       <replace>rip_audio_dls</replace>
@@ -95,8 +95,9 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/dltxt_to_csv.py" />
         <option value="$PROJECT_DIR$/clipwatcher_single.py" />
+        <option value="$PROJECT_DIR$/dltxt_to_csv.py" />
+        <option value="$PROJECT_DIR$/../../_code/soundgasm_rip.py" />
         <option value="$PROJECT_DIR$/soundgasm_rip.py" />
       </list>
     </option>
@@ -108,7 +109,7 @@
     <option name="height" value="1056" />
   </component>
   <component name="ProjectView">
-    <navigator proportions="" version="1">
+    <navigator currentView="ProjectPane" proportions="" version="1">
       <flattenPackages />
       <showMembers />
       <showModules />
@@ -121,7 +122,24 @@
       <manualOrder />
       <foldersAlwaysOnTop value="true" />
     </navigator>
-    <panes />
+    <panes>
+      <pane id="ProjectPane">
+        <subPane>
+          <PATH>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="_sgasm-repo" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="_sgasm-repo" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+          </PATH>
+        </subPane>
+      </pane>
+      <pane id="Scratches" />
+      <pane id="Scope" />
+    </panes>
   </component>
   <component name="RunManager" selected="Python.soundgasm_rip">
     <configuration default="false" name="soundgasm_rip" type="PythonConfigurationType" factoryName="Python" temporary="true">
@@ -154,6 +172,23 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <module name="_sgasm-repo" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/dltxt_to_csv.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <method />
+    </configuration>
+    <configuration default="false" name="soundgasm_rip (1)" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/../../_code" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <module name="_sgasm-repo" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/../../_code/soundgasm_rip.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <method />
@@ -292,14 +327,16 @@
       <option name="USE_KEYWORD" value="false" />
       <method />
     </configuration>
-    <list size="2">
+    <list size="3">
       <item index="0" class="java.lang.String" itemvalue="Python.soundgasm_rip" />
       <item index="1" class="java.lang.String" itemvalue="Python.dltxt_to_csv" />
+      <item index="2" class="java.lang.String" itemvalue="Python.soundgasm_rip (1)" />
     </list>
     <recent_temporary>
-      <list size="2">
-        <item index="0" class="java.lang.String" itemvalue="Python.soundgasm_rip" />
+      <list size="3">
+        <item index="0" class="java.lang.String" itemvalue="Python.soundgasm_rip (1)" />
         <item index="1" class="java.lang.String" itemvalue="Python.dltxt_to_csv" />
+        <item index="2" class="java.lang.String" itemvalue="Python.soundgasm_rip" />
       </list>
     </recent_temporary>
   </component>
@@ -471,23 +508,44 @@
       <option name="project" value="LOCAL" />
       <updated>1494455468569</updated>
     </task>
-    <option name="localTasksCounter" value="23" />
+    <task id="LOCAL-00023" summary="Hardcoded checking for [f4f] in tags but only skip it when 4m] isnt present; Added option to rip from redditor">
+      <created>1494530354173</created>
+      <option name="number" value="00023" />
+      <option name="presentableId" value="LOCAL-00023" />
+      <option name="project" value="LOCAL" />
+      <updated>1494530354173</updated>
+    </task>
+    <task id="LOCAL-00024" summary="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern">
+      <created>1494536728261</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1494536728261</updated>
+    </task>
+    <task id="LOCAL-00025" summary="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern; Now filters for unique URLs when taking single reddit links">
+      <created>1494537080832</created>
+      <option name="number" value="00025" />
+      <option name="presentableId" value="LOCAL-00025" />
+      <option name="project" value="LOCAL" />
+      <updated>1494537080832</updated>
+    </task>
+    <option name="localTasksCounter" value="26" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
-    <editor active="false" />
+    <editor active="true" />
     <layout>
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.1406744" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.1406744" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.24973656" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
+      <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.24973656" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Debug" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -538,14 +596,17 @@
     <MESSAGE value="File is now actually skipped when it exists and is found in direct URLs" />
     <MESSAGE value="Always save df to csv/json even we didnt have any new dls since were temporarirly filling in missing reddit info that might get lost otherwise" />
     <MESSAGE value="Also save df to csv/json when ripping from reddit, even we didnt have any new dls since were temporarirly filling in missing reddit info that might get lost otherwise" />
-    <option name="LAST_COMMIT_MESSAGE" value="Also save df to csv/json when ripping from reddit, even we didnt have any new dls since were temporarirly filling in missing reddit info that might get lost otherwise" />
+    <MESSAGE value="Hardcoded checking for [f4f] in tags but only skip it when 4m] isnt present; Added option to rip from redditor" />
+    <MESSAGE value="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern" />
+    <MESSAGE value="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern; Now filters for unique URLs when taking single reddit links" />
+    <option name="LAST_COMMIT_MESSAGE" value="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern; Now filters for unique URLs when taking single reddit links" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints-dialog>
         <breakpoints-dialog />
       </breakpoints-dialog>
-      <option name="time" value="59" />
+      <option name="time" value="66" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
@@ -559,11 +620,18 @@
         <watch expression="SGR_DF[&quot;redditID&quot;][0]" language="Python" />
         <watch expression="SGR_DF[&quot;subredditName&quot;][0]" language="Python" />
         <watch expression="df[&quot;rPostUrl&quot;][0]" language="Python" />
+        <watch expression="df.iloc[[0]]" language="Python" />
+        <watch expression="df.tail(5).values" language="Python" />
         <watch expression="SGR_DF" language="Python" />
         <watch expression="SGR_DF.tail(5).values" language="Python" />
         <watch expression="self" />
         <watch expression="df_append_dict" />
         <watch expression="df_append_dict.values()" language="Python" />
+        <watch expression="dframe.redditTitle[5000]" language="Python" />
+        <watch expression="dframe.dtypes" language="Python" />
+        <watch expression="re.search(&quot;\s?Added: \d{2}\/\d{2}\/\d{4}&quot;, linecont)" language="Python" />
+        <watch expression="repr(linecont)" language="Python" />
+        <watch expression="df.redditTitle.dtype" language="Python" />
       </configuration>
     </watches-manager>
   </component>
@@ -573,20 +641,18 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#10366#10619#0" expanded="false" />
-            <element signature="e#10662#10787#0" expanded="false" />
-            <element signature="e#10833#10962#0" expanded="false" />
-            <element signature="e#11074#11188#0" expanded="false" />
-            <element signature="e#16376#17142#0" expanded="false" />
-            <element signature="e#18124#18758#0" expanded="false" />
-            <element signature="e#22555#24442#0" expanded="false" />
-            <element signature="e#24478#24969#0" expanded="false" />
-            <element signature="e#25026#25234#0" expanded="false" />
-            <element signature="e#25317#25758#0" expanded="false" />
-            <element signature="e#25820#26462#0" expanded="false" />
-            <element signature="e#29056#29766#0" expanded="false" />
-            <element signature="e#30189#30858#0" expanded="false" />
-            <element signature="e#34647#35013#0" expanded="false" />
+            <element signature="e#10121#10374#0" expanded="false" />
+            <element signature="e#10417#10542#0" expanded="false" />
+            <element signature="e#10846#10960#0" expanded="false" />
+            <element signature="e#16148#16914#0" expanded="false" />
+            <element signature="e#17896#18530#0" expanded="false" />
+            <element signature="e#24250#24741#0" expanded="false" />
+            <element signature="e#24798#25006#0" expanded="false" />
+            <element signature="e#25089#25530#0" expanded="false" />
+            <element signature="e#25592#26234#0" expanded="false" />
+            <element signature="e#28828#29538#0" expanded="false" />
+            <element signature="e#29961#30630#0" expanded="false" />
+            <element signature="e#34419#34785#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -596,20 +662,18 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#10366#10619#0" expanded="false" />
-            <element signature="e#10662#10787#0" expanded="false" />
-            <element signature="e#10833#10962#0" expanded="false" />
-            <element signature="e#11074#11188#0" expanded="false" />
-            <element signature="e#16376#17142#0" expanded="false" />
-            <element signature="e#18124#18758#0" expanded="false" />
-            <element signature="e#22555#24442#0" expanded="false" />
-            <element signature="e#24478#24969#0" expanded="false" />
-            <element signature="e#25026#25234#0" expanded="false" />
-            <element signature="e#25317#25758#0" expanded="false" />
-            <element signature="e#25820#26462#0" expanded="false" />
-            <element signature="e#29056#29766#0" expanded="false" />
-            <element signature="e#30189#30858#0" expanded="false" />
-            <element signature="e#34647#35013#0" expanded="false" />
+            <element signature="e#10121#10374#0" expanded="false" />
+            <element signature="e#10417#10542#0" expanded="false" />
+            <element signature="e#10846#10960#0" expanded="false" />
+            <element signature="e#16148#16914#0" expanded="false" />
+            <element signature="e#17896#18530#0" expanded="false" />
+            <element signature="e#24250#24741#0" expanded="false" />
+            <element signature="e#24798#25006#0" expanded="false" />
+            <element signature="e#25089#25530#0" expanded="false" />
+            <element signature="e#25592#26234#0" expanded="false" />
+            <element signature="e#28828#29538#0" expanded="false" />
+            <element signature="e#29961#30630#0" expanded="false" />
+            <element signature="e#34419#34785#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -626,20 +690,18 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#10366#10619#0" expanded="false" />
-            <element signature="e#10662#10787#0" expanded="false" />
-            <element signature="e#10833#10962#0" expanded="false" />
-            <element signature="e#11074#11188#0" expanded="false" />
-            <element signature="e#16376#17142#0" expanded="false" />
-            <element signature="e#18124#18758#0" expanded="false" />
-            <element signature="e#22555#24442#0" expanded="false" />
-            <element signature="e#24478#24969#0" expanded="false" />
-            <element signature="e#25026#25234#0" expanded="false" />
-            <element signature="e#25317#25758#0" expanded="false" />
-            <element signature="e#25820#26462#0" expanded="false" />
-            <element signature="e#29056#29766#0" expanded="false" />
-            <element signature="e#30189#30858#0" expanded="false" />
-            <element signature="e#34647#35013#0" expanded="false" />
+            <element signature="e#10121#10374#0" expanded="false" />
+            <element signature="e#10417#10542#0" expanded="false" />
+            <element signature="e#10846#10960#0" expanded="false" />
+            <element signature="e#16148#16914#0" expanded="false" />
+            <element signature="e#17896#18530#0" expanded="false" />
+            <element signature="e#24250#24741#0" expanded="false" />
+            <element signature="e#24798#25006#0" expanded="false" />
+            <element signature="e#25089#25530#0" expanded="false" />
+            <element signature="e#25592#26234#0" expanded="false" />
+            <element signature="e#28828#29538#0" expanded="false" />
+            <element signature="e#29961#30630#0" expanded="false" />
+            <element signature="e#34419#34785#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -656,20 +718,18 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#10366#10619#0" expanded="false" />
-            <element signature="e#10662#10787#0" expanded="false" />
-            <element signature="e#10833#10962#0" expanded="false" />
-            <element signature="e#11074#11188#0" expanded="false" />
-            <element signature="e#16376#17142#0" expanded="false" />
-            <element signature="e#18124#18758#0" expanded="false" />
-            <element signature="e#22555#24442#0" expanded="false" />
-            <element signature="e#24478#24969#0" expanded="false" />
-            <element signature="e#25026#25234#0" expanded="false" />
-            <element signature="e#25317#25758#0" expanded="false" />
-            <element signature="e#25820#26462#0" expanded="false" />
-            <element signature="e#29056#29766#0" expanded="false" />
-            <element signature="e#30189#30858#0" expanded="false" />
-            <element signature="e#34647#35013#0" expanded="false" />
+            <element signature="e#10121#10374#0" expanded="false" />
+            <element signature="e#10417#10542#0" expanded="false" />
+            <element signature="e#10846#10960#0" expanded="false" />
+            <element signature="e#16148#16914#0" expanded="false" />
+            <element signature="e#17896#18530#0" expanded="false" />
+            <element signature="e#24250#24741#0" expanded="false" />
+            <element signature="e#24798#25006#0" expanded="false" />
+            <element signature="e#25089#25530#0" expanded="false" />
+            <element signature="e#25592#26234#0" expanded="false" />
+            <element signature="e#28828#29538#0" expanded="false" />
+            <element signature="e#29961#30630#0" expanded="false" />
+            <element signature="e#34419#34785#0" expanded="false" />
           </folding>
         </state>
       </provider>
@@ -702,13 +762,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="407">
           <caret line="462" column="29" lean-forward="true" selection-start-line="462" selection-start-column="29" selection-end-line="462" selection-end-column="29" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$APPLICATION_HOME_DIR$/helpers/pydev/_pydev_imps/_pydev_execfile.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="289">
-          <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
         </state>
       </provider>
     </entry>
@@ -748,13 +801,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="373">
-          <caret line="146" column="38" lean-forward="false" selection-start-line="146" selection-start-column="38" selection-end-line="146" selection-end-column="38" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/clipwatcher_single.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="322">
@@ -786,25 +832,63 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$APPLICATION_HOME_DIR$/helpers/pydev/_pydev_imps/_pydev_execfile.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="289">
+          <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/pandas/core/internals.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="481">
+          <caret line="4232" column="0" lean-forward="false" selection-start-line="4232" selection-start-column="0" selection-end-line="4232" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/pandas/core/frame.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="5656" column="0" lean-forward="false" selection-start-line="5656" selection-start-column="0" selection-end-line="5656" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../../_code/soundgasm_rip.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="272">
+          <caret line="67" column="0" lean-forward="false" selection-start-line="67" selection-start-column="0" selection-end-line="67" selection-end-column="64" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/dltxt_to_csv.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="356">
+          <caret line="160" column="63" lean-forward="true" selection-start-line="160" selection-start-column="63" selection-end-line="160" selection-end-column="63" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="232">
-          <caret line="160" column="59" lean-forward="true" selection-start-line="160" selection-start-column="59" selection-end-line="160" selection-end-column="59" />
+        <state relative-caret-position="311">
+          <caret line="168" column="46" lean-forward="false" selection-start-line="168" selection-start-column="46" selection-end-line="168" selection-end-column="46" />
           <folding>
-            <element signature="e#10366#10619#0" expanded="false" />
-            <element signature="e#10662#10787#0" expanded="false" />
-            <element signature="e#10833#10962#0" expanded="false" />
-            <element signature="e#11074#11188#0" expanded="false" />
-            <element signature="e#16376#17142#0" expanded="false" />
-            <element signature="e#18124#18758#0" expanded="false" />
-            <element signature="e#22555#24442#0" expanded="false" />
-            <element signature="e#24478#24969#0" expanded="false" />
-            <element signature="e#25026#25234#0" expanded="false" />
-            <element signature="e#25317#25758#0" expanded="false" />
-            <element signature="e#25820#26462#0" expanded="false" />
-            <element signature="e#29056#29766#0" expanded="false" />
-            <element signature="e#30189#30858#0" expanded="false" />
-            <element signature="e#34647#35013#0" expanded="false" />
+            <element signature="e#10121#10374#0" expanded="false" />
+            <element signature="e#10417#10542#0" expanded="false" />
+            <element signature="e#10846#10960#0" expanded="false" />
+            <element signature="e#16148#16914#0" expanded="false" />
+            <element signature="e#17896#18530#0" expanded="false" />
+            <element signature="e#24250#24741#0" expanded="false" />
+            <element signature="e#24798#25006#0" expanded="false" />
+            <element signature="e#25089#25530#0" expanded="false" />
+            <element signature="e#25592#26234#0" expanded="false" />
+            <element signature="e#28828#29538#0" expanded="false" />
+            <element signature="e#29961#30630#0" expanded="false" />
+            <element signature="e#34419#34785#0" expanded="false" />
           </folding>
         </state>
       </provider>

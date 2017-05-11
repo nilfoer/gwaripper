@@ -9,7 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
 # match ^beginning of string \d+ one or more digtis whitespace Dateien
 # match alrdy only matches at beginning of str, so ^ is redundant
 PATTERN_OLD_DATE = re.compile("^\d+ Dateien")
-PATTER_ADDED_DATE = re.compile("^\s?Added: \d{2}/\d{2}/\d{4}")
+PATTER_ADDED_DATE = re.compile("\s?Added: \d{2}/\d{2}/\d{4}", re.UNICODE)
 
 
 def get_files_to_parse():
@@ -34,14 +34,18 @@ def get_files_to_parse():
 def _get_date(linecont):
     line_cont = linecont
 
-    if re.match(PATTER_ADDED_DATE, line_cont):
+    # re.match wont find match since (when Added is at beginning of file) \\ufeff -> BOM in unciode
+    # we could either decode the line or use search and not use ^ for beginning of string
+    # '\\'\\tAdded: 09/05/2017 12:07:57\\''
+    # '\\'\\ufeff\\tAdded: 09/05/2017 18:46:10,\\''
+    if re.search(PATTER_ADDED_DATE, line_cont):
         # ^stringstart \s whitespace 0 or 1 Added:..
         # match alrdy
         # old line_cont.startswith("\tAdded:")
         # Added: DD/MM/YYYY HH:MM:SS
         # 0      1          2
         # pass slice [1:3] endpoint not incl
-        return line_cont.split()[1:3]
+        return line_cont.strip(",").split()[1:3]
     elif line_cont.startswith("User Rip von"):
         return line_cont.split()[9:11]
     elif re.match(PATTERN_OLD_DATE, line_cont):
@@ -142,6 +146,17 @@ def main():
 
     # create new empty cols
     df["redditTitle"] = df["created_utc"] = df["redditID"] = df["subredditName"] = df["rPostUrl"] = None
+    # Append dummy row with values that match dtype of actual df so if the entire column is empty in the csv
+    # loading it wont assign float64 to it (since its np.nan) -> conversion error when set_value with string
+    # we could also set the first row as "MISSING"
+    # df.set_value(0, ["redditTitle", "created_utc", "redditID", "subredditName", "rPostUrl"], "MISSING")
+    df_dummy = pd.DataFrame(data=[['Date',  'Description: DummyLine',  'Local_filename',  'Time',  'Title: DummyTitle',  'URL',
+                                     'URLsg',  'redditURL',  'sgasm_user',  'reddit_user',  0,  'redditTitle',
+                                     12345.0,  'redditID',  'subredditName',  'rPostUrl']],
+                            columns=['Date',  'Description',  'Local_filename',  'Time',  'Title',  'URL',
+                                     'URLsg',  'redditURL',  'sgasm_user',  'reddit_user',  'filenr',  'redditTitle',
+                                     'created_utc',  'redditID',  'subredditName',  'rPostUrl'])
+    df = df.append(df_dummy, ignore_index=True)
 
     df.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
     df.to_json("../sgasm_rip_db.json")
