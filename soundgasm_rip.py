@@ -3,13 +3,14 @@ import urllib.request
 import re
 import os
 import time
+import sys
+import configparser
+import logging
+import logging.handlers
+import base64
 import clipwatcher_single
 import praw
 import bs4
-import logging
-import logging.handlers
-import sys
-import configparser
 import pandas as pd
 import timeit
 
@@ -171,10 +172,16 @@ def main():
 
 
 class AudioDownload:
-    def __init__(self, sgasm_url, reddit_info=None):
-        self.sgasm_url = sgasm_url
-        self.sgasm_usr = self.sgasm_url.split("/u/", 1)[1].split("/", 1)[0]
+    def __init__(self, page_url, host, reddit_info=None):
+        self.page_url = page_url
+        self.host = host
         self.reddit_info = reddit_info
+        # use reddit user name if not sgasm
+        if host == "sgasm":
+            self.name_usr = self.page_url.split("/u/", 1)[1].split("/", 1)[0]
+        else:
+            self.name_usr = self.reddit_info["r_user"]
+        self.host = None
         self.url_to_file = None
         self.title = None
         self.filename_local = None
@@ -182,13 +189,34 @@ class AudioDownload:
         self.date = None
         self.time = None
 
+    def call_host_get_file_info(self):
+        if self.host == "sgasm":
+            self.set_sgasm_info()
+        elif self.host == "chirb.it":
+            self.set_chirbit_url()
+
+    def set_chirbit_url(self):
+        site = urllib.request.urlopen(self.page_url)
+        html = site.read().decode('utf-8')
+        site.close()
+        soup = bs4.BeautifulSoup(html, "html.parser")
+
+        # selects ONE i tag with set data-fd attribute beneath tag with class .wavholder beneath div with id main
+        # then get attribute data-fd
+        str_b64 = soup.select_one('div#main .wavholder i[data-fd]')["data-fd"]
+        # reverse string using a slice -> string[start:stop:step], going through whole string with step -1 -> reverse
+        str_b64_rev = str_b64[::-1]
+        # decode base64 string to get url to file
+        # this link EXPIRES so get it right b4 downloading
+        self.url_to_file = base64.b64decode(str_b64_rev)
+
     def set_sgasm_info(self):
         # @Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
         # in missing information in the SGR_DF
         if not self.url_to_file:
-            logger.info("Getting soundgasm info of: %s" % self.sgasm_url)
+            logger.info("Getting soundgasm info of: %s" % self.page_url)
             try:
-                site = urllib.request.urlopen(self.sgasm_url)
+                site = urllib.request.urlopen(self.page_url)
                 html = site.read().decode('utf-8')
                 site.close()
                 nhtml = html.split("aria-label=\"title\">")
@@ -205,14 +233,14 @@ class AudioDownload:
                 self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", title[0:110]) + ".m4a"
                 self.descr = descript
             except urllib.request.HTTPError:
-                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.sgasm_url)
+                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
     def write_selftext_file(self):
         if self.reddit_info["selftext"]:
             # write_to_txtf uses append mode, but we'd have the selftext several times in the file since
             # there are reddit posts with multiple sgasm files
-            # write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.sgasm_usr)
-            mypath = os.path.join(ROOTDIR, self.sgasm_usr)
+            # write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.name_usr)
+            mypath = os.path.join(ROOTDIR, self.name_usr)
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
             # if selftext file doesnt already exists
@@ -247,7 +275,7 @@ def get_sub_from_reddit_urls(urllist):
 def gen_audiodl_from_sglink(sglinks):
     dl_list = []
     for link in sglinks:
-        a = AudioDownload(link)
+        a = AudioDownload(link, "sgasm")
         dl_list.append(a)
     return dl_list
 
@@ -274,7 +302,7 @@ def rip_audio_dls(dl_list, current_usr=None):
     # create dict that has direct links to files as keys and AudioDownload instances as values
     dl_dict = {}
     for audio in dl_list:
-        dl_dict[audio.sgasm_url] = audio
+        dl_dict[audio.page_url] = audio
 
     # returns list of new downloads, dl_dict still holds all of them
     new_dls = filter_alrdy_downloaded(dl_dict, current_usr)
@@ -289,7 +317,7 @@ def rip_audio_dls(dl_list, current_usr=None):
         # teilt string in form von https://soundgasm.net/u/USERNAME/link-to-post an /u/,
         # so erhaelt man liste mit https://soundgasm.net/u/, USERNAME/link-to-post
         # wird weiter an / geteilt aber nur ein mal und man hat den username
-        currentusr = audio_dl.sgasm_usr
+        currentusr = audio_dl.name_usr
         txtfilename = "sgasm-" + currentusr + "-rip.txt"
         erg = rip_file(audio_dl, txtfilename, currentusr, dlcounter, filestodl,
                        single=single, usrrip_string=userrip_str)
@@ -331,8 +359,8 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
         df_append_dict["Description"].append(audio_dl.descr)
         df_append_dict["Title"].append(audio_dl.title)
         df_append_dict["URL"].append(audio_dl.url_to_file)
-        df_append_dict["URLsg"].append(audio_dl.sgasm_url)
-        df_append_dict["sgasm_user"].append(audio_dl.sgasm_usr)
+        df_append_dict["URLsg"].append(audio_dl.page_url)
+        df_append_dict["sgasm_user"].append(audio_dl.name_usr)
 
         # append all the reddit info if set
         if audio_dl.reddit_info:
@@ -460,7 +488,7 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
         if single and audio_dl.reddit_info:
             write_to_txtf(gen_dl_txtstring(("Added", "{} {}".format(audio_dl.date, audio_dl.time)),
                                            ("Title", audio_dl.title), ("Description", audio_dl.descr),
-                                           ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
+                                           ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.page_url),
                                            ("Local filename", filename),
                                            ("redditURL", audio_dl.reddit_info["permalink"]),
                                            ("redditTitle", audio_dl.reddit_info["title"]), ("end", "")),
@@ -471,11 +499,11 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
         elif single and not audio_dl.reddit_info:
             write_to_txtf(gen_dl_txtstring(("Added", "{} {}".format(audio_dl.date, audio_dl.time)),
                                            ("Title", audio_dl.title), ("Description", audio_dl.descr),
-                                           ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
+                                           ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.page_url),
                                            ("Local filename", filename), ("end", "")), txtfilename, currentusr)
         else:
             usrrip_string += gen_dl_txtstring(("Title", audio_dl.title), ("Description", audio_dl.descr),
-                                              ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.sgasm_url),
+                                              ("URL", audio_dl.url_to_file), ("URLsg", audio_dl.page_url),
                                               ("Local filename", filename), ("end", ""))
 
         return curfnr, usrrip_string
@@ -487,15 +515,15 @@ def rip_file(audio_dl, txtfilename, currentusr, curfnr, maxfnr, single=True, usr
 def set_missing_values_df(dframe, audiodl_obj):
     # get index of matching direct url in dframe
     index = dframe[dframe["URL"] == audiodl_obj.url_to_file].index[0]
-    # fill_dict = {"Local filename": audiodl_obj.filename_local, "URLsg": audiodl_obj.sgasm_url}
+    # fill_dict = {"Local filename": audiodl_obj.filename_local, "URLsg": audiodl_obj.page_url}
     # dframe.iloc[index, :].fillna(fill_dict, inplace=True)
     # isnull on row iloc[index] returns Series with True for null values
     # only np.nan pd.NaT or None are considered null by isnull()
     cell_null_bool = dframe.iloc[index].isnull()
     # if field isnull()
     if cell_null_bool["URLsg"]:
-        # dframe["URLsg"][index] = audiodl_obj.sgasm_url
-        dframe.set_value(index, "URLsg", audiodl_obj.sgasm_url)
+        # dframe["URLsg"][index] = audiodl_obj.page_url
+        dframe.set_value(index, "URLsg", audiodl_obj.page_url)
     else:
         logger.warning("Field not set since it wasnt empty when trying to set "
                        "URLsg on row[{}] for {}".format(index, audiodl_obj.title))
@@ -608,7 +636,7 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # -> turn into dict with dict(), this method(same string concat): 0.4478
     # d = dict(dl_list)
     for dup in duplicate:
-        dup_titles += " ".join(dl_dict[dup].sgasm_url[24:].split("-")) + "\n"
+        dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
         # @Temporary
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to SGR_DF and write selftext to file
@@ -699,34 +727,44 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 # deactivted LASTDLTIME check by default
 def parse_submissions_for_links(sublist, fromtxt=True):
     dl_list = []
-    # get new lastdltime from cfg
-    reload_config()
+    if not fromtxt:
+        # get new lastdltime from cfg
+        reload_config()
     lastdltime = config["Time"]["LAST_DL_TIME"]
     for submission in sublist:
+
         if (not check_submission_banned_tags(submission, KEYWORDLIST) and
                 (fromtxt or check_submission_time(submission, lastdltime))):
+
             found_urls = []
-            if "soundgasm.net" in submission.url:
-                found_urls.append(submission.url)
-                logger.info("Link found in URL of: " + submission.title)
-                check_new_redditor(submission.url, str(submission.author))
-            elif (submission.selftext_html is not None) and ("soundgasm.net" in submission.selftext_html):
+            sub_url = submission.url
+
+            if "soundgasm.net" in sub_url:
+                found_urls.append(("sgasm", sub_url))
+                logger.info("SGASM link found in URL of: " + submission.title)
+            elif "chirb.it/" in sub_url:
+                found_urls.append(("chirb.it", sub_url))
+                logger.info("chirb.it link found in URL of: " + submission.title)
+            elif submission.selftext_html is not None:
+                print(submission.selftext_html)
                 soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
 
-                # selects all anchors(a) with href attribute that contains "soundgasm.net/u/"
-                # ^= is for begins with, $= is for ends with, *= is for is in
-                # select returns them as tag objects
-                sgasmlinks = soup.select('a[href*="soundgasm.net/u/"]')
-                uchecked = False
+                # selftext_html is not like the normal it starts with <div class="md"..
+                # so i can just go through all a
+                # css selector -> tag a with set href attribute
+                sgasmlinks = soup.select('a[href]')
+                usrcheck = re.compile("/u/.+/.+", re.IGNORECASE)
+
                 for link in sgasmlinks:
-                    usrcheck = re.compile("/u/.+/.+", re.IGNORECASE)
-                    if usrcheck.search(link["href"]):
+                    href = link["href"]
+                    # make sure we dont get an user link
+                    if ("soundgasm.net" in href) and usrcheck.search(href):
                         # appends href-attribute of tag object link
-                        found_urls.append(link["href"])
+                        found_urls.append(("sgasm", href))
                         logger.info("SGASM link found in text, in submission: " + submission.title)
-                        if not uchecked:
-                            check_new_redditor(link["href"], str(submission.author))
-                            uchecked = True
+                    elif "chirb.it/" in href:
+                        found_urls.append(("chirb.it", href))
+                        logger.info("chirb.it link found in text, in submission: " + submission.title)
             else:
                 logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
@@ -737,10 +775,11 @@ def parse_submissions_for_links(sublist, fromtxt=True):
             reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
                            "selftext": submission.selftext, "r_user": submission.author.name,
                            "created_utc": submission.created_utc, "id": submission.id,
-                           "subreddit": submission.subreddit.display_name, "r_post_url": submission.url}
+                           "subreddit": submission.subreddit.display_name, "r_post_url": sub_url}
+
             # create AudioDownload from found_urls
-            for url in found_urls:
-                dl_list.append(AudioDownload(url, reddit_info=reddit_info))
+            for host, url in found_urls:
+                dl_list.append(AudioDownload(url, host, reddit_info=reddit_info))
 
     return dl_list
 
