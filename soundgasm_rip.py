@@ -1,5 +1,6 @@
 #! python3
 import urllib.request
+from urllib.parse import quote as url_quote
 import re
 import os
 import time
@@ -222,14 +223,18 @@ class AudioDownload:
 
         # selects script tags beneath div with id main and div class post
         # returns list of bs4.element.Tag -> access text with .text
-        scripts = soup.select("div#main div.post script")[0].text
+        scripts = soup.select("div#main div.post script")[1].text
+        # vars that are needed to gen dl link are included in script tag
         # access group of RE (part in '()') with .group(index)
         # Group 0 is always present; it’s the whole RE
         fname = re.search("var filename = \"(.+)\"", scripts).group(1)
+        server = re.search("var playerServerURLAuthorityIncludingScheme = \"(.+)\"", scripts).group(1)
+        dl_token = re.search("var downloadToken = \"(.+)\"", scripts).group(1)
+        # convert fname to make it url safe with urllib.quote (quote_plus replaces spaces with plus signs)
+        fname = url_quote(fname)  # renamed so i dont accidentally create a func with same name
 
-
-        self.url_to_file = file_url
-        self.file_type = file_url[-4:]
+        self.url_to_file = "{}/fd/{}/{}".format(server, dl_token, fname)
+        self.file_type = fname[-4:]
         self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_sgasm_info(self):
