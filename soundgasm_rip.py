@@ -194,6 +194,8 @@ class AudioDownload:
             self.set_sgasm_info()
         elif self.host == "chirb.it":
             self.set_chirbit_url()
+        elif self.host == "eraudica":
+            self.set_eraudica_info()
 
     def set_chirbit_url(self):
         site = urllib.request.urlopen(self.page_url)
@@ -210,6 +212,24 @@ class AudioDownload:
         # this link EXPIRES so get it right b4 downloading
         self.url_to_file = base64.b64decode(str_b64_rev).decode("utf-8")
         self.file_type = self.url_to_file.split("?")[0][-4:]
+        self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
+
+    def set_eraudica_info(self):
+        site = urllib.request.urlopen(self.page_url)
+        html = site.read().decode('utf-8')
+        site.close()
+        soup = bs4.BeautifulSoup(html, "html.parser")
+
+        # selects script tags beneath div with id main and div class post
+        # returns list of bs4.element.Tag -> access text with .text
+        scripts = soup.select("div#main div.post script")[0].text
+        # access group of RE (part in '()') with .group(index)
+        # Group 0 is always present; it’s the whole RE
+        fname = re.search("var filename = \"(.+)\"", scripts).group(1)
+
+
+        self.url_to_file = file_url
+        self.file_type = file_url[-4:]
         self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_sgasm_info(self):
@@ -669,13 +689,20 @@ def parse_submissions_for_links(sublist, fromtxt=True):
 
             found_urls = []
             sub_url = submission.url
-
+            # @Refactor make this more automated by checking for list of supported hosts or sth.
             if "soundgasm.net" in sub_url:
                 found_urls.append(("sgasm", sub_url))
                 logger.info("SGASM link found in URL of: " + submission.title)
             elif "chirb.it/" in sub_url:
                 found_urls.append(("chirb.it", sub_url))
                 logger.info("chirb.it link found in URL of: " + submission.title)
+            elif "eraudica.com/" in sub_url:
+                # remove gwa so we can access dl link directly
+                if sub_url.endswith("/gwa"):
+                    found_urls.append(("eraudica", sub_url[:-4]))
+                else:
+                    found_urls.append(("eraudica", sub_url))
+                logger.info("eraudica link found in URL of: " + submission.title)
             elif submission.selftext_html is not None:
                 soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
 
@@ -695,6 +722,13 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                     elif "chirb.it/" in href:
                         found_urls.append(("chirb.it", href))
                         logger.info("chirb.it link found in text, in submission: " + submission.title)
+                    elif "eraudica.com/" in href:
+                        # remove gwa so we can access dl link directly
+                        if href.endswith("/gwa"):
+                            found_urls.append(("eraudica", href[:-4]))
+                        else:
+                            found_urls.append(("eraudica", href))
+                        logger.info("eraudica link found in text, in submission: " + submission.title)
             else:
                 logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),

@@ -24,21 +24,30 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="260">
-              <caret line="420" column="42" lean-forward="true" selection-start-line="420" selection-start-column="42" selection-end-line="420" selection-end-column="42" />
+            <state relative-caret-position="350">
+              <caret line="227" column="70" lean-forward="true" selection-start-line="227" selection-start-column="70" selection-end-line="227" selection-end-column="70" />
               <folding>
-                <element signature="e#13711#13964#0" expanded="false" />
-                <element signature="e#14007#14132#0" expanded="false" />
-                <element signature="e#20233#20867#0" expanded="false" />
-                <element signature="e#20922#22806#0" expanded="false" />
-                <element signature="e#23134#23788#0" expanded="false" />
-                <element signature="e#26406#27116#0" expanded="false" />
-                <element signature="e#27186#27454#0" expanded="false" />
-                <element signature="e#27539#28208#0" expanded="false" />
-                <element signature="e#32230#32927#0" expanded="false" />
-                <element signature="e#33241#33449#0" expanded="false" />
-                <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
+                <element signature="e#14579#14832#0" expanded="false" />
+                <element signature="e#14875#15000#0" expanded="false" />
+                <element signature="e#21101#21735#0" expanded="false" />
+                <element signature="e#21790#23674#0" expanded="false" />
+                <element signature="e#24002#24656#0" expanded="false" />
+                <element signature="e#27274#27984#0" expanded="false" />
+                <element signature="e#28407#29076#0" expanded="false" />
+                <element signature="e#34019#34716#0" expanded="false" />
+                <element signature="e#35030#35238#0" expanded="false" />
+                <marker date="1494604355176" expanded="false" signature="23726:23936" ph="..." />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="element.py" pinned="false" current-in-tab="false">
+        <entry file="file://C:/python3.5/Lib/site-packages/bs4/element.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="175">
+              <caret line="996" column="0" lean-forward="false" selection-start-line="996" selection-start-column="0" selection-end-line="996" selection-end-column="0" />
+              <folding />
             </state>
           </provider>
         </entry>
@@ -547,24 +556,31 @@
       <option name="project" value="LOCAL" />
       <updated>1494598407757</updated>
     </task>
-    <option name="localTasksCounter" value="29" />
+    <task id="LOCAL-00029" summary="Implemented chirb.it as host, refactored sgasm specific stuff; rip_file is now a method of AudioDownload; not writing to dltxtfile anymore">
+      <created>1494599170513</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1494599170513</updated>
+    </task>
+    <option name="localTasksCounter" value="30" />
     <servers />
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
-    <editor active="true" />
+    <editor active="false" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.1406744" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Event Log" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Find" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Version Control" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Python Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Python Console" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.32936078" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.14752372" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -626,14 +642,14 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/soundgasm_rip.py</url>
-          <line>414</line>
-          <option name="timeStamp" value="80" />
+          <line>123</line>
+          <option name="timeStamp" value="82" />
         </line-breakpoint>
       </breakpoints>
       <breakpoints-dialog>
         <breakpoints-dialog />
       </breakpoints-dialog>
-      <option name="time" value="81" />
+      <option name="time" value="83" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
@@ -668,17 +684,16 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#13711#13964#0" expanded="false" />
-            <element signature="e#14007#14132#0" expanded="false" />
-            <element signature="e#20233#20867#0" expanded="false" />
-            <element signature="e#20922#22806#0" expanded="false" />
-            <element signature="e#23134#23788#0" expanded="false" />
-            <element signature="e#26406#27116#0" expanded="false" />
-            <element signature="e#27186#27454#0" expanded="false" />
-            <element signature="e#27539#28208#0" expanded="false" />
-            <element signature="e#32230#32927#0" expanded="false" />
-            <element signature="e#33241#33449#0" expanded="false" />
-            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
+            <element signature="e#14579#14832#0" expanded="false" />
+            <element signature="e#14875#15000#0" expanded="false" />
+            <element signature="e#21101#21735#0" expanded="false" />
+            <element signature="e#21790#23674#0" expanded="false" />
+            <element signature="e#24002#24656#0" expanded="false" />
+            <element signature="e#27274#27984#0" expanded="false" />
+            <element signature="e#28407#29076#0" expanded="false" />
+            <element signature="e#34019#34716#0" expanded="false" />
+            <element signature="e#35030#35238#0" expanded="false" />
+            <marker date="1494604355176" expanded="false" signature="23726:23936" ph="..." />
           </folding>
         </state>
       </provider>
@@ -688,17 +703,16 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#13711#13964#0" expanded="false" />
-            <element signature="e#14007#14132#0" expanded="false" />
-            <element signature="e#20233#20867#0" expanded="false" />
-            <element signature="e#20922#22806#0" expanded="false" />
-            <element signature="e#23134#23788#0" expanded="false" />
-            <element signature="e#26406#27116#0" expanded="false" />
-            <element signature="e#27186#27454#0" expanded="false" />
-            <element signature="e#27539#28208#0" expanded="false" />
-            <element signature="e#32230#32927#0" expanded="false" />
-            <element signature="e#33241#33449#0" expanded="false" />
-            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
+            <element signature="e#14579#14832#0" expanded="false" />
+            <element signature="e#14875#15000#0" expanded="false" />
+            <element signature="e#21101#21735#0" expanded="false" />
+            <element signature="e#21790#23674#0" expanded="false" />
+            <element signature="e#24002#24656#0" expanded="false" />
+            <element signature="e#27274#27984#0" expanded="false" />
+            <element signature="e#28407#29076#0" expanded="false" />
+            <element signature="e#34019#34716#0" expanded="false" />
+            <element signature="e#35030#35238#0" expanded="false" />
+            <marker date="1494604355176" expanded="false" signature="23726:23936" ph="..." />
           </folding>
         </state>
       </provider>
@@ -715,17 +729,16 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#13711#13964#0" expanded="false" />
-            <element signature="e#14007#14132#0" expanded="false" />
-            <element signature="e#20233#20867#0" expanded="false" />
-            <element signature="e#20922#22806#0" expanded="false" />
-            <element signature="e#23134#23788#0" expanded="false" />
-            <element signature="e#26406#27116#0" expanded="false" />
-            <element signature="e#27186#27454#0" expanded="false" />
-            <element signature="e#27539#28208#0" expanded="false" />
-            <element signature="e#32230#32927#0" expanded="false" />
-            <element signature="e#33241#33449#0" expanded="false" />
-            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
+            <element signature="e#14579#14832#0" expanded="false" />
+            <element signature="e#14875#15000#0" expanded="false" />
+            <element signature="e#21101#21735#0" expanded="false" />
+            <element signature="e#21790#23674#0" expanded="false" />
+            <element signature="e#24002#24656#0" expanded="false" />
+            <element signature="e#27274#27984#0" expanded="false" />
+            <element signature="e#28407#29076#0" expanded="false" />
+            <element signature="e#34019#34716#0" expanded="false" />
+            <element signature="e#35030#35238#0" expanded="false" />
+            <marker date="1494604355176" expanded="false" signature="23726:23936" ph="..." />
           </folding>
         </state>
       </provider>
@@ -742,17 +755,16 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#13711#13964#0" expanded="false" />
-            <element signature="e#14007#14132#0" expanded="false" />
-            <element signature="e#20233#20867#0" expanded="false" />
-            <element signature="e#20922#22806#0" expanded="false" />
-            <element signature="e#23134#23788#0" expanded="false" />
-            <element signature="e#26406#27116#0" expanded="false" />
-            <element signature="e#27186#27454#0" expanded="false" />
-            <element signature="e#27539#28208#0" expanded="false" />
-            <element signature="e#32230#32927#0" expanded="false" />
-            <element signature="e#33241#33449#0" expanded="false" />
-            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
+            <element signature="e#14579#14832#0" expanded="false" />
+            <element signature="e#14875#15000#0" expanded="false" />
+            <element signature="e#21101#21735#0" expanded="false" />
+            <element signature="e#21790#23674#0" expanded="false" />
+            <element signature="e#24002#24656#0" expanded="false" />
+            <element signature="e#27274#27984#0" expanded="false" />
+            <element signature="e#28407#29076#0" expanded="false" />
+            <element signature="e#34019#34716#0" expanded="false" />
+            <element signature="e#35030#35238#0" expanded="false" />
+            <marker date="1494604355176" expanded="false" signature="23726:23936" ph="..." />
           </folding>
         </state>
       </provider>
@@ -890,22 +902,29 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://C:/python3.5/Lib/site-packages/bs4/element.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="175">
+          <caret line="996" column="0" lean-forward="false" selection-start-line="996" selection-start-column="0" selection-end-line="996" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="260">
-          <caret line="420" column="42" lean-forward="true" selection-start-line="420" selection-start-column="42" selection-end-line="420" selection-end-column="42" />
+        <state relative-caret-position="350">
+          <caret line="227" column="70" lean-forward="true" selection-start-line="227" selection-start-column="70" selection-end-line="227" selection-end-column="70" />
           <folding>
-            <element signature="e#13711#13964#0" expanded="false" />
-            <element signature="e#14007#14132#0" expanded="false" />
-            <element signature="e#20233#20867#0" expanded="false" />
-            <element signature="e#20922#22806#0" expanded="false" />
-            <element signature="e#23134#23788#0" expanded="false" />
-            <element signature="e#26406#27116#0" expanded="false" />
-            <element signature="e#27186#27454#0" expanded="false" />
-            <element signature="e#27539#28208#0" expanded="false" />
-            <element signature="e#32230#32927#0" expanded="false" />
-            <element signature="e#33241#33449#0" expanded="false" />
-            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
+            <element signature="e#14579#14832#0" expanded="false" />
+            <element signature="e#14875#15000#0" expanded="false" />
+            <element signature="e#21101#21735#0" expanded="false" />
+            <element signature="e#21790#23674#0" expanded="false" />
+            <element signature="e#24002#24656#0" expanded="false" />
+            <element signature="e#27274#27984#0" expanded="false" />
+            <element signature="e#28407#29076#0" expanded="false" />
+            <element signature="e#34019#34716#0" expanded="false" />
+            <element signature="e#35030#35238#0" expanded="false" />
+            <marker date="1494604355176" expanded="false" signature="23726:23936" ph="..." />
           </folding>
         </state>
       </provider>
