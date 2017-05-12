@@ -24,20 +24,20 @@
       <file leaf-file-name="soundgasm_rip.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="502">
-              <caret line="309" column="28" lean-forward="true" selection-start-line="309" selection-start-column="28" selection-end-line="309" selection-end-column="28" />
+            <state relative-caret-position="260">
+              <caret line="420" column="42" lean-forward="true" selection-start-line="420" selection-start-column="42" selection-end-line="420" selection-end-column="42" />
               <folding>
-                <element signature="e#11260#11513#0" expanded="false" />
-                <element signature="e#11556#11681#0" expanded="false" />
-                <element signature="e#17292#18058#0" expanded="false" />
-                <element signature="e#19040#19674#0" expanded="false" />
-                <element signature="e#25388#25879#0" expanded="false" />
-                <element signature="e#25936#26144#0" expanded="false" />
-                <element signature="e#26227#26668#0" expanded="false" />
-                <element signature="e#26730#27372#0" expanded="false" />
-                <element signature="e#29965#30675#0" expanded="false" />
-                <element signature="e#31098#31767#0" expanded="false" />
-                <element signature="e#35817#36183#0" expanded="false" />
+                <element signature="e#13711#13964#0" expanded="false" />
+                <element signature="e#14007#14132#0" expanded="false" />
+                <element signature="e#20233#20867#0" expanded="false" />
+                <element signature="e#20922#22806#0" expanded="false" />
+                <element signature="e#23134#23788#0" expanded="false" />
+                <element signature="e#26406#27116#0" expanded="false" />
+                <element signature="e#27186#27454#0" expanded="false" />
+                <element signature="e#27539#28208#0" expanded="false" />
+                <element signature="e#32230#32927#0" expanded="false" />
+                <element signature="e#33241#33449#0" expanded="false" />
+                <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
               </folding>
             </state>
           </provider>
@@ -70,12 +70,15 @@
       <find>TEMPORARY</find>
       <find>.sgasm_usr</find>
       <find>submission.url</find>
+      <find>currentusr</find>
+      <find>rip_file</find>
     </findStrings>
     <replaceStrings>
       <replace>rip_audio_dls</replace>
       <replace>.page_url</replace>
       <replace>.name_usr</replace>
       <replace>sub_url</replace>
+      <replace>self.name_usr</replace>
     </replaceStrings>
   </component>
   <component name="Git.Settings">
@@ -530,7 +533,21 @@
       <option name="project" value="LOCAL" />
       <updated>1494538325745</updated>
     </task>
-    <option name="localTasksCounter" value="27" />
+    <task id="LOCAL-00027" summary="Implementing chirb.it as host, refactoring sgasm specific stuff">
+      <created>1494594077418</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1494594077418</updated>
+    </task>
+    <task id="LOCAL-00028" summary="Implemented chirb.it as host, refactored sgasm specific stuff; rip_file is now a method of AudioDownload; not writing to dltxtfile anymore">
+      <created>1494598407757</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1494598407757</updated>
+    </task>
+    <option name="localTasksCounter" value="29" />
     <servers />
   </component>
   <component name="ToolWindowManager">
@@ -547,7 +564,7 @@
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.14752372" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Favorites" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
-      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
+      <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.3997833" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -600,14 +617,23 @@
     <MESSAGE value="Hardcoded checking for [f4f] in tags but only skip it when 4m] isnt present; Added option to rip from redditor" />
     <MESSAGE value="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern" />
     <MESSAGE value="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern; Now filters for unique URLs when taking single reddit links" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added dummy line when converting dltxts to df so dtype doesnt change when loading from csv; Added way to deal with BOM at start of dltxt when matching date pattern; Now filters for unique URLs when taking single reddit links" />
+    <MESSAGE value="Implementing chirb.it as host, refactoring sgasm specific stuff" />
+    <MESSAGE value="Implemented chirb.it as host, refactored sgasm specific stuff; rip_file is now a method of AudioDownload; not writing to dltxtfile anymore" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implemented chirb.it as host, refactored sgasm specific stuff; rip_file is now a method of AudioDownload; not writing to dltxtfile anymore" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/soundgasm_rip.py</url>
+          <line>414</line>
+          <option name="timeStamp" value="80" />
+        </line-breakpoint>
+      </breakpoints>
       <breakpoints-dialog>
         <breakpoints-dialog />
       </breakpoints-dialog>
-      <option name="time" value="67" />
+      <option name="time" value="81" />
     </breakpoint-manager>
     <watches-manager>
       <configuration name="PythonConfigurationType">
@@ -642,17 +668,17 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#11260#11513#0" expanded="false" />
-            <element signature="e#11556#11681#0" expanded="false" />
-            <element signature="e#17292#18058#0" expanded="false" />
-            <element signature="e#19040#19674#0" expanded="false" />
-            <element signature="e#25388#25879#0" expanded="false" />
-            <element signature="e#25936#26144#0" expanded="false" />
-            <element signature="e#26227#26668#0" expanded="false" />
-            <element signature="e#26730#27372#0" expanded="false" />
-            <element signature="e#29965#30675#0" expanded="false" />
-            <element signature="e#31098#31767#0" expanded="false" />
-            <element signature="e#35817#36183#0" expanded="false" />
+            <element signature="e#13711#13964#0" expanded="false" />
+            <element signature="e#14007#14132#0" expanded="false" />
+            <element signature="e#20233#20867#0" expanded="false" />
+            <element signature="e#20922#22806#0" expanded="false" />
+            <element signature="e#23134#23788#0" expanded="false" />
+            <element signature="e#26406#27116#0" expanded="false" />
+            <element signature="e#27186#27454#0" expanded="false" />
+            <element signature="e#27539#28208#0" expanded="false" />
+            <element signature="e#32230#32927#0" expanded="false" />
+            <element signature="e#33241#33449#0" expanded="false" />
+            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
           </folding>
         </state>
       </provider>
@@ -662,17 +688,17 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#11260#11513#0" expanded="false" />
-            <element signature="e#11556#11681#0" expanded="false" />
-            <element signature="e#17292#18058#0" expanded="false" />
-            <element signature="e#19040#19674#0" expanded="false" />
-            <element signature="e#25388#25879#0" expanded="false" />
-            <element signature="e#25936#26144#0" expanded="false" />
-            <element signature="e#26227#26668#0" expanded="false" />
-            <element signature="e#26730#27372#0" expanded="false" />
-            <element signature="e#29965#30675#0" expanded="false" />
-            <element signature="e#31098#31767#0" expanded="false" />
-            <element signature="e#35817#36183#0" expanded="false" />
+            <element signature="e#13711#13964#0" expanded="false" />
+            <element signature="e#14007#14132#0" expanded="false" />
+            <element signature="e#20233#20867#0" expanded="false" />
+            <element signature="e#20922#22806#0" expanded="false" />
+            <element signature="e#23134#23788#0" expanded="false" />
+            <element signature="e#26406#27116#0" expanded="false" />
+            <element signature="e#27186#27454#0" expanded="false" />
+            <element signature="e#27539#28208#0" expanded="false" />
+            <element signature="e#32230#32927#0" expanded="false" />
+            <element signature="e#33241#33449#0" expanded="false" />
+            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
           </folding>
         </state>
       </provider>
@@ -689,17 +715,17 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#11260#11513#0" expanded="false" />
-            <element signature="e#11556#11681#0" expanded="false" />
-            <element signature="e#17292#18058#0" expanded="false" />
-            <element signature="e#19040#19674#0" expanded="false" />
-            <element signature="e#25388#25879#0" expanded="false" />
-            <element signature="e#25936#26144#0" expanded="false" />
-            <element signature="e#26227#26668#0" expanded="false" />
-            <element signature="e#26730#27372#0" expanded="false" />
-            <element signature="e#29965#30675#0" expanded="false" />
-            <element signature="e#31098#31767#0" expanded="false" />
-            <element signature="e#35817#36183#0" expanded="false" />
+            <element signature="e#13711#13964#0" expanded="false" />
+            <element signature="e#14007#14132#0" expanded="false" />
+            <element signature="e#20233#20867#0" expanded="false" />
+            <element signature="e#20922#22806#0" expanded="false" />
+            <element signature="e#23134#23788#0" expanded="false" />
+            <element signature="e#26406#27116#0" expanded="false" />
+            <element signature="e#27186#27454#0" expanded="false" />
+            <element signature="e#27539#28208#0" expanded="false" />
+            <element signature="e#32230#32927#0" expanded="false" />
+            <element signature="e#33241#33449#0" expanded="false" />
+            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
           </folding>
         </state>
       </provider>
@@ -716,17 +742,17 @@
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
           <folding>
-            <element signature="e#11260#11513#0" expanded="false" />
-            <element signature="e#11556#11681#0" expanded="false" />
-            <element signature="e#17292#18058#0" expanded="false" />
-            <element signature="e#19040#19674#0" expanded="false" />
-            <element signature="e#25388#25879#0" expanded="false" />
-            <element signature="e#25936#26144#0" expanded="false" />
-            <element signature="e#26227#26668#0" expanded="false" />
-            <element signature="e#26730#27372#0" expanded="false" />
-            <element signature="e#29965#30675#0" expanded="false" />
-            <element signature="e#31098#31767#0" expanded="false" />
-            <element signature="e#35817#36183#0" expanded="false" />
+            <element signature="e#13711#13964#0" expanded="false" />
+            <element signature="e#14007#14132#0" expanded="false" />
+            <element signature="e#20233#20867#0" expanded="false" />
+            <element signature="e#20922#22806#0" expanded="false" />
+            <element signature="e#23134#23788#0" expanded="false" />
+            <element signature="e#26406#27116#0" expanded="false" />
+            <element signature="e#27186#27454#0" expanded="false" />
+            <element signature="e#27539#28208#0" expanded="false" />
+            <element signature="e#32230#32927#0" expanded="false" />
+            <element signature="e#33241#33449#0" expanded="false" />
+            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
           </folding>
         </state>
       </provider>
@@ -866,20 +892,20 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/soundgasm_rip.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="502">
-          <caret line="309" column="28" lean-forward="true" selection-start-line="309" selection-start-column="28" selection-end-line="309" selection-end-column="28" />
+        <state relative-caret-position="260">
+          <caret line="420" column="42" lean-forward="true" selection-start-line="420" selection-start-column="42" selection-end-line="420" selection-end-column="42" />
           <folding>
-            <element signature="e#11260#11513#0" expanded="false" />
-            <element signature="e#11556#11681#0" expanded="false" />
-            <element signature="e#17292#18058#0" expanded="false" />
-            <element signature="e#19040#19674#0" expanded="false" />
-            <element signature="e#25388#25879#0" expanded="false" />
-            <element signature="e#25936#26144#0" expanded="false" />
-            <element signature="e#26227#26668#0" expanded="false" />
-            <element signature="e#26730#27372#0" expanded="false" />
-            <element signature="e#29965#30675#0" expanded="false" />
-            <element signature="e#31098#31767#0" expanded="false" />
-            <element signature="e#35817#36183#0" expanded="false" />
+            <element signature="e#13711#13964#0" expanded="false" />
+            <element signature="e#14007#14132#0" expanded="false" />
+            <element signature="e#20233#20867#0" expanded="false" />
+            <element signature="e#20922#22806#0" expanded="false" />
+            <element signature="e#23134#23788#0" expanded="false" />
+            <element signature="e#26406#27116#0" expanded="false" />
+            <element signature="e#27186#27454#0" expanded="false" />
+            <element signature="e#27539#28208#0" expanded="false" />
+            <element signature="e#32230#32927#0" expanded="false" />
+            <element signature="e#33241#33449#0" expanded="false" />
+            <marker date="1494599165785" expanded="false" signature="22858:23068" ph="..." />
           </folding>
         </state>
       </provider>
