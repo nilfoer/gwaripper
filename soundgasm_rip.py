@@ -182,6 +182,7 @@ class AudioDownload:
             self.name_usr = self.page_url.split("/u/", 1)[1].split("/", 1)[0]
         else:
             self.name_usr = self.reddit_info["r_user"]
+        self.downloaded = False
         self.url_to_file = None
         self.file_type = None
         self.title = None
@@ -292,9 +293,14 @@ class AudioDownload:
             logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
             self.date = time.strftime("%d/%m/%Y")
             self.time = time.strftime("%H:%M:%S")
+            # set downloaded
+            self.downloaded = True
+
             try:
                 urllib.request.urlretrieve(self.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
             except urllib.request.HTTPError:
+                # dl failed set downloaded
+                self.downloaded = False
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.url_to_file)
 
             if self.reddit_info:
@@ -409,23 +415,24 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
     for url in new_dl_list:
         audio_dl = dl_dict[url]
 
-        df_append_dict["Date"].append(audio_dl.date)
-        df_append_dict["Time"].append(audio_dl.time)
-        df_append_dict["Local_filename"].append(audio_dl.filename_local)
-        df_append_dict["Description"].append(audio_dl.descr)
-        df_append_dict["Title"].append(audio_dl.title)
-        df_append_dict["URL"].append(audio_dl.url_to_file)
-        df_append_dict["URLsg"].append(audio_dl.page_url)
-        df_append_dict["sgasm_user"].append(audio_dl.name_usr)
+        if audio_dl.downloaded:
+            df_append_dict["Date"].append(audio_dl.date)
+            df_append_dict["Time"].append(audio_dl.time)
+            df_append_dict["Local_filename"].append(audio_dl.filename_local)
+            df_append_dict["Description"].append(audio_dl.descr)
+            df_append_dict["Title"].append(audio_dl.title)
+            df_append_dict["URL"].append(audio_dl.url_to_file)
+            df_append_dict["URLsg"].append(audio_dl.page_url)
+            df_append_dict["sgasm_user"].append(audio_dl.name_usr)
 
-        # append all the reddit info if set
-        if audio_dl.reddit_info:
-            for col, r_dkey in reddit_set_helper:
-                df_append_dict[col].append(audio_dl.reddit_info[r_dkey])
-        # make sure we write all the columns -> append "" or none as reddit info
-        else:
-            for col, r_dkey in reddit_set_helper:
-                df_append_dict[col].append("")
+            # append all the reddit info if set
+            if audio_dl.reddit_info:
+                for col, r_dkey in reddit_set_helper:
+                    df_append_dict[col].append(audio_dl.reddit_info[r_dkey])
+            # make sure we write all the columns -> append "" or none as reddit info
+            else:
+                for col, r_dkey in reddit_set_helper:
+                    df_append_dict[col].append("")
 
     # check if lists have equal length -> NOT -> ABORT!!
     # store length of one list in var to avoid overhead if accessing it in loop
@@ -435,6 +442,9 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
     # also works without iter()
     if not all(len(i) == len_first for i in iter(df_append_dict.values())):
         logger.error("ABORT !! Lists of append dict ARE NOT THE SAME SIZE !! ABORT !!")
+        return
+    elif len_first == 0:
+        logger.info("No new downloads!")
         return
 
     df_dict = pd.DataFrame.from_dict(df_append_dict)
@@ -530,6 +540,9 @@ def set_missing_values_df(dframe, audiodl_obj):
             else:
                 logger.warning("Field not set since it wasnt empty when trying to set {} "
                                "on row for {}[{}]".format(col, audiodl_obj.title, index))
+
+        # write selftext if there's reddit info
+        audiodl_obj.write_selftext_file()
 
 
 def write_to_txtf(wstring, filename, currentusr):
