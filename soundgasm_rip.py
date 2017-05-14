@@ -455,6 +455,9 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
     SGR_DF.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
     SGR_DF.to_json("../sgasm_rip_db.json")
 
+    # auto backup
+    backup_db()
+
 
 def rip_usr_to_files(sgasm_usr_url):
     currentusr = sgasm_usr_url.split("/u/", 1)[1].split("/", 1)[0]
@@ -787,11 +790,60 @@ def write_last_dltime():
     # create dict if it doesnt exist
     config["Time"] = {"LAST_DL_TIME": str(time.time())}
     with open("config.ini", "w") as config_file:
+        # configparser doesnt preserve comments when writing
         config.write(config_file)
 
 
 def reload_config():
     config.read("config.ini")
+
+
+def backup_db(force_bu=False):
+    bu_dir = os.path.join(ROOTDIR, "_db-autobu")
+    if not os.path.exists(bu_dir):
+        os.makedirs(bu_dir)
+    # time.time() get utc number
+    now = time.time()
+    # freq in days convert to secs since utc time is in secs since epoch
+    freq_secs = int(config["Settings"]["db_bu_freq"]) * 24 * 60 * 60
+    elapsed_time = now - float(config["Time"]["last_db_bu"])
+
+    # if time since last db bu is greater than frequency in settings or we want to force a bu
+    # time.time() is in gmt/utc whereas time.strftime() uses localtime
+    if (elapsed_time > freq_secs) or force_bu:
+        time_str = time.strftime("%Y-%m-%d")
+        logger.info("Writing backup of database!")
+        SGR_DF.to_csv("../_db-autobu/{}_sgasm_rip_db.csv".format(time_str), sep=";", encoding="utf-8")
+        SGR_DF.to_json("../_db-autobu/{}_sgasm_rip_db.json".format(time_str))
+
+        # update last db bu time
+        config["Time"]["last_db_bu"] = str(now)
+        with open("config.ini", "w") as config_file:
+            config.write(config_file)
+
+        # iterate over listdir, add file to list if isfile returns true
+        bu_dir_list = [os.path.join(bu_dir, f) for f in os.listdir(bu_dir) if os.path.isfile(os.path.join(bu_dir, f))]
+        # we could also use list(filter(os.path.isfile, bu_dir_list)) but then we need to have a list with PATHS
+        # but we need the paths for os.path.getctime anyway
+        # filter returns iterator!! that yields items which function is true -> only files
+        # iterator -> have to iterate over it or pass it to function that does that -> list() creates a list from it
+        # filter prob slower than list comprehension WHEN you call other function (def, lambda, os.path.isfile),
+        # WHEREAS you would use a simple if x == "bla" in the list comprehension, here prob same speed
+
+        # if there are more files than number of bu allowed (2 files per bu atm)
+        if len(bu_dir_list) > (int(config["Settings"]["max_db_bu"]) * 2):
+            # use creation time (getctime) for sorting, due to how name the files we could also sort alphabetically
+            bu_dir_list = sorted(bu_dir_list, key=os.path.getctime)
+
+            logger.info("Too many backups, deleting the oldest one!")
+            # remove the oldest two files
+            os.remove(bu_dir_list[0])
+            os.remove(bu_dir_list[1])
+    else:
+        # time in sec that is needed to reach next backup
+        next_bu = freq_secs - elapsed_time
+        logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
+                    "in {: .2f} Tagen!".format(config["Settings"]["db_bu_freq"], next_bu / 24 / 60 / 60))
 
 
 def check_submission_time(submission, lastdltime):
