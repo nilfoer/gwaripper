@@ -286,7 +286,8 @@ class AudioDownload:
                     # count up i till file doesnt exist anymore
                     while os.path.isfile(os.path.join(mypath, filename)):
                         i += 1
-                        filename = self.filename_local[:-8] + "_" + str(i).zfill(3) + self.file_type
+                        # @Refactor get rid of ending in filename?
+                        filename = self.filename_local[:-4] + "_" + str(i).zfill(3) + self.file_type
                     # set filename on AudioDownload instance
                     self.filename_local = filename
 
