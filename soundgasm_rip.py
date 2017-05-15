@@ -169,6 +169,7 @@ def main():
         #               number=10000))
         # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
         # new(), hot(), top(time_filter="all")
+        backup_db()
         main()
 
 
@@ -707,7 +708,15 @@ def parse_submissions_for_links(sublist, fromtxt=True):
     if not fromtxt:
         # get new lastdltime from cfg
         reload_config()
-    lastdltime = config["Time"]["LAST_DL_TIME"]
+    # all values stored as strings, configparser wont convert automatically so we do it with float(config[]..)
+    # or use provided getfloat, getint method
+    # provide fallback value if key isnt available
+    # also works on parser-level if section (here: Time) isnt present:
+    # float(config.get('Time', 'last_dl_time', fallback='0.0'))
+    # configparser provides also a legacy API with explicit get/set methods. While there are valid use cases for the
+    # methods outlined below, mapping protocol access is preferred for new projects
+    # -> when we dont need fallback value use config["Time"]["last_dl_time"] etc.
+    lastdltime = config.getfloat("Time", "last_dl_time", fallback=0.0)
     for submission in sublist:
 
         if (not check_submission_banned_tags(submission, KEYWORDLIST) and
@@ -792,8 +801,11 @@ def check_submission_banned_tags(submission, keywordlist):
 
 
 def write_last_dltime():
-    # create dict if it doesnt exist
-    config["Time"] = {"LAST_DL_TIME": str(time.time())}
+    if config.has_section("Time"):
+        config["Time"]["LAST_DL_TIME"] = str(time.time())
+    else:
+        # create section if it doesnt exist
+        config["Time"] = {"LAST_DL_TIME": str(time.time())}
     with open("config.ini", "w") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)
@@ -810,8 +822,9 @@ def backup_db(force_bu=False):
     # time.time() get utc number
     now = time.time()
     # freq in days convert to secs since utc time is in secs since epoch
-    freq_secs = int(config["Settings"]["db_bu_freq"]) * 24 * 60 * 60
-    elapsed_time = now - float(config["Time"]["last_db_bu"])
+    # get freq from config.ini use fallback value 3 days
+    freq_secs = config.getint("Settings", "db_bu_freq", fallback=5) * 24 * 60 * 60
+    elapsed_time = now - config.getfloat("Time", "last_db_bu", fallback=0.0)
 
     # if time since last db bu is greater than frequency in settings or we want to force a bu
     # time.time() is in gmt/utc whereas time.strftime() uses localtime
@@ -822,7 +835,11 @@ def backup_db(force_bu=False):
         SGR_DF.to_json("../_db-autobu/{}_sgasm_rip_db.json".format(time_str))
 
         # update last db bu time
-        config["Time"]["last_db_bu"] = str(now)
+        if config.has_section("Time"):
+            config["Time"]["last_db_bu"] = str(now)
+        else:
+            config["Time"] = {"last_db_bu": str(now)}
+        # write config to file
         with open("config.ini", "w") as config_file:
             config.write(config_file)
 
@@ -836,7 +853,7 @@ def backup_db(force_bu=False):
         # WHEREAS you would use a simple if x == "bla" in the list comprehension, here prob same speed
 
         # if there are more files than number of bu allowed (2 files per bu atm)
-        if len(bu_dir_list) > (int(config["Settings"]["max_db_bu"]) * 2):
+        if len(bu_dir_list) > (config.getint("Settings", "max_db_bu", fallback=5) * 2):
             # use creation time (getctime) for sorting, due to how name the files we could also sort alphabetically
             bu_dir_list = sorted(bu_dir_list, key=os.path.getctime)
 
@@ -848,7 +865,7 @@ def backup_db(force_bu=False):
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
-                    "in {: .2f} Tagen!".format(config["Settings"]["db_bu_freq"], next_bu / 24 / 60 / 60))
+                    "in {: .2f} Tagen!".format(config.getint("Settings", "db_bu_freq", fallback=5), next_bu / 24 / 60 / 60))
 
 
 def check_submission_time(submission, lastdltime):
