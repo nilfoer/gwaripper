@@ -456,6 +456,10 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
     SGR_DF.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
     SGR_DF.to_json("../sgasm_rip_db.json")
 
+    # update groupby obj
+    global GRPED_DF
+    GRPED_DF = SGR_DF.groupby("sgasm_user")
+
     # auto backup
     backup_db()
 
