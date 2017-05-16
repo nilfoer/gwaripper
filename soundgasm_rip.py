@@ -172,6 +172,8 @@ def main():
         print("test")
     # we could check with: if not len(sys.argv) > 1
     # if no arguments were passed and call our old input main func; or use argument with default value args.old
+    elif not len(sys.argv) > 1:
+        print("No arguments passed! Call this script from the command line with -h to show available commands.")
     else:
         # call func that was selected for subparser/command
         args.func(args)
