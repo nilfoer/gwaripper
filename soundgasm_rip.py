@@ -96,6 +96,8 @@ def main():
     parser_usr = subparsers.add_parser('ripuser', help='Rip sgasm or reddit user/s')
     # nargs="+" -> one or more arguments
     parser_usr.add_argument("names", help="Names of users to rip.", nargs="+")
+    # from argparse doc: Required options are generally considered bad form because users expect options to
+    # be optional, and thus they should be avoided when possible.
     parser_usr.add_argument("-ty", "--type", required=True, choices=("sgasm", "reddit"),
                             help="Type of user: soundgasm.net user or redditor")
     # choices -> available options -> error if not contained; default -> default value if not supplied
@@ -140,7 +142,8 @@ def main():
     parser_sub.set_defaults(func=cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
-    # parser normally uses name of dest var for refering to argument -> --subreddit SUBREDDIT
+    # parser normally uses name of dest=name (which u use to access value with args.name) var for refering to
+    # argument -> --subreddit SUBREDDIT; can be different from option string e.g. -user, dest="name"
     # can be changed with metavar, when nargs=n -> tuple with n elements
     # bug in argparse: http://bugs.python.org/issue14074
     # no tuples allowed as metavars for positional arguments
@@ -164,16 +167,59 @@ def main():
 
     parser.add_argument("-te", "--test", action="store_true")
 
-    # parse_args() will only contain attributes for the main parser and the subparser that was selected
-    args = parser.parse_args()
+    # check with: if not len(sys.argv) > 1
+    # if no arguments were passed and call our old input main func; or use argument with default value args.old
+    if not len(sys.argv) > 1:
+        print("No arguments passed! Call this script from the command line with -h to show available commands.")
+        argv_str = input("Simulating command line input!!\n\nType in command line args:\n").split()
+
+        # simulate shell/cmd way of considering strings with spaces in quotation marks as one single arg/string
+        argv_clean = []
+        # index of element in list with first quotation mark
+        first_i = None
+        # iterate over list, keeping track of index with enumerate
+        for i, s in enumerate(argv_str):
+            # found quotation mark and were not currently looking for the end of a quote (first_i not set)
+            # ("\"" in s) or ("\'" in s) and not first_i needs to be in extra parentheses  or it will be evaluated like:
+            # True | (False & False) -> True, since only ("\'" in s) and not first_i get connected with and
+            # (("\"" in s) or ("\'" in s)) and not first_i:
+            # (This OR This must be true) AND not This must be false
+            if (("\"" in s) or ("\'" in s)) and not first_i:
+                # the whole quote is in this element of the list
+                if (s.count("\"") > 1) or (s.count("\'") > 1):
+                    # strip away quot marks and append
+                    argv_clean.append(s.strip("\"").strip("\'"))
+                    continue
+                else:
+                    # save index
+                    first_i = i
+                    # continue with next element in list
+                    continue
+            # found quotation mark and were currently looking for the end of a quote (first_i set)
+            elif (("\"" in s) or ("\'" in s)) and first_i:
+                # get slice of list from index of first quot mark to this index: argv_str[first_i:i+1]
+                # due to how slicing works we have to +1 the current i
+                # join the slice with spaces to get the spaces back: " ".join()
+                # get rid of quot marks with strip("\"")
+                # append str to clean list
+                argv_clean.append(" ".join(argv_str[first_i:i+1]).strip("\""))
+                # unset first_i
+                first_i = None
+                continue
+            elif not first_i:
+                # normal element of list -> append to clean list
+                argv_clean.append(s)
+
+        # simulate command line input by passing in list like: ['--sum', '7', '-1', '42']
+        # which is the same as prog.py --sum 7 -1 42 -> this is also used in docs of argparse
+        args = parser.parse_args(argv_clean)
+    else:
+        # parse_args() will only contain attributes for the main parser and the subparser that was selected
+        args = parser.parse_args()
 
     if args.test:
         # test code
         print("test")
-    # we could check with: if not len(sys.argv) > 1
-    # if no arguments were passed and call our old input main func; or use argument with default value args.old
-    elif not len(sys.argv) > 1:
-        print("No arguments passed! Call this script from the command line with -h to show available commands.")
     else:
         # call func that was selected for subparser/command
         args.func(args)
@@ -260,7 +306,7 @@ def cl_search(args):
     if adl_list:
         rip_audio_dls(adl_list)
     else:
-        logger.warning("No matching subs/links found in {}, with: '{}'".format(*args.subsearch))
+        logger.warning("No matching subs/links found in {}, with: '{}'".format(args.subname, args.sstr))
 
 
 class AudioDownload:
