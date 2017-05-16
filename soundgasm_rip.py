@@ -96,8 +96,8 @@ def main():
     parser_usr = subparsers.add_parser('ripuser', help='Rip sgasm or reddit user/s')
     # nargs="+" -> one or more arguments
     parser_usr.add_argument("names", help="Names of users to rip.", nargs="+")
-    # from argparse doc: Required options are generally considered bad form because users expect options to
-    # be optional, and thus they should be avoided when possible.
+    # TODO Cleanup from argparse doc: Required options are generally considered bad form because users expect
+    # options to be optional, and thus they should be avoided when possible.
     parser_usr.add_argument("-ty", "--type", required=True, choices=("sgasm", "reddit"),
                             help="Type of user: soundgasm.net user or redditor")
     # choices -> available options -> error if not contained; default -> default value if not supplied
@@ -250,7 +250,7 @@ def cl_ripuser(args):
                 sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
             else:  # just get new posts if input doesnt match hot or top
                 sublist = redditor.submissions.new(limit=limit)
-            # @Refactor check if subreddit is gwa or pta first?
+            # TODO Refactor check if subreddit is gwa or pta first?
             adl_list = parse_submissions_for_links(sublist)
             if adl_list:
                 rip_audio_dls(adl_list)
@@ -376,7 +376,7 @@ class AudioDownload:
         self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_sgasm_info(self):
-        # @Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
+        # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
         # in missing information in the SGR_DF
         if not self.url_to_file:
             logger.info("Getting soundgasm info of: %s" % self.page_url)
@@ -427,7 +427,7 @@ class AudioDownload:
                     # count up i till file doesnt exist anymore
                     while os.path.isfile(os.path.join(mypath, filename)):
                         i += 1
-                        # @Refactor get rid of ending in filename?
+                        # TODO Refactor get rid of ending in filename?
                         filename = self.filename_local[:-4] + "_" + str(i).zfill(3) + self.file_type
                     # set filename on AudioDownload instance
                     self.filename_local = filename
@@ -532,7 +532,7 @@ def rip_audio_dls(dl_list, current_usr=None):
         # write info of new downloads to SGR_DF
         append_new_info_downloaded(new_dls, dl_dict)
     elif dl_list[0].reddit_info:
-        # @Temporary we might have set missing info on already downloaded files so new_dls might
+        # TODO Temporary we might have set missing info on already downloaded files so new_dls might
         # be None even if we added info to df so always safe it to be sure
         # or do elif dl_list[0].reddit_info -> ripping from reddit links so we wrote missing info
         # if we didnt dl sth new
@@ -753,7 +753,7 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # d = dict(dl_list)
     for dup in duplicate:
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
-        # @Temporary
+        # TODO Temporary
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to SGR_DF and write selftext to file
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
@@ -863,7 +863,7 @@ def parse_submissions_for_links(sublist, fromtxt=True):
 
             found_urls = []
             sub_url = submission.url
-            # @Refactor make this more automated by checking for list of supported hosts or sth.
+            # TODO Refactor make this more automated by checking for list of supported hosts or sth.
             if "soundgasm.net" in sub_url:
                 found_urls.append(("sgasm", sub_url))
                 logger.info("SGASM link found in URL of: " + submission.title)
@@ -930,7 +930,7 @@ def check_submission_banned_tags(submission, keywordlist):
         if keyword in subtitle:
             logger.info("Banned keyword '{}' in: {}\n\t slink: {}".format(keyword, subtitle, submission.shortlink))
             return True
-    # @Refactor Hardcoding this is bad if someone else wants to use this script
+    # TODO Hardcode Hardcoding this is bad if someone else wants to use this script
     if ("[f4f]" in subtitle) and not ("4m]" in subtitle):
         logger.info("Banned keyword: no '4m]' in title where '[f4f]' is in: {}\n\t "
                     "slink: {}".format(subtitle, submission.shortlink))
