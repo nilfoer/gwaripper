@@ -9,6 +9,7 @@ import configparser
 import logging
 import logging.handlers
 import base64
+import argparse
 import clipwatcher_single
 import praw
 import bs4
@@ -72,105 +73,192 @@ GRPED_DF = SGR_DF.groupby("sgasm_user")
 
 
 def main():
-    opt = input("Was moechten Sie tun?\n\n 1. Rip/Update Users\n 2. Rip from single links\n "
-                "3. Rip single links from a txt file\n 4. Watch clipboard for sgasm links\n "
-                "5. Watch clipboard for reddit links\n 6. Download sgasm posts from subreddit\n "
-                "7. Rip single reddit links from a txt file\n 8. Subreddit durchsuchen und Ergebnisse "
-                "herunterladen\n 9. Rip from Redditor\n 0. Test\n")
-    if opt == "1":
-        usrurls = input("Enter soundgasm User URLs separated by \",\" - no spaces\n")
-        rip_users(usrurls)
-        main()
-    elif opt == "2":
-        adl_list = input("Enter soundgasm post URLs separated by \",\" - no spaces\n")
-        llist = gen_audiodl_from_sglink(adl_list.split(","))
-        rip_audio_dls(llist)
-        main()
-    elif opt == "3":
-        txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
-        mypath = os.path.join(ROOTDIR, "_linkcol")
+    parser = argparse.ArgumentParser(description="Script to download gonewildaudio/pta posts from either reddit "
+                                                 "or soundgasm.net directly.")
+    # support sub-commands like svn checkout which require different kinds of command-line arguments
+    subparsers = parser.add_subparsers(title='subcommands', description='valid subcommands', help='sub-command help')
 
-        rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, txtfn)))
-        main()
-    elif opt == "4":
+    # process single links by default # nargs="*" -> zero or more arguments
+    # !! -> doesnt work since we need to specify a subcommand since they work like positional arguements
+    # and providing a default subcommand isnt supported atm
+    # create the parser for the "links" subcommand
+    parser_lnk = subparsers.add_parser('links', help='Process single link/s')
+    parser_lnk.add_argument("links", help="Links to process. Provide type of links as flag!", nargs="+")
+    # argparse will make sure that only one of the arguments in the mutually exclusive group was present
+    # also accepts a required argument, to indicate that at least one of the mutually exclusive arguments is required
+    group_lnk = parser_lnk.add_mutually_exclusive_group(required=True)
+    # store_true sets args.watchsgasm to true if flag is passed
+    group_lnk.add_argument("-sg", "--sglinks", help="Rip from single sgasm link/s", action="store_true")
+    group_lnk.add_argument("-r", "--reddit", help="Rip supported links from given reddit link/s.", action="store_true")
+    # set funct to call when subcommand is used
+    parser_lnk.set_defaults(func=cl_link)
+
+    parser_usr = subparsers.add_parser('ripuser', help='Rip sgasm or reddit user/s')
+    # nargs="+" -> one or more arguments
+    parser_usr.add_argument("names", help="Names of users to rip.", nargs="+")
+    parser_usr.add_argument("-ty", "--type", required=True, choices=("sgasm", "reddit"),
+                            help="Type of user: soundgasm.net user or redditor")
+    # choices -> available options -> error if not contained; default -> default value if not supplied
+    parser_usr.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
+                            help="Reddit post sorting method")
+    parser_usr.add_argument("-l", "--limit", type=int, required=True, help="How many posts to download")
+    parser_usr.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+                            choices=("all", "day", "hour", "month", "week", "year"))
+    parser_usr.set_defaults(func=cl_ripuser)
+    # we could set a function to call with these args parser_foo.set_defaults(func=foo)
+    # call with args.func(args) -> let argparse handle which func to call instead of long if..elif
+    # However, if it is necessary to check the name of the subparser that was invoked, the dest keyword argument
+    # to the add_subparsers(): parser.add_subparsers(dest='subparser_name')
+    # Namespace(subparser_name='ripuser', ...)
+
+    parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file located in _linkcol')
+    group_txt = parser_txt.add_mutually_exclusive_group(required=True)
+
+    parser_txt.add_argument("filename", help="Filename of txt file in _linkcol folder. Specify type of links"
+                                             "with flag!")
+    group_txt.add_argument("-sgt", "--sgfromtxt", help="File with given filename contains sgasm links!",
+                           action="store_true")
+    group_txt.add_argument("-rt", "--reddittxt", help="File with given filename contains reddit links!",
+                           action="store_true")
+    parser_txt.set_defaults(func=cl_fromtxt)
+
+    parser_clip = subparsers.add_parser('watch', help='Watch clipboard for sgasm/reddit links and save them to txt;'
+                                                      ' option to process them immediately')
+    parser_clip.add_argument("type", help="Type of links to watch for", choices=("sgasm", "reddit"))
+    parser_clip.set_defaults(func=cl_watch)
+
+    # provide shorthands or alt names with aliases
+    parser_sub = subparsers.add_parser('subreddit', aliases=["sub"],
+                                       help='Parse subreddit and download supported links')
+
+    parser_sub.add_argument("sub", help="Name of subreddit")
+    parser_sub.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method",
+                            default="top")
+    parser_sub.add_argument("-l", "--limit", type=int, help="How many posts to download", required=True)
+    parser_sub.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+                            choices=("all", "day", "hour", "month", "week", "year"))
+    parser_sub.set_defaults(func=cl_sub)
+
+    parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
+    # parser normally uses name of dest var for refering to argument -> --subreddit SUBREDDIT
+    # can be changed with metavar, when nargs=n -> tuple with n elements
+    # bug in argparse: http://bugs.python.org/issue14074
+    # no tuples allowed as metavars for positional arguments
+    # it works with a list but the help output is wrong:
+    # on usage it uses 2x['SUBREDDIT', 'SEARCHSTRING'] instead of SUBREDDIT SEARCHSTRING
+    # with a tuple and as optional arg it works correctly: [-subsearch SUBREDDIT SEARCHSTRING]
+    # but fails with a list: on opt arg line as well
+    # [-subsearch ['SUBREDDIT', 'SEARCHSTRING'] ['SUBREDDIT', 'SEARCHSTRING']]
+    # only uniform positional arguments allowed basically as in: searchstring searchstring...
+    # always of the same kind
+    # metavar=['SUBREDDIT', 'SEARCHSTRING'])
+    parser_se.add_argument("subname", help="Name of subreddit")
+    parser_se.add_argument("sstr", help="'searchstring' in QUOTES: https://www.reddit.com/wiki/search",
+                           metavar="searchstring")
+    parser_se.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method",
+                           default="top")
+    parser_se.add_argument("-l", "--limit", type=int, help="How many posts to download", required=True)
+    parser_se.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+                           choices=("all", "day", "hour", "month", "week", "year"))
+    parser_se.set_defaults(func=cl_search)
+
+    parser.add_argument("-te", "--test", action="store_true")
+
+    # parse_args() will only contain attributes for the main parser and the subparser that was selected
+    args = parser.parse_args()
+
+    if args.test:
+        # test code
+        print("test")
+    # we could check with: if not len(sys.argv) > 1
+    # if no arguments were passed and call our old input main func; or use argument with default value args.old
+    else:
+        # call func that was selected for subparser/command
+        args.func(args)
+
+
+def cl_link(args):
+    if args.sglinks:
+        llist = gen_audiodl_from_sglink(args.links)
+        rip_audio_dls(llist)
+    else:
+        llist = get_sub_from_reddit_urls(args.links)
+        adl_list = parse_submissions_for_links(llist)
+        rip_audio_dls(adl_list)
+
+
+def cl_ripuser(args):
+    if args.type == "sgasm":
+        rip_users(*args.names)
+    else:
+        sort = args.sort
+        limit = args.limit
+        time_filter = args.timefilter
+        for usr in args.names:
+            redditor = reddit_praw.redditor(usr)
+            if sort == "hot":
+                sublist = redditor.submissions.hot(limit=limit)
+            elif sort == "top":
+                sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
+            else:  # just get new posts if input doesnt match hot or top
+                sublist = redditor.submissions.new(limit=limit)
+            # @Refactor check if subreddit is gwa or pta first?
+            adl_list = parse_submissions_for_links(sublist)
+            if adl_list:
+                rip_audio_dls(adl_list)
+            else:
+                logger.warning("No subs recieved from user {} with time_filter {}".format(usr, args.timefilter))
+
+
+def cl_fromtxt(args):
+    mypath = os.path.join(ROOTDIR, "_linkcol")
+    if args.sgfromtxt:
+        rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, args.filename)))
+    else:
+        llist = get_sub_from_reddit_urls(txt_to_list(mypath, args.filename))
+        adl_list = parse_submissions_for_links(llist, True)
+        rip_audio_dls(adl_list)
+
+
+def cl_watch(args):
+    if args.type == "sgasm":
         found = watch_clip("sgasm")
         if found:
             llist = gen_audiodl_from_sglink(found)
             rip_audio_dls(llist)
-        main()
-    elif opt == "5":
+    else:
         found = watch_clip("reddit")
         if found:
             llist = get_sub_from_reddit_urls(found)
             adl_list = parse_submissions_for_links(llist, True)
             rip_audio_dls(adl_list)
-        main()
-    elif opt == "6":
-        subr = input("Enter subreddit name: \n")
-        limit = input("Enter post-limit:\n\tGood limit for top posts: week -> 25posts, month -> 100posts\n")
-        sort = input("Enter sorting type - 'hot' or 'top':\n")
-        if sort == "top":
-            time_filter = input("Enter time period (week, month, year, all):\n")
-            adl_list = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit), time_filter=time_filter))
-        else:
-            # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
-            adl_list = parse_submissions_for_links(parse_subreddit(subr, sort, int(limit)), fromtxt=False)
-            write_last_dltime()
-        rip_audio_dls(adl_list)
-        main()
-    elif opt == "7":
-        txtfn = input("Enter filename of txt file containing post URLs separated by newlines\n")
-        llist = get_sub_from_reddit_urls(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), txtfn))
-        adl_list = parse_submissions_for_links(llist, True)
-        rip_audio_dls(adl_list)
-        main()
-    elif opt == "8":
-        subname = input("Enter name of subreddit\n")
-        limit = input("Enter limit for found submissions, max 1000 forced by Reddit:\n")
-        searchstring = input("Enter search string:\n")
 
-        kw_inp = input("Enter additional kwargs to search func e.g. 'time_filter' (all, year, month..)\n"
-                       "(kwarg,value;kwarg,value;..):\n")
-        kwargs = {}
-        if kwargs:
-            for kw in kw_inp.split(";"):
-                kw_v = kw.split(",")
-                kwargs[kw_v[0]] = kw_v[1]
 
-        # if i have a function def test(pospar, kwarg1=Default, kwarg2=Default2)
-        # and i pass a dict with kwargs=  {"kwarg1": "value", "kwarg2": "passed"} to func with test(0, **kwargs)
-        # then i get (when test prints the kwarg1 and 2): "value" "passed"
-        # if theres one func before that def t(n, **kwargs) that just calls test(0, **kwargs)
-        # we get the same result so the kwargs were pass through that function to the other
-        # also works when def t(n, kwargs) and t is called like t(0, kwargs) -> WITHOUT ** otherwise error
-        # but then kwargs is a positional param unless you assign a def value like t(n, kwargs={})
-        found_subs = search_subreddit(subname, searchstring, limit=int(limit), **kwargs)
-        adl_list = parse_submissions_for_links(found_subs, True)
+def cl_sub(args):
+    sort = args.sort
+    limit = args.limit
+    time_filter = args.timefilter
+    if sort == "top":
+        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter))
+    else:
+        # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
+        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), fromtxt=False)
+        write_last_dltime()
+    rip_audio_dls(adl_list)
+
+
+def cl_search(args):
+    sort = args.sort
+    limit = args.limit
+    time_filter = args.timefilter
+
+    found_subs = search_subreddit(args.subname, args.sstr, limit=limit, time_filter=time_filter,
+                                  sort=sort)
+    adl_list = parse_submissions_for_links(found_subs, True)
+    if adl_list:
         rip_audio_dls(adl_list)
-        main()
-    elif opt == "9":
-        r_u_name = input("Enter name of redditor: ")
-        get_sort = input("Get hot, top or new posts?: ")
-        limit = int(input("Enter number of posts: "))
-        redditor = reddit_praw.redditor(r_u_name)
-        if get_sort == "hot":
-            sublist = redditor.submissions.hot(limit=limit)
-        elif get_sort == "top":
-            sublist = redditor.submissions.top(limit=limit, time_filter="all")
-        else:  # just get new posts if input doesnt match hot or top
-            sublist = redditor.submissions.new(limit=limit)
-        # @Refactor check if subreddit is gwa or pta first?
-        adl_list = parse_submissions_for_links(sublist)
-        rip_audio_dls(adl_list)
-        main()
-    elif opt == "0":
-        # print(timeit.timeit('filter_alrdy_downloaded(l)',
-        #               setup="from __main__ import filter_alrdy_downloaded, txt_to_list, ROOTDIR, l; import os",
-        #               number=10000))
-        # filter_alrdy_downloaded(txt_to_list(os.path.join(ROOTDIR, "_linkcol"), "test.txt"), "test")
-        # new(), hot(), top(time_filter="all")
-        backup_db()
-        main()
+    else:
+        logger.warning("No matching subs/links found in {}, with: '{}'".format(*args.subsearch))
 
 
 class AudioDownload:
@@ -274,6 +362,10 @@ class AudioDownload:
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
             i = 0
+            # Actually it is considered better practice to try and open the file with a try-except block, than
+            # to check for existence – jarondl Jul 6 '13 at 12:45 3
+            # @jarondl is right. This should be changed to use a try: ... except IOError to avoid potential race
+            # conditions. For most cases it won't matter but this has bitten me recently
             if os.path.isfile(os.path.join(mypath, filename)):
                 if check_direct_url_for_dl(self.url_to_file, self.name_usr):
                     set_missing_values_df(SGR_DF, self)
@@ -328,12 +420,10 @@ class AudioDownload:
                     w.write(self.reddit_info["selftext"])
 
 
-def rip_users(sgusr_urls):
-    # trennt user url string an den kommas
-    sgusr_urllist = sgusr_urls.split(",")
-    for usr in sgusr_urllist:
+def rip_users(*users):
+    for usr in users:
         # geht jede url in der liste durch entfernt das komma und gibt sie an rip_usr_to_files weiter
-        rip_usr_to_files(usr.strip(","))
+        rip_usr_to_files(usr)
 
 
 def txt_to_list(path, txtfilename):
@@ -465,8 +555,8 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
     backup_db()
 
 
-def rip_usr_to_files(sgasm_usr_url):
-    currentusr = sgasm_usr_url.split("/u/", 1)[1].split("/", 1)[0]
+def rip_usr_to_files(currentusr):
+    sgasm_usr_url = "https://soundgasm.net/u/{}".format(currentusr)
     logger.info("Ripping user %s" % currentusr)
 
     dl_list = gen_audiodl_from_sglink(rip_usr_links(sgasm_usr_url))
@@ -688,6 +778,7 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
         found_sub_list.append(sub)
     return found_sub_list
 
+
 # If you have a PRAW object, e.g., Comment, Message, Redditor, or Submission, and you want to see what
 # attributes are available along with their values, use the built-in vars() function of python
 # import pprint
@@ -865,7 +956,8 @@ def backup_db(force_bu=False):
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
-                    "in {: .2f} Tagen!".format(config.getint("Settings", "db_bu_freq", fallback=5), next_bu / 24 / 60 / 60))
+                    "in {: .2f} Tagen!".format(config.getint("Settings", "db_bu_freq",
+                                                             fallback=5), next_bu / 24 / 60 / 60))
 
 
 def check_submission_time(submission, lastdltime):
