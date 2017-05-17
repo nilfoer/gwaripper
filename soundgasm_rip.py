@@ -179,37 +179,38 @@ def main():
         first_i = None
         # iterate over list, keeping track of index with enumerate
         for i, s in enumerate(argv_str):
-            # found quotation mark and were not currently looking for the end of a quote (first_i not set)
+            # found start of quote and were not currently looking for the end of a quote (first_i not set)
             # ("\"" in s) or ("\'" in s) and not first_i needs to be in extra parentheses  or it will be evaluated like:
             # True | (False & False) -> True, since only ("\'" in s) and not first_i get connected with and
             # (("\"" in s) or ("\'" in s)) and not first_i:
             # (This OR This must be true) AND not This must be false
-            if (("\"" in s) or ("\'" in s)) and not first_i:
-                # the whole quote is in this element of the list
-                if (s.count("\"") > 1) or (s.count("\'") > 1):
-                    # strip away quot marks and append
+            if (s.startswith("\"") or s.startswith("\'")) and not first_i:
+                # element contains whole quote
+                if s.endswith("\"") or s.endswith("\'"):
                     argv_clean.append(s.strip("\"").strip("\'"))
-                    continue
                 else:
                     # save index
                     first_i = i
-                    # continue with next element in list
-                    continue
-            # found quotation mark and were currently looking for the end of a quote (first_i set)
-            elif (("\"" in s) or ("\'" in s)) and first_i:
+                # continue with next element in list
+                continue
+            # found end of quote and were currently looking for the end of a quote (first_i set)
+            elif (s.endswith("\"") or s.endswith("\'")) and first_i:
                 # get slice of list from index of first quot mark to this index: argv_str[first_i:i+1]
                 # due to how slicing works we have to +1 the current i
                 # join the slice with spaces to get the spaces back: " ".join()
                 # get rid of quot marks with strip("\"")
                 # append str to clean list
-                argv_clean.append(" ".join(argv_str[first_i:i+1]).strip("\""))
+                argv_clean.append(" ".join(argv_str[first_i:i+1]).strip("\"").strip("\'"))
                 # unset first_i
                 first_i = None
+                continue
+            # quote started (first_i set) but didnt end (last element of list)
+            elif i == len(argv_str)-1 and first_i:
+                argv_clean.append(" ".join(argv_str[first_i:i + 1]).strip("\"").strip("\'"))
                 continue
             elif not first_i:
                 # normal element of list -> append to clean list
                 argv_clean.append(s)
-
         # simulate command line input by passing in list like: ['--sum', '7', '-1', '42']
         # which is the same as prog.py --sum 7 -1 42 -> this is also used in docs of argparse
         args = parser.parse_args(argv_clean)
