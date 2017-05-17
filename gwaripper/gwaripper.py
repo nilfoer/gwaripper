@@ -68,7 +68,7 @@ logger.addHandler(stdohandler)
 
 # load dataframe
 # SGR_DF = pd.read_json("../sgasm_rip_db.json", orient="columns")
-SGR_DF = pd.read_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8", index_col=0)
+SGR_DF = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
 GRPED_DF = SGR_DF.groupby("sgasm_user")
 
 
