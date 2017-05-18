@@ -414,7 +414,9 @@ class AudioDownload:
         # this link EXPIRES so get it right b4 downloading
         self.url_to_file = base64.b64decode(str_b64_rev).decode("utf-8")
         self.file_type = self.url_to_file.split("?")[0][-4:]
-        self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
+        # [^\w\-_\.,\[\] ] -> match not(^) any of \w \- _  and whitepsace etc.,
+        # replace any that isnt in the  [] with _
+        self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_eraudica_info(self):
         site = urllib.request.urlopen(self.page_url)
@@ -436,7 +438,7 @@ class AudioDownload:
 
         self.url_to_file = "{}/fd/{}/{}".format(server, dl_token, fname)
         self.file_type = fname[-4:]
-        self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
+        self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_sgasm_info(self):
         # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
@@ -459,7 +461,7 @@ class AudioDownload:
                 self.url_to_file = urlm4a
                 self.file_type = ".m4a"
                 self.title = title
-                self.filename_local = re.sub("[^\w\-_\.,\[\] ]", "_", title[0:110]) + ".m4a"
+                self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", title[0:110]) + ".m4a"
                 self.descr = descript
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
