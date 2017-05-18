@@ -15,7 +15,12 @@ import bs4
 import pandas as pd
 import praw
 
-import clipwatcher_single
+# since gwaripper contains __init__.py -> considered a package, so this becomes a intra-package reference
+# we could use an absolute reference with: import gwaripper.clipwatcher_single
+# or relative: from . import clipwatcher_single (.. -> would be for par dir and so on)
+# for more info see: https://docs.python.org/3/tutorial/modules.html#intra-package-references
+# and: http://stackoverflow.com/questions/4142151/how-to-import-the-class-within-the-same-directory-or-sub-directory
+from . import clipwatcher_single
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # you can also use: os.path.dirname(os.path.realpath(__file__))

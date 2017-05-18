@@ -8,6 +8,7 @@ prune build
 prune dist
 prune .idea
 prune gwaripper/pyperclip
+prune gwaripper/dev_tools
 recursive-exclude *.egg-info *
 recursive-include gwaripper *.py
 # exclude log files and pyc or pyo files
