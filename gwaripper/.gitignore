@@ -6,5 +6,5 @@
 # *~
 .idea/
 __pycache__/
-config.ini
+config_script.ini
 *.log

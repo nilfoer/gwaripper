@@ -29,8 +29,10 @@ config = configparser.ConfigParser()
 config.read(os.path.join(MODULE_PATH, "config.ini"))
 
 # init Reddit instance
+# installed app -> only client_id needed, but read-only access until we get a refresh_token
+# for this script read-only access is enough
 reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
-                          client_secret=config["Reddit"]["CLIENT_SECRET"],
+                          client_secret=None,
                           user_agent=config["Reddit"]["USER_AGENT"])
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
@@ -160,6 +162,12 @@ def main():
     parser_cfg = subparsers.add_parser("config", help="Configure script: save location etc.")
     parser_cfg.add_argument("-p", "--path", help="Set path to root directory, "
                                                  "where all the files will be downloaded to")
+    parser_cfg.add_argument("-bf", "--backup-freq", metavar="FREQUENCY", type=float,
+                            help="Set auto backup frequency in days")
+    parser_cfg.add_argument("-bn", "--backup-nr", metavar="N-BACKUPS", type=int,
+                            help="Set max. number of backups to keep")
+    parser_cfg.add_argument("-tf", "--tagfilter", help="Set banned strings/tags in reddit title", nargs="+",
+                            metavar="TAG")
     parser_cfg.set_defaults(func=cl_config)
 
     parser.add_argument("-te", "--test", action="store_true")
@@ -324,8 +332,31 @@ def cl_config(args):
             config["Settings"]["root_path"] = path_in
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"root_path": str(path_in)}
+            config["Settings"] = {"root_path": path_in}
         print("New root dir is: {}".format(path_in))
+    # not elif since theyre not mutually exclusive
+    if args.backup_freq:
+        try:
+            config["Settings"]["db_bu_freq"] = str(args.backup_freq)
+        except KeyError:
+            # settings setciton not present
+            config["Settings"] = {"db_bu_freq": str(args.backup_freq)}
+        print("Auto backups are due every {} days now!".format(args.backup_freq))
+    if args.backup_nr:
+        try:
+            config["Settings"]["max_db_bu"] = str(args.backup_nr)
+        except KeyError:
+            # settings setciton not present
+            config["Settings"] = {"max_db_bu": str(args.backup_nr)}
+        print("{} backups will be kept from now on".format(args.backup_nr))
+    if args.tagfilter:
+        tf_str = ", ".join(args.tagfilter).strip(", ")
+        try:
+            config["Settings"]["tag_filter"] = tf_str
+        except KeyError:
+            # settings setciton not present
+            config["Settings"] = {"tag_filter": tf_str}
+        print("Banned tags were set to: {}".format(tf_str))
     else:
         # print current cfg
         for sec in config.sections():
