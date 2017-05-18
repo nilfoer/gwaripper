@@ -19,7 +19,9 @@ setuptools.setup(
     keywords="script rip gonewildaudio download scraping",
     packages=setuptools.find_packages(exclude=['pyperclip', 'tests*']),
     install_requires=["pyperclip", "praw", "bs4", "pandas"],
-    package_data={},
+    package_data={
+        'gwaripper': ['config.ini'],
+    },
     entry_points={
         'console_scripts': [
             # linking the executable gwaripper here to running the python function main in the gwaripper module
