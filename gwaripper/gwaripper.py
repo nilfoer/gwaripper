@@ -38,9 +38,11 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
 KEYWORDLIST = [x.strip() for x in config["Settings"]["tag_filter"].split(",")]
 
 # path to dir where the soundfiles will be stored in subfolders
-ROOTDIR = config["Settings"]["root_path"]
-# set working dir to ROOTDIR
-os.chdir(ROOTDIR)
+ROOTDIR = None
+try:
+    ROOTDIR = config["Settings"]["root_path"]
+except KeyError:
+    pass
 
 DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
 
@@ -99,9 +101,9 @@ def main():
     parser_rusr.add_argument("names", help="Names of users to rip.", nargs="+")
     # choices -> available options -> error if not contained; default -> default value if not supplied
     parser_rusr.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
-                            help="Reddit post sorting method")
+                             help="Reddit post sorting method")
     parser_rusr.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
-                            choices=("all", "day", "hour", "month", "week", "year"))
+                             choices=("all", "day", "hour", "month", "week", "year"))
     parser_rusr.set_defaults(func=cl_redditor)
     # we could set a function to call with these args parser_foo.set_defaults(func=foo)
     # call with args.func(args) -> let argparse handle which func to call instead of long if..elif
@@ -195,12 +197,12 @@ def main():
                 # join the slice with spaces to get the spaces back: " ".join()
                 # get rid of quot marks with strip("\"")
                 # append str to clean list
-                argv_clean.append(" ".join(argv_str[first_i:i+1]).strip("\"").strip("\'"))
+                argv_clean.append(" ".join(argv_str[first_i:i + 1]).strip("\"").strip("\'"))
                 # unset first_i
                 first_i = None
                 continue
             # quote started (first_i set) but didnt end (last element of list)
-            elif i == len(argv_str)-1 and first_i:
+            elif i == len(argv_str) - 1 and first_i:
                 argv_clean.append(" ".join(argv_str[first_i:i + 1]).strip("\"").strip("\'"))
                 continue
             elif not first_i:
@@ -213,12 +215,20 @@ def main():
         # parse_args() will only contain attributes for the main parser and the subparser that was selected
         args = parser.parse_args()
 
-    if args.test:
-        # test code
-        print("test")
+    # if root dir isnt set
+    if ROOTDIR:
+        if args.test:
+            # test code
+            print("test")
+        else:
+            # call func that was selected for subparser/command
+            args.func(args)
+    # rootdir istn set but we want to call cl_config
+    elif not ROOTDIR and args.func is cl_config:
+        cl_config(args)
     else:
-        # call func that was selected for subparser/command
-        args.func(args)
+        print("root_path not set in config.ini, use command config -p 'C:\\absolute\\path' to specify where the"
+              "files will be downloaded to")
 
 
 def cl_link(args):
@@ -247,6 +257,7 @@ def cl_redditor(args):
             rip_audio_dls(adl_list)
         else:
             logger.warning("No subs recieved from user {} with time_filter {}".format(usr, args.timefilter))
+
 
 def cl_rip_users(args):
     for usr in args.names:
@@ -519,6 +530,7 @@ def rip_audio_dls(dl_list, current_usr=None):
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
     # implement new featueres
 
+    # TODO handle df file not existing
     # load dataframe
     # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
     df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
