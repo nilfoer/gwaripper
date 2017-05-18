@@ -23,3 +23,7 @@ gwaripper/pyperclip/
 **/config_script.ini
 **/*.log
 **/.ipynb_checkpoints/
+# also ignore wheels since theyre binary and git doesnt deal well with that (cant compress as well etc)
+dist/
+*.egg-info/
+build/

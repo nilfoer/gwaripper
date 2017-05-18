@@ -2,9 +2,15 @@
 exclude .gitignore
 include README.txt
 include setup.cfg
+include gwaripper/config.ini
 prune .git
 prune build
 prune dist
 prune .idea
+prune gwaripper/pyperclip
 recursive-exclude *.egg-info *
+recursive-include gwaripper *.py
+# exclude log files and pyc or pyo files
+global-exclude *.log
+global-exclude *.py[co]
 # recursive-include tests *
