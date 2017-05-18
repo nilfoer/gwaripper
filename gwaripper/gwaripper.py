@@ -7,14 +7,13 @@ import time
 import sys
 import configparser
 import logging
-import logging.handlers
+from logging.handlers import TimedRotatingFileHandler
 import base64
 import argparse
 import clipwatcher_single
 import praw
 import bs4
 import pandas as pd
-import timeit
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # you can also use: os.path.dirname(os.path.realpath(__file__))
@@ -54,7 +53,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # create a file handler
-handler = logging.handlers.TimedRotatingFileHandler("gwaripper.log", "D", encoding="UTF-8", backupCount=10)
+handler = TimedRotatingFileHandler("gwaripper.log", "D", encoding="UTF-8", backupCount=10)
 handler.setLevel(logging.DEBUG)
 
 # create a logging format
@@ -170,6 +169,8 @@ def main():
                             metavar="TAG")
     parser_cfg.set_defaults(func=cl_config)
 
+    parser.add_argument("-v", "--verbosity", help="How much information is  printed in the console")
+    # TODO implement stdohandler.setLevel(logging.INFO)
     parser.add_argument("-te", "--test", action="store_true")
 
     # check with: if not len(sys.argv) > 1
@@ -227,7 +228,7 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db1.csv"), sep=";", encoding="utf-8", index_col=0)
+            print("test")
         else:
             # call func that was selected for subparser/command
             args.func(args)
@@ -471,7 +472,7 @@ class AudioDownload:
                 os.makedirs(mypath)
             i = 0
             if os.path.isfile(os.path.join(mypath, filename)):
-                if check_direct_url_for_dl(self.url_to_file, self.name_usr):
+                if check_direct_url_for_dl(df, self.url_to_file, self.name_usr):
                     # TODO Temporary
                     set_missing_values_df(df, self)
                     logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
@@ -723,13 +724,13 @@ def set_missing_values_df(dframe, audiodl_obj):
         # dframe["URLsg"][index] = audiodl_obj.page_url
         dframe.set_value(index, "URLsg", audiodl_obj.page_url)
     else:
-        logger.warning("Field not set since it wasnt empty when trying to set "
-                       "URLsg on row[{}] for {}".format(index, audiodl_obj.title))
+        logger.debug("Field not set since it wasnt empty when trying to set "
+                     "URLsg on row[{}] for {}".format(index, audiodl_obj.title))
     if cell_null_bool["Local_filename"]:
         dframe.set_value(index, "Local_filename", audiodl_obj.filename_local)
     else:
-        logger.warning("Field not set since it wasnt empty when trying to set Local filename "
-                       "on row for {}[{}]".format(audiodl_obj.title, index))
+        logger.debug("Field not set since it wasnt empty when trying to set Local filename "
+                     "on row for {}[{}]".format(audiodl_obj.title, index))
 
     # also set reddit info if available
     if audiodl_obj.reddit_info:
@@ -741,8 +742,8 @@ def set_missing_values_df(dframe, audiodl_obj):
             if cell_null_bool[col]:
                 dframe.set_value(index, col, audiodl_obj.reddit_info[dictkey])
             else:
-                logger.warning("Field not set since it wasnt empty when trying to set {} "
-                               "on row for {}[{}]".format(col, audiodl_obj.title, index))
+                logger.debug("Field not set since it wasnt empty when trying to set {} "
+                             "on row for {}[{}]".format(col, audiodl_obj.title, index))
 
         # write selftext if there's reddit info
         audiodl_obj.write_selftext_file()
@@ -1026,7 +1027,7 @@ def backup_db(df, force_bu=False):
     now = time.time()
     # freq in days convert to secs since utc time is in secs since epoch
     # get freq from config.ini use fallback value 3 days
-    freq_secs = config.getint("Settings", "db_bu_freq", fallback=5) * 24 * 60 * 60
+    freq_secs = config.getfloat("Settings", "db_bu_freq", fallback=5.0) * 24 * 60 * 60
     elapsed_time = now - config.getfloat("Time", "last_db_bu", fallback=0.0)
 
     # if time since last db bu is greater than frequency in settings or we want to force a bu
@@ -1068,7 +1069,7 @@ def backup_db(df, force_bu=False):
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
-                    "in {: .2f} Tagen!".format(config.getint("Settings", "db_bu_freq",
+                    "in {: .2f} Tagen!".format(config.getfloat("Settings", "db_bu_freq",
                                                              fallback=5), next_bu / 24 / 60 / 60))
 
 
