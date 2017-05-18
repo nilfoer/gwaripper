@@ -16,12 +16,17 @@ import bs4
 import pandas as pd
 import timeit
 
+# by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
+# you can also use: os.path.dirname(os.path.realpath(__file__))
+# but __file__ is not always defined
+MODULE_PATH = os.path.dirname(os.path.realpath(sys.argv[0]))
+
 # init ConfigParser instance
 config = configparser.ConfigParser()
 # read config file, ConfigParser pretty much behaves like a dict, sections in in ["Reddit"] is a key that holds
 # another dict with keys(USER_AGENT etc.) and values -> nested dict -> access with config["Reddit"]["USER_AGENT"]
 # !! keys in sections are case-insensitive and stored in lowercase
-config.read("config.ini")
+config.read(os.path.join(MODULE_PATH, "config.ini"))
 
 # init Reddit instance
 reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
@@ -33,7 +38,9 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
 KEYWORDLIST = [x.strip() for x in config["Settings"]["tag_filter"].split(",")]
 
 # path to dir where the soundfiles will be stored in subfolders
-ROOTDIR = os.path.abspath(os.path.join(os.getcwd(), os.pardir))
+ROOTDIR = config["Settings"]["root_path"]
+# set working dir to ROOTDIR
+os.chdir(ROOTDIR)
 
 DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
 
@@ -63,14 +70,6 @@ formatterstdo = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "
 stdohandler.setFormatter(formatterstdo)
 logger.addHandler(stdohandler)
 
-# we dont have to re-load while still running since it gets appended and then reassigned and
-# SGR_DF survives main() starting again
-
-# load dataframe
-# SGR_DF = pd.read_json("../sgasm_rip_db.json", orient="columns")
-SGR_DF = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
-GRPED_DF = SGR_DF.groupby("sgasm_user")
-
 
 def main():
     parser = argparse.ArgumentParser(description="Script to download gonewildaudio/pta posts from either reddit "
@@ -83,30 +82,27 @@ def main():
     # and providing a default subcommand isnt supported atm
     # create the parser for the "links" subcommand
     parser_lnk = subparsers.add_parser('links', help='Process single link/s')
+    parser_lnk.add_argument("type", help="Reddit(r) or sgasm(sg) link/s", choices=("r", "sg"))
     parser_lnk.add_argument("links", help="Links to process. Provide type of links as flag!", nargs="+")
-    # argparse will make sure that only one of the arguments in the mutually exclusive group was present
-    # also accepts a required argument, to indicate that at least one of the mutually exclusive arguments is required
-    group_lnk = parser_lnk.add_mutually_exclusive_group(required=True)
-    # store_true sets args.watchsgasm to true if flag is passed
-    group_lnk.add_argument("-sg", "--sglinks", help="Rip from single sgasm link/s", action="store_true")
-    group_lnk.add_argument("-r", "--reddit", help="Rip supported links from given reddit link/s.", action="store_true")
     # set funct to call when subcommand is used
     parser_lnk.set_defaults(func=cl_link)
 
-    parser_usr = subparsers.add_parser('ripuser', help='Rip sgasm or reddit user/s')
+    parser_sgusr = subparsers.add_parser('sguser', help='Rip sgasm user/s')
     # nargs="+" -> one or more arguments
-    parser_usr.add_argument("names", help="Names of users to rip.", nargs="+")
-    # TODO Cleanup from argparse doc: Required options are generally considered bad form because users expect
-    # options to be optional, and thus they should be avoided when possible.
-    parser_usr.add_argument("-ty", "--type", required=True, choices=("sgasm", "reddit"),
-                            help="Type of user: soundgasm.net user or redditor")
+    parser_sgusr.add_argument("names", help="Names of users to rip.", nargs="+")
+    parser_sgusr.set_defaults(func=cl_rip_users)
+    # Required options are generally considered bad form because users expect options to be optional,
+    # and thus they should be avoided when possible.
+
+    parser_rusr = subparsers.add_parser('redditor', help='Rip redditor/s')
+    parser_rusr.add_argument("limit", type=int, help="How many posts to download when ripping redditor")
+    parser_rusr.add_argument("names", help="Names of users to rip.", nargs="+")
     # choices -> available options -> error if not contained; default -> default value if not supplied
-    parser_usr.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
+    parser_rusr.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
                             help="Reddit post sorting method")
-    parser_usr.add_argument("-l", "--limit", type=int, required=True, help="How many posts to download")
-    parser_usr.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+    parser_rusr.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
                             choices=("all", "day", "hour", "month", "week", "year"))
-    parser_usr.set_defaults(func=cl_ripuser)
+    parser_rusr.set_defaults(func=cl_redditor)
     # we could set a function to call with these args parser_foo.set_defaults(func=foo)
     # call with args.func(args) -> let argparse handle which func to call instead of long if..elif
     # However, if it is necessary to check the name of the subparser that was invoked, the dest keyword argument
@@ -114,19 +110,13 @@ def main():
     # Namespace(subparser_name='ripuser', ...)
 
     parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file located in _linkcol')
-    group_txt = parser_txt.add_mutually_exclusive_group(required=True)
-
-    parser_txt.add_argument("filename", help="Filename of txt file in _linkcol folder. Specify type of links"
-                                             "with flag!")
-    group_txt.add_argument("-sgt", "--sgfromtxt", help="File with given filename contains sgasm links!",
-                           action="store_true")
-    group_txt.add_argument("-rt", "--reddittxt", help="File with given filename contains reddit links!",
-                           action="store_true")
+    parser_txt.add_argument("type", help="Reddit(r) or sgasm(sg) link/s in txt", choices=("r", "sg"))
+    parser_txt.add_argument("filename", help="Filename of txt file in _linkcol folder")
     parser_txt.set_defaults(func=cl_fromtxt)
 
     parser_clip = subparsers.add_parser('watch', help='Watch clipboard for sgasm/reddit links and save them to txt;'
                                                       ' option to process them immediately')
-    parser_clip.add_argument("type", help="Type of links to watch for", choices=("sgasm", "reddit"))
+    parser_clip.add_argument("type", help="Type of links to watch for: sgasm(sg) or reddit(r)", choices=("sg", "r"))
     parser_clip.set_defaults(func=cl_watch)
 
     # provide shorthands or alt names with aliases
@@ -134,9 +124,9 @@ def main():
                                        help='Parse subreddit and download supported links')
 
     parser_sub.add_argument("sub", help="Name of subreddit")
+    parser_sub.add_argument("limit", type=int, help="How many posts to download")
     parser_sub.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method",
                             default="top")
-    parser_sub.add_argument("-l", "--limit", type=int, help="How many posts to download", required=True)
     parser_sub.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
                             choices=("all", "day", "hour", "month", "week", "year"))
     parser_sub.set_defaults(func=cl_sub)
@@ -158,12 +148,17 @@ def main():
     parser_se.add_argument("subname", help="Name of subreddit")
     parser_se.add_argument("sstr", help="'searchstring' in QUOTES: https://www.reddit.com/wiki/search",
                            metavar="searchstring")
+    parser_se.add_argument("limit", type=int, help="How many posts to download")
     parser_se.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method",
                            default="top")
-    parser_se.add_argument("-l", "--limit", type=int, help="How many posts to download", required=True)
     parser_se.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
                            choices=("all", "day", "hour", "month", "week", "year"))
     parser_se.set_defaults(func=cl_search)
+
+    parser_cfg = subparsers.add_parser("config", help="Configure script: save location etc.")
+    parser_cfg.add_argument("-p", "--path", help="Set path to root directory, "
+                                                 "where all the files will be downloaded to")
+    parser_cfg.set_defaults(func=cl_config)
 
     parser.add_argument("-te", "--test", action="store_true")
 
@@ -227,7 +222,7 @@ def main():
 
 
 def cl_link(args):
-    if args.sglinks:
+    if args.type == "sg":
         llist = gen_audiodl_from_sglink(args.links)
         rip_audio_dls(llist)
     else:
@@ -236,32 +231,31 @@ def cl_link(args):
         rip_audio_dls(adl_list)
 
 
-def cl_ripuser(args):
-    if args.type == "sgasm":
-        rip_users(*args.names)
-    else:
-        sort = args.sort
-        limit = args.limit
-        time_filter = args.timefilter
-        for usr in args.names:
-            redditor = reddit_praw.redditor(usr)
-            if sort == "hot":
-                sublist = redditor.submissions.hot(limit=limit)
-            elif sort == "top":
-                sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
-            else:  # just get new posts if input doesnt match hot or top
-                sublist = redditor.submissions.new(limit=limit)
-            # TODO Refactor check if subreddit is gwa or pta first?
-            adl_list = parse_submissions_for_links(sublist)
-            if adl_list:
-                rip_audio_dls(adl_list)
-            else:
-                logger.warning("No subs recieved from user {} with time_filter {}".format(usr, args.timefilter))
+def cl_redditor(args):
+    limit = args.limit
+    time_filter = args.timefilter
+    for usr in args.names:
+        redditor = reddit_praw.redditor(usr)
+        if args.sort == "hot":
+            sublist = redditor.submissions.hot(limit=limit)
+        elif args.sort == "top":
+            sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
+        else:  # just get new posts if input doesnt match hot or top
+            sublist = redditor.submissions.new(limit=limit)
+        adl_list = parse_submissions_for_links(sublist)
+        if adl_list:
+            rip_audio_dls(adl_list)
+        else:
+            logger.warning("No subs recieved from user {} with time_filter {}".format(usr, args.timefilter))
+
+def cl_rip_users(args):
+    for usr in args.names:
+        rip_usr_to_files(usr)
 
 
 def cl_fromtxt(args):
     mypath = os.path.join(ROOTDIR, "_linkcol")
-    if args.sgfromtxt:
+    if args.type == "sg":
         rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, args.filename)))
     else:
         llist = get_sub_from_reddit_urls(txt_to_list(mypath, args.filename))
@@ -270,7 +264,7 @@ def cl_fromtxt(args):
 
 
 def cl_watch(args):
-    if args.type == "sgasm":
+    if args.type == "sg":
         found = watch_clip("sgasm")
         if found:
             llist = gen_audiodl_from_sglink(found)
@@ -308,6 +302,29 @@ def cl_search(args):
         rip_audio_dls(adl_list)
     else:
         logger.warning("No matching subs/links found in {}, with: '{}'".format(args.subname, args.sstr))
+
+
+def cl_config(args):
+    if args.path:
+        # normalize path, remove double \ and convert / to \ on windows
+        path_in = os.path.normpath(args.path)
+        # i dont need to change cwd and ROOTDIR since script gets restarted anyway
+        try:
+            config["Settings"]["root_path"] = path_in
+        except KeyError:
+            # settings setciton not present
+            config["Settings"] = {"root_path": str(path_in)}
+        print("New root dir is: {}".format(path_in))
+    else:
+        # print current cfg
+        for sec in config.sections():
+            print("[{}]".format(sec))
+            for option, val in config[sec].items():
+                print("{} = {}".format(option, val))
+            print("")
+        return  # so we dont reach writing of cfg
+    # write updated config
+    write_config_module()
 
 
 class AudioDownload:
@@ -378,7 +395,7 @@ class AudioDownload:
 
     def set_sgasm_info(self):
         # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
-        # in missing information in the SGR_DF
+        # in missing information in the df
         if not self.url_to_file:
             logger.info("Getting soundgasm info of: %s" % self.page_url)
             try:
@@ -402,7 +419,7 @@ class AudioDownload:
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
-    def download(self, curfnr, maxfnr):
+    def download(self, df, curfnr, maxfnr):
         if self.url_to_file is not None:
             curfnr += 1
 
@@ -411,13 +428,10 @@ class AudioDownload:
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
             i = 0
-            # Actually it is considered better practice to try and open the file with a try-except block, than
-            # to check for existence – jarondl Jul 6 '13 at 12:45 3
-            # @jarondl is right. This should be changed to use a try: ... except IOError to avoid potential race
-            # conditions. For most cases it won't matter but this has bitten me recently
             if os.path.isfile(os.path.join(mypath, filename)):
                 if check_direct_url_for_dl(self.url_to_file, self.name_usr):
-                    set_missing_values_df(SGR_DF, self)
+                    # TODO Temporary
+                    set_missing_values_df(df, self)
                     logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
                                    "--> not renaming --> SKIPPING")
                     return curfnr
@@ -469,12 +483,6 @@ class AudioDownload:
                     w.write(self.reddit_info["selftext"])
 
 
-def rip_users(*users):
-    for usr in users:
-        # geht jede url in der liste durch entfernt das komma und gibt sie an rip_usr_to_files weiter
-        rip_usr_to_files(usr)
-
-
 def txt_to_list(path, txtfilename):
     with open(os.path.join(path, txtfilename), "r", encoding="UTF-8") as f:
         llist = f.read().split()
@@ -511,13 +519,20 @@ def rip_audio_dls(dl_list, current_usr=None):
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
     # implement new featueres
 
+    # load dataframe
+    # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
+    df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
+    df_grp = None
+    if current_usr:
+        df_grp = df.groupby("sgasm_user")
+
     # create dict that has direct links to files as keys and AudioDownload instances as values
     dl_dict = {}
     for audio in dl_list:
         dl_dict[audio.page_url] = audio
 
     # returns list of new downloads, dl_dict still holds all of them
-    new_dls = filter_alrdy_downloaded(dl_dict, current_usr)
+    new_dls = filter_alrdy_downloaded(df, dl_dict, current_usr, df_grp)
 
     filestodl = len(new_dls)
     dlcounter = 0
@@ -530,20 +545,20 @@ def rip_audio_dls(dl_list, current_usr=None):
         dlcounter = audio_dl.download(dlcounter, filestodl)
 
     if new_dls:
-        # write info of new downloads to SGR_DF
-        append_new_info_downloaded(new_dls, dl_dict)
+        # write info of new downloads to df
+        append_new_info_downloaded(df, new_dls, dl_dict)
     elif dl_list[0].reddit_info:
         # TODO Temporary we might have set missing info on already downloaded files so new_dls might
         # be None even if we added info to df so always safe it to be sure
         # or do elif dl_list[0].reddit_info -> ripping from reddit links so we wrote missing info
         # if we didnt dl sth new
-        SGR_DF.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
-        SGR_DF.to_json("../sgasm_rip_db.json")
+        df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
+        df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
 
     return dlcounter
 
 
-def append_new_info_downloaded(new_dl_list, dl_dict):
+def append_new_info_downloaded(df, new_dl_list, dl_dict):
     # filenr missing
     df_append_dict = {"Date": [], "Time": [], "Local_filename": [], "Description": [], "Title": [], "URL": [],
                       "URLsg": [], "sgasm_user": [], "redditURL": [], "reddit_user": [], "redditTitle": [],
@@ -589,19 +604,14 @@ def append_new_info_downloaded(new_dl_list, dl_dict):
         return
 
     df_dict = pd.DataFrame.from_dict(df_append_dict)
-    # append to global SGR_DF
-    global SGR_DF
-    logger.info("Writing info of new downloads to Database!")
-    SGR_DF = SGR_DF.append(df_dict, ignore_index=True, verify_integrity=True)
-    SGR_DF.to_csv("../sgasm_rip_db.csv", sep=";", encoding="utf-8")
-    SGR_DF.to_json("../sgasm_rip_db.json")
 
-    # update groupby obj
-    global GRPED_DF
-    GRPED_DF = SGR_DF.groupby("sgasm_user")
+    logger.info("Writing info of new downloads to Database!")
+    df = df.append(df_dict, ignore_index=True, verify_integrity=True)
+    df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
+    df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
 
     # auto backup
-    backup_db()
+    backup_db(df)
 
 
 def rip_usr_to_files(currentusr):
@@ -701,43 +711,47 @@ def write_to_txtf(wstring, filename, currentusr):
         w.write(wstring)
 
 
-def check_direct_url_for_dl(direct_url, current_usr=None):
+def check_direct_url_for_dl(df, direct_url, current_usr=None, grped_df=None):
     """
     Returns True if file was already downloaded
+    :param df: DataFrame in which to look for url
     :param direct_url: direct URL to m4a file
     :param current_usr: User when doing full user rip
-    :return: True if m4aurl is in SGR_DF in col URL, else False
+    :param grped_df: GroupByObject of df to use when downloading a user
+    :return: True if m4aurl is in df in col URL, else False
     """
-    if current_usr:
+    if current_usr and grped_df:
         try:
-            if direct_url in GRPED_DF.get_group(current_usr)["URL"].values:
+            if direct_url in grped_df.get_group(current_usr)["URL"].values:
                 return True
             else:
                 return False
         except KeyError:
-            logger.info("User '{}' not yet in databas!".format(current_usr))
+            logger.info("User '{}' not yet in database!".format(current_usr))
             return False
     else:
-        if direct_url in SGR_DF["URL"].values:
+        if direct_url in df["URL"].values:
             return True
         else:
             return False
 
 
-def filter_alrdy_downloaded(dl_dict, currentusr=None):
+def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
     # OLD when passing 2pair tuples, unpack tuples in dl_list into two lists
     # url_list, title = zip(*dl_list)
     # filter dupes
     unique_urls = set(dl_dict.keys())
-    if currentusr:
+    # using grped df is slightly faster than checking all urls:
+    # df: 1000 loops, best of 3: 705 µs per loop; grped_df: 1000 loops, best of 3: 488 µs per loop
+    if currentusr and grped_df:
         try:
-            duplicate = unique_urls.intersection(GRPED_DF.get_group(currentusr)["URLsg"].values)
+            duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URLsg"].values)
         except KeyError:
-            logger.info("User '{}' not yet in databas!".format(currentusr))
+            logger.info("User '{}' not yet in database!".format(currentusr))
             duplicate = set()
     else:
         # timeit 1000: 0.19
-        duplicate = unique_urls.intersection(SGR_DF["URLsg"].values)
+        duplicate = unique_urls.intersection(df["URLsg"].values)
 
     dup_titles = ""
     # OLD when passing 2pair tuples -> create dict from it, NOW passing ref to dict
@@ -756,11 +770,11 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
         # TODO Temporary
         # when we got reddit info get sgasm info even if this file was already downloaded b4
-        # then write missing info to SGR_DF and write selftext to file
+        # then write missing info to df and write selftext to file
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
             dl_dict[dup].set_sgasm_info()
-            set_missing_values_df(SGR_DF, dl_dict[dup])
+            set_missing_values_df(df, dl_dict[dup])
             dl_dict[dup].write_selftext_file()
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
@@ -772,11 +786,11 @@ def filter_alrdy_downloaded(dl_dict, currentusr=None):
     # str.contains accepts regex patter, join url strings with | -> htt..m4a|htt...m4a etc
     # returns Series/array of boolean values, .any() True if any element is True
     # timeit 1000: 1.129
-    # mask = SGR_DF["URL"].str.contains('|'.join(url_list))
+    # mask = df["URL"].str.contains('|'.join(url_list))
     # isin also works
     # timeit 1000: 0.29
-    # mask = SGR_DF["URL"].isin(unique_urls)
-    # print(SGR_DF["URL"][mask])
+    # mask = df["URL"].isin(unique_urls)
+    # print(df["URL"][mask])
 
     return result
 
@@ -946,16 +960,20 @@ def write_last_dltime():
     else:
         # create section if it doesnt exist
         config["Time"] = {"LAST_DL_TIME": str(time.time())}
-    with open("config.ini", "w") as config_file:
+    write_config_module()
+
+
+def reload_config():
+    config.read(os.path.join(MODULE_PATH, "config.ini"))
+
+
+def write_config_module():
+    with open(os.path.join(MODULE_PATH, "config.ini"), "w") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)
 
 
-def reload_config():
-    config.read("config.ini")
-
-
-def backup_db(force_bu=False):
+def backup_db(df, force_bu=False):
     bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     if not os.path.exists(bu_dir):
         os.makedirs(bu_dir)
@@ -971,8 +989,9 @@ def backup_db(force_bu=False):
     if (elapsed_time > freq_secs) or force_bu:
         time_str = time.strftime("%Y-%m-%d")
         logger.info("Writing backup of database!")
-        SGR_DF.to_csv("../_db-autobu/{}_sgasm_rip_db.csv".format(time_str), sep=";", encoding="utf-8")
-        SGR_DF.to_json("../_db-autobu/{}_sgasm_rip_db.json".format(time_str))
+        df.to_csv(os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.csv".format(time_str)),
+                  sep=";", encoding="utf-8")
+        df.to_json(os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.json".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):
@@ -980,8 +999,7 @@ def backup_db(force_bu=False):
         else:
             config["Time"] = {"last_db_bu": str(now)}
         # write config to file
-        with open("config.ini", "w") as config_file:
-            config.write(config_file)
+        write_config_module()
 
         # iterate over listdir, add file to list if isfile returns true
         bu_dir_list = [os.path.join(bu_dir, f) for f in os.listdir(bu_dir) if os.path.isfile(os.path.join(bu_dir, f))]
