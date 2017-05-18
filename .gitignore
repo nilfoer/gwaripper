@@ -5,6 +5,7 @@
 # *.[oa]
 # *~
 .idea/
-__pycache__/
-config.ini
-*.log
+**/__pycache__/
+gwaripper/pyperclip/
+**/config_script.ini
+**/*.log
