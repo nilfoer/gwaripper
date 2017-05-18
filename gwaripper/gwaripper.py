@@ -1,19 +1,21 @@
 #! python3
-import urllib.request
-from urllib.parse import quote as url_quote
-import re
-import os
-import time
-import sys
+import argparse
+import base64
 import configparser
 import logging
+import os
+import re
+import sys
+import time
+import urllib.request
 from logging.handlers import TimedRotatingFileHandler
-import base64
-import argparse
-import clipwatcher_single
-import praw
+from urllib.parse import quote as url_quote
+
 import bs4
 import pandas as pd
+import praw
+
+import clipwatcher_single
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # you can also use: os.path.dirname(os.path.realpath(__file__))
@@ -1070,7 +1072,7 @@ def backup_db(df, force_bu=False):
         next_bu = freq_secs - elapsed_time
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
                     "in {: .2f} Tagen!".format(config.getfloat("Settings", "db_bu_freq",
-                                                             fallback=5), next_bu / 24 / 60 / 60))
+                                                               fallback=5), next_bu / 24 / 60 / 60))
 
 
 def create_new_db():
