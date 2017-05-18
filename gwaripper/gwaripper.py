@@ -219,7 +219,7 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            print("test")
+            df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db1.csv"), sep=";", encoding="utf-8", index_col=0)
         else:
             # call func that was selected for subparser/command
             args.func(args)
@@ -530,10 +530,12 @@ def rip_audio_dls(dl_list, current_usr=None):
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
     # implement new featueres
 
-    # TODO handle df file not existing
     # load dataframe
     # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
-    df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
+    try:
+        df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db1.csv"), sep=";", encoding="utf-8", index_col=0)
+    except FileNotFoundError:
+        df = create_new_db()
     df_grp = None
     if current_usr:
         df_grp = df.groupby("sgasm_user")
@@ -554,7 +556,7 @@ def rip_audio_dls(dl_list, current_usr=None):
         # get appropriate func for host to get direct url, sgasm title etc.
         audio_dl.call_host_get_file_info()
 
-        dlcounter = audio_dl.download(dlcounter, filestodl)
+        dlcounter = audio_dl.download(df, dlcounter, filestodl)
 
     if new_dls:
         # write info of new downloads to df
@@ -1037,6 +1039,15 @@ def backup_db(df, force_bu=False):
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
                     "in {: .2f} Tagen!".format(config.getint("Settings", "db_bu_freq",
                                                              fallback=5), next_bu / 24 / 60 / 60))
+
+
+def create_new_db():
+    # we dont need a dummy row to not lose dtypes since were only saving if there are new dls and since there
+    # was no db before there can only be unique dls or were not saving it all (due to banned tags etc.)
+    df = pd.DataFrame(columns=['Date', 'Description', 'Local_filename', 'Time', 'Title', 'URL',
+                               'URLsg', 'redditURL', 'sgasm_user', 'reddit_user', 'filenr', 'redditTitle',
+                               'created_utc', 'redditID', 'subredditName', 'rPostUrl'])
+    return df
 
 
 def check_submission_time(submission, lastdltime):
