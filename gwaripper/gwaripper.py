@@ -25,14 +25,43 @@ from . import clipwatcher_single
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # you can also use: os.path.dirname(os.path.realpath(__file__))
 # but __file__ is not always defined
-MODULE_PATH = os.path.dirname(os.path.realpath(sys.argv[0]))
+# cmd                                               output
+# os.getcwd()                       N:\_archive\test\trans\soundgasmNET\_dev\_sgasm-repo\dist (where my cmd was, cwd)
+# os.path.dirname(os.path.realpath(sys.argv[0]))    C:\python3.5\Scripts (loc of gwaripper.exe) -> script path
+# os.path.dirname(os.path.realpath(__file__))       c:\python3.5\lib\site-packages\gwaripper (loc of module)
 
 # init ConfigParser instance
 config = configparser.ConfigParser()
 # read config file, ConfigParser pretty much behaves like a dict, sections in in ["Reddit"] is a key that holds
 # another dict with keys(USER_AGENT etc.) and values -> nested dict -> access with config["Reddit"]["USER_AGENT"]
 # !! keys in sections are case-insensitive and stored in lowercase
-config.read(os.path.join(MODULE_PATH, "config.ini"))
+# configparser.read() takes a list of paths if one fails it will be ignored
+# An application which requires initial values to be loaded from a file should load the required file or files
+# using read_file() before calling read() for any optional files
+try:
+    with open("config.ini", "r") as cfg:
+        config.read_file(cfg)
+except FileNotFoundError:
+    init_cfg = {
+        "Reddit": {
+            "user_agent": "gwaRipper",
+            "client_id": "***REMOVED***",
+        },
+        "Settings": {
+            "tag_filter": "[request], [script offer]",
+            "db_bu_freq": "5",
+            "max_db_bu": "5",
+        },
+        "Time": {
+            "last_db_bu": "0.0",
+            "last_dl_time": "0.0",
+        }
+    }
+    # read initial config from dict (sections are keys with dicts as values with options as keys..)
+    config.read_dict(init_cfg)
+    # write cfg file
+    with open("config.ini", "w") as cfg:
+        config.write(cfg)
 
 # init Reddit instance
 # installed app -> only client_id needed, but read-only access until we get a refresh_token
@@ -1019,11 +1048,11 @@ def write_last_dltime():
 
 
 def reload_config():
-    config.read(os.path.join(MODULE_PATH, "config.ini"))
+    config.read("config.ini")
 
 
 def write_config_module():
-    with open(os.path.join(MODULE_PATH, "config.ini"), "w") as config_file:
+    with open("config.ini", "w") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)
 
