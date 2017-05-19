@@ -58,7 +58,7 @@ except FileNotFoundError:
             "max_db_bu": "5",
         },
         "Time": {
-            "last_db_bu": "0.0",
+            "last_db_bu": str(time.time()),
             "last_dl_time": "0.0",
         }
     }
@@ -221,6 +221,7 @@ def main():
                             help="Set max. number of backups to keep")
     parser_cfg.add_argument("-tf", "--tagfilter", help="Set banned strings/tags in reddit title", nargs="+",
                             metavar="TAG")
+    # TODO implement changing tag1 tag2 list
     parser_cfg.set_defaults(func=cl_config)
 
     # TODO implement verbosity with: stdohandler.setLevel(logging.INFO)?
