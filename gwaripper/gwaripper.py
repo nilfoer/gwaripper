@@ -76,8 +76,15 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
                           user_agent=config["Reddit"]["USER_AGENT"])
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
-# load from config ini, split at comma, strip whitespaces
-KEYWORDLIST = [x.strip() for x in config["Settings"]["tag_filter"].split(",")]
+# load from config ini, split at comma, strip whitespaces, ensure that they are lowercase with .lower()
+KEYWORDLIST = [x.strip().lower() for x in config["Settings"]["tag_filter"].split(",")]
+
+# tag1 is only banned if tag2 isnt there, in cfg file: tag1 &! tag2; tag3 &! tag4;...
+TAG1_BUT_NOT_TAG2 = []
+if config.has_option("Settings", "tag1_in_but_not_tag2"):
+    for tag_comb in config["Settings"]["tag1_in_but_not_tag2"].split(";"):
+        tag1, tag2 = tag_comb.split("&!")
+        TAG1_BUT_NOT_TAG2.append((tag1.strip().lower(), tag2.strip().lower()))
 
 # path to dir where the soundfiles will be stored in subfolders
 ROOTDIR = None
@@ -124,7 +131,8 @@ def main():
     parser = argparse.ArgumentParser(description="Script to download gonewildaudio/pta posts from either reddit "
                                                  "or soundgasm.net directly.")
     # support sub-commands like svn checkout which require different kinds of command-line arguments
-    subparsers = parser.add_subparsers(title='subcommands', description='valid subcommands', help='sub-command help')
+    subparsers = parser.add_subparsers(title='subcommands', description='valid subcommands', help='sub-command help',
+                                       dest="subcmd")  # save name of used subcmd in var
 
     # process single links by default # nargs="*" -> zero or more arguments
     # !! -> doesnt work since we need to specify a subcommand since they work like positional arguements
@@ -215,8 +223,8 @@ def main():
                             metavar="TAG")
     parser_cfg.set_defaults(func=cl_config)
 
-    parser.add_argument("-v", "--verbosity", help="How much information is  printed in the console")
-    # TODO implement stdohandler.setLevel(logging.INFO)
+    # TODO implement verbosity with: stdohandler.setLevel(logging.INFO)?
+    # parser.add_argument("-v", "--verbosity", help="How much information is  printed in the console")
     parser.add_argument("-te", "--test", action="store_true")
 
     # check with: if not len(sys.argv) > 1
@@ -274,12 +282,14 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            print("test")
+            tit = "[F4F][F4M][Daddy] Hypno for both sexes"
+            print(check_submission_banned_tags(tit, KEYWORDLIST, TAG1_BUT_NOT_TAG2))
+
         else:
             # call func that was selected for subparser/command
             args.func(args)
     # rootdir istn set but we want to call cl_config
-    elif not ROOTDIR and args.func is cl_config:
+    elif not ROOTDIR and args.subcmd == "config":
         cl_config(args)
     else:
         print("root_path not set in config.ini, use command config -p 'C:\\absolute\\path' to specify where the"
@@ -803,7 +813,7 @@ def check_direct_url_for_dl(df, direct_url, current_usr=None, grped_df=None):
             else:
                 return False
         except KeyError:
-            logger.info("User '{}' not yet in database!".format(current_usr))
+            logger.debug("User '{}' not yet in database!".format(current_usr))
             return False
     else:
         if direct_url in df["URL"].values:
@@ -823,7 +833,7 @@ def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
         try:
             duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URLsg"].values)
         except KeyError:
-            logger.info("User '{}' not yet in database!".format(currentusr))
+            logger.debug("User '{}' not yet in database!".format(currentusr))
             duplicate = set()
     else:
         # timeit 1000: 0.19
@@ -844,7 +854,7 @@ def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
     # d = dict(dl_list)
     for dup in duplicate:
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
-        # TODO Temporary
+        # TODO Temporary or leave it in?
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to df and write selftext to file
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
@@ -949,8 +959,8 @@ def parse_submissions_for_links(sublist, fromtxt=True):
     # -> when we dont need fallback value use config["Time"]["last_dl_time"] etc.
     lastdltime = config.getfloat("Time", "last_dl_time", fallback=0.0)
     for submission in sublist:
-
-        if (not check_submission_banned_tags(submission, KEYWORDLIST) and
+        # TODO take out sub time check? or refactor
+        if (not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2) and
                 (fromtxt or check_submission_time(submission, lastdltime))):
 
             found_urls = []
@@ -1014,7 +1024,7 @@ def parse_submissions_for_links(sublist, fromtxt=True):
     return dl_list
 
 
-def check_submission_banned_tags(submission, keywordlist):
+def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None):
     # checks submissions title for banned words contained in keywordlist
     # returns True if it finds a match
     subtitle = submission.title.lower()
@@ -1022,13 +1032,14 @@ def check_submission_banned_tags(submission, keywordlist):
         if keyword in subtitle:
             logger.info("Banned keyword '{}' in: {}\n\t slink: {}".format(keyword, subtitle, submission.shortlink))
             return True
-    # TODO Hardcode Hardcoding this is bad if someone else wants to use this script
-    if ("[f4f]" in subtitle) and not ("4m]" in subtitle):
-        logger.info("Banned keyword: no '4m]' in title where '[f4f]' is in: {}\n\t "
-                    "slink: {}".format(subtitle, submission.shortlink))
-        return True
-    else:
-        return False
+    if tag1_but_not_2:
+        for tag_b, tag_in in tag1_but_not_2:
+            # tag_b is only banned if tag_in isnt found in subtitle
+            if (tag_b in subtitle) and not (tag_in in subtitle):
+                logger.info("Banned keyword: no '{}' in title where '{}' is in: {}\n\t "
+                            "slink: {}".format(tag_in, tag_b, subtitle, submission.shortlink))
+                return True
+    return False
 
 
 def write_last_dltime():
@@ -1093,7 +1104,8 @@ def backup_db(df, force_bu=False):
             bu_dir_list = sorted(bu_dir_list, key=os.path.getctime)
 
             logger.info("Too many backups, deleting the oldest one!")
-            # remove the oldest two files
+            # remove the oldest two files, keep deleting till nr of bu == max_db_bu? only relevant if user copied
+            # files in there
             os.remove(bu_dir_list[0])
             os.remove(bu_dir_list[1])
     else:
