@@ -8,7 +8,7 @@ import re
 import sys
 import time
 import urllib.request
-from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import RotatingFileHandler
 from urllib.parse import quote as url_quote
 
 import bs4
@@ -20,15 +20,20 @@ import praw
 # or relative: from . import clipwatcher_single (.. -> would be for par dir and so on)
 # for more info see: https://docs.python.org/3/tutorial/modules.html#intra-package-references
 # and: http://stackoverflow.com/questions/4142151/how-to-import-the-class-within-the-same-directory-or-sub-directory
+# relative imports dont work when i try to run this module as a script!!!! either use __main__.py in package dir
+# contents: from .bootstrap import main
+#           main()
+# and run package with python -m gwaripper or use helper file gwaripper-runner.py that just imports main
+# and does if __name__ == "__main__": main() and run that file as script
 from . import clipwatcher_single
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
-# you can also use: os.path.dirname(os.path.realpath(__file__))
-# but __file__ is not always defined
 # cmd                                               output
 # os.getcwd()                       N:\_archive\test\trans\soundgasmNET\_dev\_sgasm-repo\dist (where my cmd was, cwd)
 # os.path.dirname(os.path.realpath(sys.argv[0]))    C:\python3.5\Scripts (loc of gwaripper.exe) -> script path
 # os.path.dirname(os.path.realpath(__file__))       c:\python3.5\lib\site-packages\gwaripper (loc of module)
+# but __file__ is not always defined
+MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 # init ConfigParser instance
 config = configparser.ConfigParser()
@@ -39,7 +44,7 @@ config = configparser.ConfigParser()
 # An application which requires initial values to be loaded from a file should load the required file or files
 # using read_file() before calling read() for any optional files
 try:
-    with open("config.ini", "r") as cfg:
+    with open(os.path.join(MODULE_PATH, "config.ini"), "r") as cfg:
         config.read_file(cfg)
 except FileNotFoundError:
     init_cfg = {
@@ -60,7 +65,7 @@ except FileNotFoundError:
     # read initial config from dict (sections are keys with dicts as values with options as keys..)
     config.read_dict(init_cfg)
     # write cfg file
-    with open("config.ini", "w") as cfg:
+    with open(os.path.join(MODULE_PATH, "config.ini"), "w") as cfg:
         config.write(cfg)
 
 # init Reddit instance
@@ -88,17 +93,22 @@ DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# create a file handler
-handler = TimedRotatingFileHandler("gwaripper.log", "D", encoding="UTF-8", backupCount=10)
-handler.setLevel(logging.DEBUG)
+# only log to file if ROOTDIR is set up so we dont clutter the cwd or the module dir
+if ROOTDIR:
+    # create a file handler
+    # handler = TimedRotatingFileHandler("gwaripper.log", "D", encoding="UTF-8", backupCount=10)
+    # max 1MB and keep 5 files
+    handler = RotatingFileHandler(os.path.join(ROOTDIR, "gwaripper.log"),
+                                  maxBytes=1048576, backupCount=5, encoding="UTF-8")
+    handler.setLevel(logging.DEBUG)
 
-# create a logging format
-formatter = logging.Formatter("%(asctime)-15s - %(name)-9s - %(levelname)-6s - %(message)s")
-# '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-handler.setFormatter(formatter)
+    # create a logging format
+    formatter = logging.Formatter("%(asctime)-15s - %(name)-9s - %(levelname)-6s - %(message)s")
+    # '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    handler.setFormatter(formatter)
 
-# add the handlers to the logger
-logger.addHandler(handler)
+    # add the handlers to the logger
+    logger.addHandler(handler)
 
 # create streamhandler
 stdohandler = logging.StreamHandler(sys.stdout)
@@ -361,6 +371,7 @@ def cl_search(args):
 
 
 def cl_config(args):
+    changed = False
     if args.path:
         # normalize path, remove double \ and convert / to \ on windows
         path_in = os.path.normpath(args.path)
@@ -370,6 +381,7 @@ def cl_config(args):
         except KeyError:
             # settings setciton not present
             config["Settings"] = {"root_path": path_in}
+        changed = True
         print("New root dir is: {}".format(path_in))
     # not elif since theyre not mutually exclusive
     if args.backup_freq:
@@ -378,6 +390,7 @@ def cl_config(args):
         except KeyError:
             # settings setciton not present
             config["Settings"] = {"db_bu_freq": str(args.backup_freq)}
+        changed = True
         print("Auto backups are due every {} days now!".format(args.backup_freq))
     if args.backup_nr:
         try:
@@ -385,6 +398,7 @@ def cl_config(args):
         except KeyError:
             # settings setciton not present
             config["Settings"] = {"max_db_bu": str(args.backup_nr)}
+        changed = True
         print("{} backups will be kept from now on".format(args.backup_nr))
     if args.tagfilter:
         tf_str = ", ".join(args.tagfilter).strip(", ")
@@ -393,8 +407,9 @@ def cl_config(args):
         except KeyError:
             # settings setciton not present
             config["Settings"] = {"tag_filter": tf_str}
+        changed = True
         print("Banned tags were set to: {}".format(tf_str))
-    else:
+    if not changed:
         # print current cfg
         for sec in config.sections():
             print("[{}]".format(sec))
@@ -603,7 +618,7 @@ def rip_audio_dls(dl_list, current_usr=None):
     # load dataframe
     # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
     try:
-        df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db1.csv"), sep=";", encoding="utf-8", index_col=0)
+        df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
     except FileNotFoundError:
         df = create_new_db()
     df_grp = None
@@ -706,29 +721,6 @@ def rip_usr_to_files(currentusr):
 
     rip_audio_dls(dl_list, currentusr)
 
-
-# # keep track if we alrdy warned the user
-# warned = False
-#
-# # filestodl decreased by one if a file gets skipped
-# if erg[1] != filestodl:
-#     skipped_file_counter += 1
-# # if the same -> not consecutive -> set to zero
-# else:
-#     skipped_file_counter = 0
-#
-# # since new audios show up on the top on sgasm user page and rip_usr_links() writes them to a list
-# # from top to bottom -> we can assume the first links we dl are the newest posts
-# # -> too many CONSECUTIVE Files already downloaded -> user_rip is probably up-to-date
-# # ask if we should continue for the offchance of having downloaded >15--25 newer consecutive files
-# # but not the old ones (when using single dl)
-# if not warned and skipped_file_counter > 15:
-#     option = input("Over 15 consecutive files already had been downloaded. Should we continue?\n"
-#                    "y or n?: ")
-#     if option == "n":
-#         break
-#     else:
-#         warned = True
 
 def rip_usr_links(sgasm_usr_url):
     site = urllib.request.urlopen(sgasm_usr_url)
@@ -883,7 +875,8 @@ def watch_clip(domain):
     # function is_domain_url will be predicate
     # eval: string -> python code
     dm = eval("clipwatcher_single.is_" + domain + "_url")
-    watcher = clipwatcher_single.ClipboardWatcher(dm, clipwatcher_single.print_write_to_txtf, 0.1)
+    watcher = clipwatcher_single.ClipboardWatcher(dm, clipwatcher_single.print_write_to_txtf,
+                                                  os.path.join(ROOTDIR, "_linkcol"), 0.1)
     try:
         logger.info("Watching clipboard...")
         watcher.run()
@@ -1048,11 +1041,11 @@ def write_last_dltime():
 
 
 def reload_config():
-    config.read("config.ini")
+    config.read(os.path.join(MODULE_PATH, "config.ini"))
 
 
 def write_config_module():
-    with open("config.ini", "w") as config_file:
+    with open(os.path.join(MODULE_PATH, "config.ini"), "w") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)
 

@@ -3,9 +3,6 @@ import os
 
 import pyperclip
 
-WRITETO = os.path.abspath(os.path.join(os.getcwd(), os.pardir, "_linkcol"))
-# windows (os.sep, "home", "m", "Dokumente", "test-sg", "_linkcol")
-
 def is_sgasm_url(url):
     if url.startswith("htt") and "soundgasm" in url:
         return True
@@ -24,11 +21,11 @@ def print_to_stdout(clipboard_content):
     print("Found url: %s" % str(clipboard_content))
 
 
-def print_write_to_txtf(wstring, txtname):
+def print_write_to_txtf(wstring, linkdir, txtname):
     print_to_stdout(wstring)
-    if not os.path.exists(WRITETO):
-        os.makedirs(WRITETO)
-    with open(os.path.join(WRITETO, txtname), 'a', encoding="UTF-8") as w:
+    if not os.path.exists(linkdir):
+        os.makedirs(linkdir)
+    with open(os.path.join(linkdir, txtname), 'a', encoding="UTF-8") as w:
         w.write(wstring + "\n")
 
 
@@ -42,9 +39,10 @@ class ClipboardWatcher:
     by Thorsten Kranz"""
     # predicate ist bedingung ob gesuchter clip content
     # hier beim aufruf in main funktion is_url_but_not_sgasm
-    def __init__(self, predicate, callback, pause=5.):
+    def __init__(self, predicate, callback, txtpath, pause=5.):
         self._predicate = predicate
         self._callback = callback
+        self._txtpath = txtpath
         self._pause = pause
         self._stopping = False
         self.txtname = time.strftime("%Y-%m-%d_%Hh.txt")
@@ -60,7 +58,7 @@ class ClipboardWatcher:
                 # if predicate is met
                 if self._predicate(recent_value):
                     # call callback
-                    self._callback(recent_value, self.txtname)
+                    self._callback(recent_value, self._txtpath, self.txtname)
                     # append to found list so we can return it when closing clipwatcher
                     self.found.append(recent_value)
             time.sleep(self._pause)
@@ -71,7 +69,7 @@ class ClipboardWatcher:
 
 def main():
     watcher = ClipboardWatcher(is_sgasm_url,
-                               print_write_to_txtf,
+                               print_write_to_txtf, os.getcwd(),
                                0.1)
 
     try:
