@@ -894,13 +894,14 @@ def watch_clip(domain):
     except KeyboardInterrupt:
         watcher.stop()
         logger.info("Stopped watching clipboard!")
-        logger.info("URLs were saved in: {}\n".format(watcher.txtname))
-        yn = input("Do you want to download found URLs directly? (yes/no):\n")
-        if yn == "yes":
-            # dont return ref so watcher can die
-            return watcher.found.copy()
-        else:
-            return
+        if watcher.found:
+            logger.info("URLs were saved in: {}\n".format(watcher.txtname))
+            yn = input("Do you want to download found URLs directly? (yes/no):\n")
+            if yn == "yes":
+                # dont return ref so watcher can die
+                return watcher.found.copy()
+            else:
+                return
 
 
 def parse_subreddit(subreddit, sort, limit, time_filter=None):
