@@ -526,12 +526,12 @@ class AudioDownload:
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
-    def download(self, df, curfnr, maxfnr):
+    def download(self, df, curfnr, maxfnr, dl_root):
         if self.url_to_file is not None:
             curfnr += 1
 
             filename = self.filename_local
-            mypath = os.path.join(ROOTDIR, self.name_usr)
+            mypath = os.path.join(dl_root, self.name_usr)
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
             i = 0
@@ -569,19 +569,19 @@ class AudioDownload:
 
             if self.reddit_info:
                 # also write reddit selftext in txtfile with same name as audio
-                self.write_selftext_file()
+                self.write_selftext_file(dl_root)
 
             return curfnr
         else:
             logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
             return curfnr
 
-    def write_selftext_file(self):
+    def write_selftext_file(self, dl_root):
         if self.reddit_info["selftext"]:
             # write_to_txtf uses append mode, but we'd have the selftext several times in the file since
             # there are reddit posts with multiple sgasm files
             # write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.name_usr)
-            mypath = os.path.join(ROOTDIR, self.name_usr)
+            mypath = os.path.join(dl_root, self.name_usr)
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
             # if selftext file doesnt already exists
@@ -652,7 +652,7 @@ def rip_audio_dls(dl_list, current_usr=None):
         # get appropriate func for host to get direct url, sgasm title etc.
         audio_dl.call_host_get_file_info()
 
-        dlcounter = audio_dl.download(df, dlcounter, filestodl)
+        dlcounter = audio_dl.download(df, dlcounter, filestodl, ROOTDIR)
 
     if new_dls:
         # write info of new downloads to df
@@ -787,7 +787,7 @@ def set_missing_values_df(dframe, audiodl_obj):
                              "on row for {}[{}]".format(col, audiodl_obj.title, index))
 
         # write selftext if there's reddit info
-        audiodl_obj.write_selftext_file()
+        audiodl_obj.write_selftext_file(ROOTDIR)
 
 
 def write_to_txtf(wstring, filename, currentusr):
@@ -862,7 +862,7 @@ def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
             logger.info("Filling in missing reddit info: TEMPORARY")
             dl_dict[dup].set_sgasm_info()
             set_missing_values_df(df, dl_dict[dup])
-            dl_dict[dup].write_selftext_file()
+            dl_dict[dup].write_selftext_file(ROOTDIR)
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 

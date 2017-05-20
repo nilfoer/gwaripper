@@ -28,3 +28,4 @@ dist/
 *.egg-info/
 build/
 .cache/
+tests/test_dl/
