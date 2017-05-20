@@ -636,7 +636,7 @@ def rip_audio_dls(dl_list, current_usr=None):
     if current_usr:
         df_grp = df.groupby("sgasm_user")
 
-    # create dict that has direct links to files as keys and AudioDownload instances as values
+    # create dict that has page urls as keys and AudioDownload instances as values
     dl_dict = {}
     for audio in dl_list:
         dl_dict[audio.page_url] = audio
@@ -656,7 +656,13 @@ def rip_audio_dls(dl_list, current_usr=None):
 
     if new_dls:
         # write info of new downloads to df
-        append_new_info_downloaded(df, new_dls, dl_dict)
+        df = append_new_info_downloaded(df, new_dls, dl_dict)
+        # write to disk
+        df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
+        df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
+
+        # auto backup
+        backup_db(df)
     elif dl_list[0].reddit_info:
         # TODO Temporary we might have set missing info on already downloaded files so new_dls might
         # be None even if we added info to df so always safe it to be sure
@@ -664,8 +670,6 @@ def rip_audio_dls(dl_list, current_usr=None):
         # if we didnt dl sth new
         df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
         df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
-
-    return dlcounter
 
 
 def append_new_info_downloaded(df, new_dl_list, dl_dict):
@@ -716,12 +720,8 @@ def append_new_info_downloaded(df, new_dl_list, dl_dict):
     df_dict = pd.DataFrame.from_dict(df_append_dict)
 
     logger.info("Writing info of new downloads to Database!")
-    df = df.append(df_dict, ignore_index=True, verify_integrity=True)
-    df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
-    df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
-
-    # auto backup
-    backup_db(df)
+    df_upd = df.append(df_dict, ignore_index=True, verify_integrity=True)
+    return df_upd
 
 
 def rip_usr_to_files(currentusr):

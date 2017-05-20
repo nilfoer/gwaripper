@@ -27,3 +27,4 @@ gwaripper/pyperclip/
 dist/
 *.egg-info/
 build/
+.cache/
