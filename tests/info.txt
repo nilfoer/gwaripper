@@ -1,0 +1,2 @@
+Not testing the AudioDownload class by default (running with: -m "not dltest") since it also tests the download method -> takes couple of mins
+Remove to test all or use: -m dltest, to only test AudioDownload class
