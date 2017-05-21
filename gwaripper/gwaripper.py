@@ -695,7 +695,6 @@ def rip_audio_dls(dl_list, current_usr=None):
         df = append_new_info_downloaded(df, new_dls, dl_dict)
         # write to disk
         df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
-        df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
 
         # auto backup
         backup_db(df)
@@ -1102,7 +1101,6 @@ def backup_db(df, force_bu=False):
         logger.info("Writing backup of database!")
         df.to_csv(os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.csv".format(time_str)),
                   sep=";", encoding="utf-8")
-        df.to_json(os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.json".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):
