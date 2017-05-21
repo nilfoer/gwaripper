@@ -8,7 +8,7 @@ submissions by certain redditors is also supported. Saves the info of downloaded
 
 setuptools.setup(
     name="GWARipper",
-    version="0.1.0.dev1",
+    version="0.1.0.a1",
     description="A script that rips and downloads audio files from the gonewildaudio subreddit.",
     long_description=long_descr,
     url="",

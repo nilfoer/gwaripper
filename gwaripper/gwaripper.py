@@ -547,7 +547,6 @@ class AudioDownload:
             mypath = os.path.join(dl_root, self.name_usr)
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
-            i = 0
             if os.path.isfile(os.path.join(mypath, filename)):
                 if check_direct_url_for_dl(df, self.url_to_file, self.name_usr):
                     # TODO Temporary
@@ -556,6 +555,7 @@ class AudioDownload:
                                    "--> not renaming --> SKIPPING")
                     return curfnr
                 else:
+                    i = 0
                     logger.info("FILE ALREADY EXISTS - RENAMING:")
                     # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag
                     # or the ending is different (since fname got cut off, so we dont exceed win path limit)
