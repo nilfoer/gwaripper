@@ -561,7 +561,12 @@ class AudioDownload:
             self.downloaded = True
 
             try:
-                urllib.request.urlretrieve(self.url_to_file, os.path.abspath(os.path.join(mypath, filename)))
+                # func passed as kwarg reporthook gets called once on establishment of the network connection
+                # and once after each block read thereafter. The hook will be passed three arguments;
+                # a count of blocks transferred so far, a block size in bytes, and the total size of the file
+                # total size is -1 if unknown
+                urllib.request.urlretrieve(self.url_to_file, os.path.abspath(os.path.join(mypath, filename)),
+                                           reporthook=prog_bar_dl)
             except urllib.request.HTTPError:
                 # dl failed set downloaded
                 self.downloaded = False
@@ -588,6 +593,35 @@ class AudioDownload:
             if not os.path.isfile(os.path.join(mypath, self.filename_local + ".txt")):
                 with open(os.path.join(mypath, self.filename_local + ".txt"), "w", encoding="UTF-8") as w:
                     w.write(self.reddit_info["selftext"])
+
+
+# http://stackoverflow.com/questions/13881092/download-progressbar-for-python-3
+# by J.F. Sebastian
+# combined with:
+# http://stackoverflow.com/questions/3160699/python-progress-bar
+# by Brian Khuu
+def prog_bar_dl(blocknum, blocksize, totalsize):
+    bar_len = 25  # Modify this to change the length of the progress bar
+    # blocknum is current block, blocksize the size of each block in bytes
+    readsofar = blocknum * blocksize
+    if totalsize > 0:
+        percent = readsofar * 1e2 / totalsize  # 1e2 == 100.0
+        # nr of blocks
+        block_nr = int(round(bar_len*readsofar/totalsize))
+        # %5.1f: pad to 5 chars and display one decimal, type float, %% -> escaped %sign
+        # %*d -> Parametrized, width -> len(str(totalsize)), value -> readsofar
+        # s = "\rDownloading: %5.1f%% %*d / %d" % (percent, len(str(totalsize)), readsofar, totalsize)
+        sn = "\rDownloading: {:4.1f}% [{}] {:4.2f} / {:.2f} MB".format(percent, "#"*block_nr + "-"*(bar_len-block_nr),
+                                                                       readsofar / 1024**2, totalsize / 1024**2)
+        sys.stdout.write(sn)
+        if readsofar >= totalsize:  # near the end
+            sys.stdout.write("\n")
+    else:  # total size is unknown
+        sys.stdout.write("\rDownloading: %.2f MB" % (readsofar / 1024**2,))
+    # Python's standard out is buffered (meaning that it collects some of the data "written" to standard out before
+    # it writes it to the terminal). flush() forces it to "flush" the buffer, meaning that it will write everything
+    # in the buffer to the terminal, even if normally it would wait before doing so.
+    sys.stdout.flush()
 
 
 def txt_to_list(path, txtfilename):
