@@ -562,8 +562,7 @@ class AudioDownload:
                     # count up i till file doesnt exist anymore
                     while os.path.isfile(os.path.join(mypath, filename)):
                         i += 1
-                        # TODO Refactor get rid of ending in filename?
-                        filename = self.filename_local[:-4] + "_" + str(i).zfill(3) + self.file_type
+                        filename = self.filename_local[:-len(self.file_type)] + "_" + str(i).zfill(3) + self.file_type
                     # set filename on AudioDownload instance
                     self.filename_local = filename
 
@@ -1014,7 +1013,7 @@ def parse_submissions_for_links(sublist, fromtxt=True):
 
             found_urls = []
             sub_url = submission.url
-            # TODO Refactor make this more automated by checking for list of supported hosts or sth.
+            # TODO Refactor do this in separate function?
             if "soundgasm.net" in sub_url:
                 found_urls.append(("sgasm", sub_url))
                 logger.info("SGASM link found in URL of: " + submission.title)
