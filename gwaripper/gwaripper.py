@@ -514,32 +514,29 @@ class AudioDownload:
         self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_sgasm_info(self):
-        # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
-        # in missing information in the df
-        if not self.url_to_file:
-            logger.info("Getting soundgasm info of: %s" % self.page_url)
-            try:
-                site = urllib.request.urlopen(self.page_url)
-                html = site.read().decode('utf-8')
-                site.close()
-                nhtml = html.split("aria-label=\"title\">")
-                title = nhtml[1].split("</div>", 1)[0]
-                # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
-                descript = \
-                    nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[
-                        1].split(
-                        "</p>\r\n", 1)[0]
-                urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
-                # set instance values
-                self.url_to_file = urlm4a
-                self.file_type = ".m4a"
-                self.title = title
-                self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", title[0:110]) + ".m4a"
-                self.descr = descript
-            except urllib.request.HTTPError:
-                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
+        logger.info("Getting soundgasm info of: %s" % self.page_url)
+        try:
+            site = urllib.request.urlopen(self.page_url)
+            html = site.read().decode('utf-8')
+            site.close()
+            nhtml = html.split("aria-label=\"title\">")
+            title = nhtml[1].split("</div>", 1)[0]
+            # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
+            descript = \
+                nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[
+                    1].split(
+                    "</p>\r\n", 1)[0]
+            urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
+            # set instance values
+            self.url_to_file = urlm4a
+            self.file_type = ".m4a"
+            self.title = title
+            self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", title[0:110]) + ".m4a"
+            self.descr = descript
+        except urllib.request.HTTPError:
+            logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
-    def download(self, df, curfnr, maxfnr, dl_root):
+    def download(self, curfnr, maxfnr, dl_root):
         if self.url_to_file is not None:
             curfnr += 1
 
@@ -547,24 +544,17 @@ class AudioDownload:
             mypath = os.path.join(dl_root, self.name_usr)
             if not os.path.exists(mypath):
                 os.makedirs(mypath)
-            i = 0
             if os.path.isfile(os.path.join(mypath, filename)):
-                if check_direct_url_for_dl(df, self.url_to_file, self.name_usr):
-                    # TODO Temporary
-                    set_missing_values_df(df, self)
-                    logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
-                                   "--> not renaming --> SKIPPING")
-                    return curfnr
-                else:
-                    logger.info("FILE ALREADY EXISTS - RENAMING:")
-                    # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag
-                    # or the ending is different (since fname got cut off, so we dont exceed win path limit)
-                    # count up i till file doesnt exist anymore
-                    while os.path.isfile(os.path.join(mypath, filename)):
-                        i += 1
-                        filename = self.filename_local[:-len(self.file_type)] + "_" + str(i).zfill(3) + self.file_type
-                    # set filename on AudioDownload instance
-                    self.filename_local = filename
+                i = 0
+                logger.info("FILE ALREADY EXISTS - RENAMING:")
+                # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag
+                # or the ending is different (since fname got cut off, so we dont exceed win path limit)
+                # count up i till file doesnt exist anymore
+                while os.path.isfile(os.path.join(mypath, filename)):
+                    i += 1
+                    filename = self.filename_local[:-len(self.file_type)] + "_" + str(i).zfill(3) + self.file_type
+                # set filename on AudioDownload instance
+                self.filename_local = filename
 
             logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
             self.date = time.strftime("%d/%m/%Y")
@@ -698,7 +688,7 @@ def rip_audio_dls(dl_list, current_usr=None):
         # get appropriate func for host to get direct url, sgasm title etc.
         audio_dl.call_host_get_file_info()
 
-        dlcounter = audio_dl.download(df, dlcounter, filestodl, ROOTDIR)
+        dlcounter = audio_dl.download(dlcounter, filestodl, ROOTDIR)
 
     if new_dls:
         # write info of new downloads to df
@@ -709,13 +699,6 @@ def rip_audio_dls(dl_list, current_usr=None):
 
         # auto backup
         backup_db(df)
-    elif dl_list[0].reddit_info:
-        # TODO Temporary we might have set missing info on already downloaded files so new_dls might
-        # be None even if we added info to df so always safe it to be sure
-        # or do elif dl_list[0].reddit_info -> ripping from reddit links so we wrote missing info
-        # if we didnt dl sth new
-        df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
-        df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
 
 
 def append_new_info_downloaded(df, new_dl_list, dl_dict):
@@ -901,14 +884,6 @@ def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
     # d = dict(dl_list)
     for dup in duplicate:
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
-        # TODO Temporary or leave it in?
-        # when we got reddit info get sgasm info even if this file was already downloaded b4
-        # then write missing info to df and write selftext to file
-        if dl_dict[dup].reddit_info and ("soundgasm" in dup):
-            logger.info("Filling in missing reddit info: TEMPORARY")
-            dl_dict[dup].set_sgasm_info()
-            set_missing_values_df(df, dl_dict[dup])
-            dl_dict[dup].write_selftext_file(ROOTDIR)
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
 

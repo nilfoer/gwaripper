@@ -107,7 +107,7 @@ def test_soundgasm(gen_audiodl_sgasm):
     assert a.descr == "Tribute to one of my listener, you know who you are, love <3"
 
     # download worked
-    a.download(pd.DataFrame(), 0, 0, dir)
+    a.download(0, 0, dir)
     assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
     assert md5(os.path.join(dir, a.name_usr, fn)) == "60fec6dc98e1d16fb73fad2d31c50588"
     assert a.downloaded is True
@@ -126,7 +126,7 @@ def test_chirbit(gen_audiodl_chirbit):
     assert a.file_type == ".mp3"
     assert a.filename_local == fn
 
-    a.download(pd.DataFrame(), 0, 0, dir)
+    a.download(0, 0, dir)
     assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
     assert md5(os.path.join(dir, a.name_usr, fn)) == "e8ff0e482d1837cd8be723c64b3ae32f"
     assert a.downloaded is True
@@ -143,7 +143,7 @@ def test_eraudica(gen_audiodl_eraudica):
     assert a.file_type == ".mp3"
     assert a.filename_local == fn
 
-    a.download(pd.DataFrame(), 0, 0, dir)
+    a.download(0, 0, dir)
     assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
     assert md5(os.path.join(dir, a.name_usr, fn)) == "b26ffe08e2068a822234a22aa7a7f40a"
     assert a.downloaded is True
