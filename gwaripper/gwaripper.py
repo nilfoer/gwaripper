@@ -221,10 +221,14 @@ def main():
                             help="Set max. number of backups to keep")
     parser_cfg.add_argument("-tf", "--tagfilter", help="Set banned strings/tags in reddit title", nargs="+",
                             metavar="TAG")
-    # TODO implement changing tag1 tag2 list
+    parser_cfg.add_argument("-tco", "--tag-combo-filter", help="Set banned tag when other isnt present: "
+                                                               "Tag1 is only banned when Tag2 isnt found, synatx"
+                                                               "is: Tag1&!Tag2 Tag3&!Tag4",
+                            metavar="TAGCOMBO", nargs="+")
     parser_cfg.set_defaults(func=cl_config)
 
     # TODO implement verbosity with: stdohandler.setLevel(logging.INFO)?
+    # -> for this to make sense change some logging lvls
     # parser.add_argument("-v", "--verbosity", help="How much information is  printed in the console")
     parser.add_argument("-te", "--test", action="store_true")
 
@@ -420,6 +424,15 @@ def cl_config(args):
             config["Settings"] = {"tag_filter": tf_str}
         changed = True
         print("Banned tags were set to: {}".format(tf_str))
+    if args.tag_combo_filter:
+        t12_str = "; ".join(args.tag_combo_filter).strip("; ")
+        try:
+            config["Settings"]["tag1_in_but_not_tag2"] = t12_str
+        except KeyError:
+            # settings setciton not present
+            config["Settings"] = {"tag1_in_but_not_tag2": t12_str}
+        changed = True
+        print("Banned tag combos were set to: {}".format(t12_str))
     if not changed:
         # print current cfg
         for sec in config.sections():
