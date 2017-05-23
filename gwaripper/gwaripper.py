@@ -522,20 +522,19 @@ class AudioDownload:
                 site = urllib.request.urlopen(self.page_url)
                 html = site.read().decode('utf-8')
                 site.close()
-                nhtml = html.split("aria-label=\"title\">")
-                title = nhtml[1].split("</div>", 1)[0]
-                # descript = nhtml[1].split("Description: ")[1].split("</li>\r\n", 1)[0]
-                descript = \
-                    nhtml[1].split("<div class=\"jp-description\">\r\n          <p style=\"white-space: pre-wrap;\">")[
-                        1].split(
-                        "</p>\r\n", 1)[0]
-                urlm4a = nhtml[1].split("m4a: \"")[1].split("\"\r\n", 1)[0]
+
+                soup = bs4.BeautifulSoup(html, "html.parser")
+
+                title = soup.select_one("div.jp-title").text
+                descr = soup.select_one("div.jp-description > p").text
+                urlm4a = re.search("m4a: \"(.+)\"", html).group(1)
+
                 # set instance values
                 self.url_to_file = urlm4a
                 self.file_type = ".m4a"
                 self.title = title
                 self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", title[0:110]) + ".m4a"
-                self.descr = descript
+                self.descr = descr
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
@@ -783,18 +782,15 @@ def rip_usr_links(sgasm_usr_url):
     site = urllib.request.urlopen(sgasm_usr_url)
     html = site.read().decode('utf-8')
     site.close()
-    # links zu den einzelnen posts isolieren
-    nhtml = html.split("<div class=\"sound-details\"><a href=\"")
-    del nhtml[0]
-    user_files = []
-    for splits in nhtml:
-        # teil str in form von https://soundgasm.net/u/USERNAME/link-to-post> an ">" und schreibt
-        # den ersten teil in die variable url
-        url = splits.split("\">", 1)[0]
-        # url in die liste anfuegen
-        user_files.append(url)
-    filestodl = len(user_files)
-    logger.info("Found " + str(filestodl) + " Files!!")
+
+    soup = bs4.BeautifulSoup(html, 'html.parser')
+
+    # decision for bs4 vs regex -> more safe and speed loss prob not significant
+    # splits: 874 µs per loop; regex: 1.49 ms per loop; bs4: 84.3 ms per loop
+    anchs = soup.select("div.sound-details > a")
+    user_files = [a["href"] for a in anchs]
+
+    logger.info("Found {} Files!!".format(len(user_files)))
     return user_files
 
 
