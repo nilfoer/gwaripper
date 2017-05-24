@@ -526,19 +526,17 @@ class AudioDownload:
                 soup = bs4.BeautifulSoup(html, "html.parser")
 
                 title = soup.select_one("div.jp-title").text
-                descr = soup.select_one("div.jp-description > p").text
-                urlm4a = re.search("m4a: \"(.+)\"", html).group(1)
 
                 # set instance values
-                self.url_to_file = urlm4a
+                self.url_to_file = re.search("m4a: \"(.+)\"", html).group(1)
                 self.file_type = ".m4a"
                 self.title = title
                 self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", title[0:110]) + ".m4a"
-                self.descr = descr
+                self.descr = soup.select_one("div.jp-description > p").text
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
-    def download(self, df, curfnr, maxfnr, dl_root):
+    def download(self, db_con, curfnr, maxfnr, dl_root):
         if self.url_to_file is not None:
             curfnr += 1
 
@@ -549,8 +547,8 @@ class AudioDownload:
             if os.path.isfile(os.path.join(mypath, filename)):
                 if check_direct_url_for_dl(df, self.url_to_file, self.name_usr):
                     # TODO Temporary
-                    set_missing_values_df(df, self)
-                    logger.warning("!!! File already exists and was found in direct urls but not in sg_urls!\n"
+                    set_missing_values_db(db_con, self)
+                    logger.warning("!!! File already exists and was found in direct url_file but not in urls!\n"
                                    "--> not renaming --> SKIPPING")
                     return curfnr
                 else:
@@ -679,14 +677,13 @@ def rip_audio_dls(dl_list):
     conn, c = load_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
 
     # load already downloaded urls -> list -> to set since searching in set is A LOT faster
-    c.execute("SELECT url_sg FROM Downloads")
-    url_tupes = c.fetchall()
-    urls_dled = set([tupe[0] for tupe in url_tupes])
+    c.execute("SELECT url FROM Downloads")
+    urls_dled = set([tupe[0] for tupe in c.fetchall()])
 
     # create dict that has page urls as keys and AudioDownload instances as values
     # dict comrehension: d = {key: value for (key, value) in iterable}
     # duplicate keys -> last key value pair is in dict, values of the same key that came before arent
-    dl_dict = {audio.page_url: audio for audio in dl_list }
+    dl_dict = {audio.page_url: audio for audio in dl_list}
 
     # returns list of new downloads, dl_dict still holds all of them
     new_dls = filter_alrdy_downloaded(urls_dled, dl_dict, conn)
@@ -699,24 +696,12 @@ def rip_audio_dls(dl_list):
         # get appropriate func for host to get direct url, sgasm title etc.
         audio_dl.call_host_get_file_info()
 
-        dlcounter = audio_dl.download(df, dlcounter, filestodl, ROOTDIR)
+        dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
 
-    if new_dls:
-        # write info of new downloads to df
-        df = append_new_info_downloaded(df, new_dls, dl_dict)
-        # write to disk
-        df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
-        df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
-
-        # auto backup
-        backup_db(df)
-    elif dl_list[0].reddit_info:
-        # TODO Temporary we might have set missing info on already downloaded files so new_dls might
-        # be None even if we added info to df so always safe it to be sure
-        # or do elif dl_list[0].reddit_info -> ripping from reddit links so we wrote missing info
-        # if we didnt dl sth new
-        df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
-        df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
+    conn.close()
+    # TODO export to csv(b4 close) + bu
+    # auto backup
+    backup_db(df)
 
 
 def load_sql_db(filename):
@@ -724,16 +709,17 @@ def load_sql_db(filename):
     c = conn.cursor()
     # create table if it doesnt exist
     c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
-              "description TEXT, local_filename TEXT, title TEXT, url TEXT, url_sg TEXT, created_utc REAL, "
+              "description TEXT, local_filename TEXT, title TEXT, url_file TEXT, url TEXT, created_utc REAL, "
               "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
               "sgasm_user TEXT, subreddit_name TEXT)")
     # commit changes
     conn.commit()
 
-    return  conn, c
+    return conn, c
 
 
-def append_new_info_downloaded(df, new_dl_list, dl_dict):
+def add_dl_to_db(db_con, new_dl_list, dl_dict):
+    # TODO url_sg changed to url etc.
     # filenr missing
     df_append_dict = {"Date": [], "Time": [], "Local_filename": [], "Description": [], "Title": [], "URL": [],
                       "URLsg": [], "sgasm_user": [], "redditURL": [], "reddit_user": [], "redditTitle": [],
@@ -765,25 +751,6 @@ def append_new_info_downloaded(df, new_dl_list, dl_dict):
                 for col, r_dkey in reddit_set_helper:
                     df_append_dict[col].append("")
 
-    # check if lists have equal length -> NOT -> ABORT!!
-    # store length of one list in var to avoid overhead if accessing it in loop
-    len_first = len(df_append_dict["Date"]) if df_append_dict else None
-    # all returns true if all elements of iterable are true
-    # dict.values() returns new view of dicts values, iter() returns an iterator over those items,
-    # also works without iter()
-    if not all(len(i) == len_first for i in iter(df_append_dict.values())):
-        logger.error("ABORT !! Lists of append dict ARE NOT THE SAME SIZE !! ABORT !!")
-        return
-    elif len_first == 0:
-        logger.info("No new downloads!")
-        return
-
-    df_dict = pd.DataFrame.from_dict(df_append_dict)
-
-    logger.info("Writing info of new downloads to Database!")
-    df_upd = df.append(df_dict, ignore_index=True, verify_integrity=True)
-    return df_upd
-
 
 def rip_usr_to_files(currentusr):
     sgasm_usr_url = "https://soundgasm.net/u/{}".format(currentusr)
@@ -791,7 +758,7 @@ def rip_usr_to_files(currentusr):
 
     dl_list = gen_audiodl_from_sglink(rip_usr_links(sgasm_usr_url))
 
-    rip_audio_dls(dl_list, currentusr)
+    rip_audio_dls(dl_list)
 
 
 def rip_usr_links(sgasm_usr_url):
@@ -815,10 +782,12 @@ def set_missing_values_db(db_con, audiodl_obj):
     db_con.row_factory = sqlite3.Row
     # we need to create new cursor after changing row_factory
     c = db_con.cursor()
+
+    # even though Row class can be accessed both by index (like tuples) and case-insensitively by name
     # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
     # new_c will always fetch Row obj and cursor will fetch tuples
     db_con.row_factory = None
-    c.execute("SELECT * FROM Downloads WHERE url = ?", (audiodl_obj.url_to_file,))
+    c.execute("SELECT * FROM Downloads WHERE url_file = ?", (audiodl_obj.url_to_file,))
     # get row
     row_cont = c.fetchone()
 
@@ -828,9 +797,9 @@ def set_missing_values_db(db_con, audiodl_obj):
 
     upd_cols = []
     upd_vals = []
-    if row_cont["url_sg"] is None:
+    if row_cont["url"] is None:
         # add col = ? strings to list -> join them later to SQL query
-        upd_cols.append("url_sg = ?")
+        upd_cols.append("url = ?")
         upd_vals.append(audiodl_obj.page_url)
     if row_cont["local_filename"] is None:
         upd_cols.append("local_filename = ?")
@@ -847,15 +816,16 @@ def set_missing_values_db(db_con, audiodl_obj):
         upd_vals.append(audiodl_obj.url_to_file)
         # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
         # so not a good idea
-        # print("UPDATE Downloads SET ({}) = ({}) WHERE url = ?".format(",".join(upd_cols),
+        # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(",".join(upd_cols),
         #                                                               ",".join("?"*len(upd_cols))))
 
-        # join only inserts the string to join on in-between the elements of the iterable (none at the end)
-        # format to -> e.g UPDATE Downloads SET url_sg = ?,local_filename = ? WHERE url = ?
-        c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
-
-    # commit changes
-    db_con.commit()
+        # Connection objects can be used as context managers that automatically commit or rollback transactions.
+        # In the event of an exception, the transaction is rolled back; otherwise, the transaction is committed
+        # Unlike with open() etc. connection WILL NOT GET CLOSED
+        with db_con:
+            # join only inserts the string to join on in-between the elements of the iterable (none at the end)
+            # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ? WHERE url_file = ?
+            c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
 
 
 def write_to_txtf(wstring, filename, currentusr):
@@ -899,7 +869,8 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     dup_titles = ""
     for dup in duplicate:
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
-        # TODO Temporary or leave it in?
+        # TODO We can leave this in if we supply a config option for it, but we need to change set_missing_values_db
+        # to use url instead of url so we dont have to get sgasm_info (new users will always have url)
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to df and write selftext to file
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
@@ -1115,9 +1086,7 @@ def backup_db(df, force_bu=False):
     if (elapsed_time > freq_secs) or force_bu:
         time_str = time.strftime("%Y-%m-%d")
         logger.info("Writing backup of database!")
-        df.to_csv(os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.csv".format(time_str)),
-                  sep=";", encoding="utf-8")
-        df.to_json(os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.json".format(time_str)))
+        os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.csv".format(time_str))
 
         # update last db bu time
         if config.has_section("Time"):
@@ -1152,15 +1121,6 @@ def backup_db(df, force_bu=False):
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
                     "in {: .2f} Tagen!".format(config.getfloat("Settings", "db_bu_freq",
                                                                fallback=5), next_bu / 24 / 60 / 60))
-
-
-def create_new_db():
-    # we dont need a dummy row to not lose dtypes since were only saving if there are new dls and since there
-    # was no db before there can only be unique dls or were not saving it all (due to banned tags etc.)
-    df = pd.DataFrame(columns=['Date', 'Description', 'Local_filename', 'Time', 'Title', 'URL',
-                               'URLsg', 'redditURL', 'sgasm_user', 'reddit_user', 'filenr', 'redditTitle',
-                               'created_utc', 'redditID', 'subredditName', 'rPostUrl'])
-    return df
 
 
 def check_submission_time(submission, lastdltime):

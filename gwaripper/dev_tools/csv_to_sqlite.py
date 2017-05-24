@@ -28,8 +28,8 @@ with conn:
     description TEXT,
     local_filename TEXT,
     title TEXT,
+    url_file TEXT,
     url TEXT,
-    url_sg TEXT,
     created_utc REAL,
     r_post_url TEXT,
     reddit_id TEXT,
@@ -38,7 +38,7 @@ with conn:
     reddit_user TEXT,
     sgasm_user TEXT,
     subreddit_name TEXT);
-    INSERT INTO my_table_copy (id, date, time, description, local_filename, title, url, url_sg, created_utc, r_post_url,
+    INSERT INTO my_table_copy (id, date, time, description, local_filename, title, url_file, url, created_utc, r_post_url,
                                 reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user, subreddit_name)
        SELECT rowid, Date, Time, Description, Local_filename, Title, URL, URLsg, created_utc, rPostUrl,
               redditID, redditTitle, redditURL, reddit_user, sgasm_user, subredditName FROM Downloads;
@@ -46,4 +46,3 @@ with conn:
     ALTER TABLE my_table_copy RENAME TO Downloads;""")
 
 conn.close()
-
