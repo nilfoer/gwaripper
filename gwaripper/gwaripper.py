@@ -8,11 +8,11 @@ import re
 import sys
 import time
 import urllib.request
+import sqlite3
 from logging.handlers import RotatingFileHandler
 from urllib.parse import quote as url_quote
 
 import bs4
-import pandas as pd
 import praw
 
 # since gwaripper contains __init__.py -> considered a package, so this becomes a intra-package reference
@@ -652,18 +652,18 @@ def get_sub_from_reddit_urls(urllist):
 # avoid too many function calls since they are expensive in python
 def gen_audiodl_from_sglink(sglinks):
     dl_list = []
-    for link in sglinks:
+    # set -> remove duplicates
+    for link in set(sglinks):
         a = AudioDownload(link, "sgasm")
         dl_list.append(a)
     return dl_list
 
 
-def rip_audio_dls(dl_list, current_usr=None):
+def rip_audio_dls(dl_list):
     """
     Accepts list of AudioDownload instances and filters them for new downloads and saves them to disk by
     calling download method
     :param dl_list: List of AudioDownload instances
-    :param current_usr: name of user when called from rip_usr_to_files
     """
     # when assigning instance Attributs of classes like self.url
     # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
@@ -673,21 +673,23 @@ def rip_audio_dls(dl_list, current_usr=None):
 
     # load dataframe
     # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
-    try:
-        df = pd.read_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
-    except FileNotFoundError:
-        df = create_new_db()
-    df_grp = None
-    if current_usr:
-        df_grp = df.groupby("sgasm_user")
+
+    # also possible to use .execute() methods on connection, which then create a cursor object and calls the
+    # corresponding mehtod with given params and returns the cursor
+    conn, c = load_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
+
+    # load already downloaded urls -> list -> to set since searching in set is A LOT faster
+    c.execute("SELECT url_sg FROM Downloads")
+    url_tupes = c.fetchall()
+    urls_dled = set([tupe[0] for tupe in url_tupes])
 
     # create dict that has page urls as keys and AudioDownload instances as values
-    dl_dict = {}
-    for audio in dl_list:
-        dl_dict[audio.page_url] = audio
+    # dict comrehension: d = {key: value for (key, value) in iterable}
+    # duplicate keys -> last key value pair is in dict, values of the same key that came before arent
+    dl_dict = {audio.page_url: audio for audio in dl_list }
 
     # returns list of new downloads, dl_dict still holds all of them
-    new_dls = filter_alrdy_downloaded(df, dl_dict, current_usr, df_grp)
+    new_dls = filter_alrdy_downloaded(urls_dled, dl_dict, conn)
 
     filestodl = len(new_dls)
     dlcounter = 0
@@ -715,6 +717,20 @@ def rip_audio_dls(dl_list, current_usr=None):
         # if we didnt dl sth new
         df.to_csv(os.path.join(ROOTDIR, "sgasm_rip_db.csv"), sep=";", encoding="utf-8")
         df.to_json(os.path.join(ROOTDIR, "sgasm_rip_db.json"))
+
+
+def load_sql_db(filename):
+    conn = sqlite3.connect(filename)
+    c = conn.cursor()
+    # create table if it doesnt exist
+    c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
+              "description TEXT, local_filename TEXT, title TEXT, url TEXT, url_sg TEXT, created_utc REAL, "
+              "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
+              "sgasm_user TEXT, subreddit_name TEXT)")
+    # commit changes
+    conn.commit()
+
+    return  conn, c
 
 
 def append_new_info_downloaded(df, new_dl_list, dl_dict):
@@ -794,42 +810,52 @@ def rip_usr_links(sgasm_usr_url):
     return user_files
 
 
-def set_missing_values_df(dframe, audiodl_obj):
-    # get index of matching direct url in dframe
-    index = dframe[dframe["URL"] == audiodl_obj.url_to_file].index[0]
-    # fill_dict = {"Local filename": audiodl_obj.filename_local, "URLsg": audiodl_obj.page_url}
-    # dframe.iloc[index, :].fillna(fill_dict, inplace=True)
-    # isnull on row iloc[index] returns Series with True for null values
-    # only np.nan pd.NaT or None are considered null by isnull()
-    cell_null_bool = dframe.iloc[index].isnull()
-    # if field isnull()
-    if cell_null_bool["URLsg"]:
-        # dframe["URLsg"][index] = audiodl_obj.page_url
-        dframe.set_value(index, "URLsg", audiodl_obj.page_url)
-    else:
-        logger.debug("Field not set since it wasnt empty when trying to set "
-                     "URLsg on row[{}] for {}".format(index, audiodl_obj.title))
-    if cell_null_bool["Local_filename"]:
-        dframe.set_value(index, "Local_filename", audiodl_obj.filename_local)
-    else:
-        logger.debug("Field not set since it wasnt empty when trying to set Local filename "
-                     "on row for {}[{}]".format(audiodl_obj.title, index))
+def set_missing_values_db(db_con, audiodl_obj):
+    # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
+    db_con.row_factory = sqlite3.Row
+    # we need to create new cursor after changing row_factory
+    c = db_con.cursor()
+    # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
+    # new_c will always fetch Row obj and cursor will fetch tuples
+    db_con.row_factory = None
+    c.execute("SELECT * FROM Downloads WHERE url = ?", (audiodl_obj.url_to_file,))
+    # get row
+    row_cont = c.fetchone()
 
-    # also set reddit info if available
+    set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"), ("reddit_user", "r_user"),
+                  ("created_utc", "created_utc"), ("reddit_id", "id"), ("subreddit_name", "subreddit"),
+                  ("r_post_url", "r_post_url"))
+
+    upd_cols = []
+    upd_vals = []
+    if row_cont["url_sg"] is None:
+        # add col = ? strings to list -> join them later to SQL query
+        upd_cols.append("url_sg = ?")
+        upd_vals.append(audiodl_obj.page_url)
+    if row_cont["local_filename"] is None:
+        upd_cols.append("local_filename = ?")
+        upd_vals.append(audiodl_obj.filename_local)
     if audiodl_obj.reddit_info:
-        set_helper = (("redditTitle", "title"), ("redditURL", "permalink"), ("reddit_user", "r_user"),
-                      ("created_utc", "created_utc"), ("redditID", "id"), ("subredditName", "subreddit"),
-                      ("rPostUrl", "r_post_url"))
-        # iterate over set_helper unpacking col name and dictkey of audiodl_obj.reddit_info
-        for col, dictkey in set_helper:
-            if cell_null_bool[col]:
-                dframe.set_value(index, col, audiodl_obj.reddit_info[dictkey])
-            else:
-                logger.debug("Field not set since it wasnt empty when trying to set {} "
-                             "on row for {}[{}]".format(col, audiodl_obj.title, index))
+        for col, key in set_helper:
+            if row_cont[col] is None:
+                upd_cols.append("{} = ?".format(col))
+                upd_vals.append(audiodl_obj.reddit_info[key])
 
-        # write selftext if there's reddit info
-        audiodl_obj.write_selftext_file(ROOTDIR)
+    if upd_cols:
+        logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
+        # append url since upd_vals need to include all the param substitutions for ?
+        upd_vals.append(audiodl_obj.url_to_file)
+        # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
+        # so not a good idea
+        # print("UPDATE Downloads SET ({}) = ({}) WHERE url = ?".format(",".join(upd_cols),
+        #                                                               ",".join("?"*len(upd_cols))))
+
+        # join only inserts the string to join on in-between the elements of the iterable (none at the end)
+        # format to -> e.g UPDATE Downloads SET url_sg = ?,local_filename = ? WHERE url = ?
+        c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
+
+    # commit changes
+    db_con.commit()
 
 
 def write_to_txtf(wstring, filename, currentusr):
@@ -865,36 +891,12 @@ def check_direct_url_for_dl(df, direct_url, current_usr=None, grped_df=None):
             return False
 
 
-def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
-    # OLD when passing 2pair tuples, unpack tuples in dl_list into two lists
-    # url_list, title = zip(*dl_list)
-    # filter dupes
-    unique_urls = set(dl_dict.keys())
-    # using grped df is slightly faster than checking all urls:
-    # df: 1000 loops, best of 3: 705 µs per loop; grped_df: 1000 loops, best of 3: 488 µs per loop
-    if currentusr and grped_df:
-        try:
-            duplicate = unique_urls.intersection(grped_df.get_group(currentusr)["URLsg"].values)
-        except KeyError:
-            logger.debug("User '{}' not yet in database!".format(currentusr))
-            duplicate = set()
-    else:
-        # timeit 1000: 0.19
-        duplicate = unique_urls.intersection(df["URLsg"].values)
+def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
+    to_filter = dl_dict.keys()
+    # Return the intersection of two sets as a new set. (i.e. all elements that are in both sets.)
+    duplicate = downloaded_urls.intersection(to_filter)
 
     dup_titles = ""
-    # OLD when passing 2pair tuples -> create dict from it, NOW passing ref to dict
-    # next -> Retrieve the next item from the iterator by calling its next() method.
-    # iterates over list till it finds match, list comprehension would iterate over whole list
-    # timeit: 0.4678
-    # for a, b in dl_list -> iterates over dl_list unpacking the tuples
-    # returns b if a == url
-    # for url in duplicate:
-    #     dup_titles += next(b for a, b in dl_list if a == url) + "\n"
-
-    # dl_list is list of 2-tuples (2elements) -> basically key-value-pairs
-    # -> turn into dict with dict(), this method(same string concat): 0.4478
-    # d = dict(dl_list)
     for dup in duplicate:
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
         # TODO Temporary or leave it in?
@@ -903,7 +905,7 @@ def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
             dl_dict[dup].set_sgasm_info()
-            set_missing_values_df(df, dl_dict[dup])
+            set_missing_values_db(db_con, dl_dict[dup])
             dl_dict[dup].write_selftext_file(ROOTDIR)
     if dup_titles:
         logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
@@ -911,15 +913,7 @@ def filter_alrdy_downloaded(df, dl_dict, currentusr=None, grped_df=None):
     # set.symmetric_difference()
     # Return a new set with elements in either the set or other but not both.
     # -> duplicates will get removed from unique_urls
-    result = list(unique_urls.symmetric_difference(duplicate))
-    # str.contains accepts regex patter, join url strings with | -> htt..m4a|htt...m4a etc
-    # returns Series/array of boolean values, .any() True if any element is True
-    # timeit 1000: 1.129
-    # mask = df["URL"].str.contains('|'.join(url_list))
-    # isin also works
-    # timeit 1000: 0.29
-    # mask = df["URL"].isin(unique_urls)
-    # print(df["URL"][mask])
+    result = to_filter.symmetric_difference(duplicate)
 
     return result
 
