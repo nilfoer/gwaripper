@@ -6,6 +6,15 @@ r_path = os.getcwd()
 
 df = pd.read_csv(os.path.join(r_path, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
 
+# remove unnecessary \r added repeatedly by pandas during csv export
+# use pd.Series.str.replace which applys it to every element and also uses regex
+# replaces \r\r\r\r\n with \r\n
+# df["Description"] = df["Description"].str.replace("\r+\n", "\r\n")
+# pandas to_csv just adds one new extra \r -> rather remove all \r
+df["Description"] = df["Description"].str.replace("\r", "")
+
+df.to_csv("sgasm_rip_db_rfix.csv", sep=";", encoding="utf-8")
+
 conn = sqlite3.connect(os.path.join(r_path, "gwarip_db.sqlite"))
 
 # with automatically commits the connection and does a rollback in case of an exception BUT DOESNT CLOSE IT!!!!

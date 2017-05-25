@@ -9,6 +9,7 @@ import sys
 import time
 import urllib.request
 import sqlite3
+import csv
 from logging.handlers import RotatingFileHandler
 from urllib.parse import quote as url_quote
 
@@ -29,7 +30,7 @@ from . import clipwatcher_single
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # cmd                                               output
-# os.getcwd()                       N:\_archive\test\trans\soundgasmNET\_dev\_sgasm-repo\dist (where my cmd was, cwd)
+# os.getcwd()                       N:\_archive\...\_sgasm-repo\dist (where my cmd was, cwd)
 # os.path.dirname(os.path.realpath(sys.argv[0]))    C:\python3.5\Scripts (loc of gwaripper.exe) -> script path
 # os.path.dirname(os.path.realpath(__file__))       c:\python3.5\lib\site-packages\gwaripper (loc of module)
 # but __file__ is not always defined
@@ -446,7 +447,9 @@ def cl_config(args):
 
 
 class AudioDownload:
-    # TODO class doscstring?
+    """
+    Represents an audio post that is
+    """
     def __init__(self, page_url, host, reddit_info=None):
         self.page_url = page_url
         self.host = host
@@ -471,13 +474,13 @@ class AudioDownload:
         :return: None
         """
         if self.host == "sgasm":
-            self.set_sgasm_info()
+            self._set_sgasm_info()
         elif self.host == "chirb.it":
-            self.set_chirbit_url()
+            self._set_chirbit_url()
         elif self.host == "eraudica":
-            self.set_eraudica_info()
+            self._set_eraudica_info()
 
-    def set_chirbit_url(self):
+    def _set_chirbit_url(self):
         """
         Gets and sets the direct url for downloading the audio file on self.page_url, the file type and
         removes special chars from filename
@@ -502,7 +505,7 @@ class AudioDownload:
         self.file_type = self.url_to_file.split("?")[0][-4:]
         self.title = self.reddit_info["title"]
 
-    def set_eraudica_info(self):
+    def _set_eraudica_info(self):
         site = urllib.request.urlopen(self.page_url)
         html = site.read().decode('utf-8')
         site.close()
@@ -524,7 +527,7 @@ class AudioDownload:
         self.title = self.reddit_info["title"]
         self.file_type = fname[-4:]
 
-    def set_sgasm_info(self):
+    def _set_sgasm_info(self):
         # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
         # in missing information in the df
         if not self.url_to_file:
@@ -559,52 +562,70 @@ class AudioDownload:
     # returned result, so it may be preferable to keep a single exit point. This will also help factoring out
     # some code paths, and the multiple exit points are a probable indication that such a refactoring is needed.
     def gen_filename(self, db_con, dl_root):
+        """
+        Generates filename to save file locally by replacing chars in the title that are not:
+         \w(regex) - , . _ [ ] or a whitespace(" ")
+        with an underscore and limiting its length. If file exists it adds a number padded
+        to a width of 2 starting at one till there is no file with that name
+        :param db_con: Connection to sqlite db
+        :param dl_root: Path to root dir of the script (where all the downloads etc. are saved)
+        :return: String with filename and added extension
+        """
         # [^\w\-_\.,\[\] ] -> match not(^) any of \w \- _  and whitepsace etc.,
         # replace any that isnt in the  [] with _
         filename = re.sub("[^\w\-_.,\[\] ]", "_", self.title[0:110])
         ftype = self.file_type
 
         mypath = os.path.join(dl_root, self.name_usr)
-        if not os.path.exists(mypath):
-            os.makedirs(mypath)
-        # file cant exist since
-        else:
-            if os.path.isfile(os.path.join(mypath, filename + ftype)):
-                if check_direct_url_for_dl(db_con, self.url_to_file, self.name_usr):
-                    # TODO Temporary
-                    # set filename since we need it to update in db
-                    self.filename_local = filename + ftype
-                    set_missing_values_db(db_con, self)
-                    logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
-                                   "--> not renaming --> SKIPPING")
-                    # No need to return filename since file was already downloaded
-                    # mb refactor so we dont have to function exits, e.g. setting filename to None and at end of func
-                    # return with if-else...
-                    return None
-                else:
-                    i = 0
+        # isfile works without checking if dir exists first
+        if os.path.isfile(os.path.join(mypath, filename + ftype)):
+            if check_direct_url_for_dl(db_con, self.url_to_file, self.name_usr):
+                # TODO Temporary, missing in docstring
+                # set filename since we need it to update in db
+                self.filename_local = filename + ftype
+                set_missing_values_db(db_con, self)
+                logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
+                               "--> not renaming --> SKIPPING")
+                # No need to return filename since file was already downloaded
+                # mb refactor so we dont have to function exits, e.g. setting filename to None and at end of func
+                # return with if-else...
+                return None
+            else:
+                i = 0
 
-                    # You don't need to copy a Python string. They are immutable, so concatenating or slicing
-                    # returns a new string
-                    filename_old = filename
+                # You don't need to copy a Python string. They are immutable, so concatenating or slicing
+                # returns a new string
+                filename_old = filename
 
-                    # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
-                    # or the ending is different (since fname got cut off, so we dont exceed win path limit)
-                    # count up i till file doesnt exist anymore
-                    while os.path.isfile(os.path.join(mypath, filename + ftype)):
-                        i += 1
-                        # :02d -> pad number with 0 to a width of 2, d -> digit(int)
-                        filename = "{}_{:02d}".format(filename_old, i)
-                    logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
+                # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
+                # or the ending is different (since fname got cut off, so we dont exceed win path limit)
+                # count up i till file doesnt exist anymore
+                while os.path.isfile(os.path.join(mypath, filename + ftype)):
+                    i += 1
+                    # :02d -> pad number with 0 to a width of 2, d -> digit(int)
+                    filename = "{}_{:02d}".format(filename_old, i)
+                logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
 
         return filename + ftype
 
-
     def download(self, db_con, curfnr, maxfnr, dl_root):
+        """
+        Will download the file to dl_root in a subfolder named self.name_usr
+        Calls self.gen_filename to get a valid filename and sets date and time of the download.
+        Also calls method to add dl to db commits when download is successful, does a rollback
+        when not (exception raised). Calls self.write_selftext_file if reddit_info is not None
+        :param db_con: Connection to sqlite db
+        :param curfnr: Current file number
+        :param maxfnr: Max files to download
+        :param dl_root: Root dir of script/where dls will be saved in subdirs
+        :return: Current file nr(int)
+        """
         if self.url_to_file is not None:
             curfnr += 1
 
             mypath = os.path.join(dl_root, self.name_usr)
+            if not os.path.exists(mypath):
+                os.makedirs(mypath)
             self.filename_local = self.gen_filename(db_con, dl_root)
 
             if self.filename_local:
@@ -618,7 +639,8 @@ class AudioDownload:
                     # automatically commits changes to db_con if everything succeeds or does a rollback if an
                     # exception is raised
                     with db_con:
-                        add_dl_to_db()
+                        # executes the SQL query but leaves commiting it to with db_con in line above
+                        self._add_to_db(db_con)
                         # func passed as kwarg reporthook gets called once on establishment of the network connection
                         # and once after each block read thereafter. The hook will be passed three arguments;
                         # a count of blocks transferred so far, a block size in bytes, and the total size of the file
@@ -639,9 +661,59 @@ class AudioDownload:
 
         return curfnr
 
+    # normally docstring only for public! modules, functions, methods..
+    def _add_to_db(self, db_con):
+        """
+        Adds instance attributes and reddit_info values to the database using named SQL query
+        parameters with a dictionary.
+        DOESN'T COMMIT the transaction, since the context manager in self.download() needs to be
+        able to do a rollback if the dl fails, will be commited in
+        :param db_con: Connection obj to sqlite db
+        :return: None
+        """
+        # create dict with keys that correspond to the named parameters in the SQL query
+        # set vals contained in reddit_info to NULL
+        val_dict = {
+            "date": self.date,
+            "time": self.time,
+            "description": self.descr,
+            "local_filename": self.filename_local,
+            "title": self.title,
+            "url_file": self.url_to_file,
+            "url": self.page_url,
+            "sgasm_user": self.name_usr,
+            "created_utc": "NULL",
+            "r_post_url": "NULL",
+            "reddit_id": "NULL",
+            "reddit_title": "NULL",
+            "reddit_url": "NULL",
+            "reddit_user": "NULL",
+            "subreddit_name": "NULL"
+        }
+
+        # reddit_info not None -> update dict with actual vals from reddit_info dict
+        # update([other]): Update the dictionary with the key/value pairs from other, overwriting existing keys
+        if self.reddit_info:
+            val_dict.update({
+                "created_utc": self.reddit_info["created_utc"],
+                "r_post_url": self.reddit_info["r_post_url"],
+                "reddit_id": self.reddit_info["id"],
+                "reddit_title": self.reddit_info["title"],
+                "reddit_url": self.reddit_info["permalink"],
+                "reddit_user": self.reddit_info["r_user"],
+                "subreddit_name": self.reddit_info["subreddit"]
+            })
+
+        db_con.execute("INSERT INTO Downloads(date, time, description, local_filename, "
+                       "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
+                       "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
+                       ":description, :local_filename, :title, :url_file, :url, :created_utc, "
+                       ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
+                       ":sgasm_user, :subreddit_name)", val_dict)
+
     def write_selftext_file(self, dl_root):
         """
-        Write selftext to a text file if not None
+        Write selftext to a text file if not None, reddit_info must not be None!!
         :param dl_root: Path of root directory where all downloads are saved to (in username folders)
         :return: None
         """
@@ -800,7 +872,7 @@ def rip_audio_dls(dl_list):
     conn.close()
     # TODO export to csv(b4 close) + bu
     # auto backup
-    backup_db(df)
+    backup_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
 
 
 def load_sql_db(filename):
@@ -821,40 +893,6 @@ def load_sql_db(filename):
     conn.commit()
 
     return conn, c
-
-
-def add_dl_to_db(db_con, new_dl_list, dl_dict):
-    # TODO url_sg changed to url etc.
-    # filenr missing
-    df_append_dict = {"Date": [], "Time": [], "Local_filename": [], "Description": [], "Title": [], "URL": [],
-                      "URLsg": [], "sgasm_user": [], "redditURL": [], "reddit_user": [], "redditTitle": [],
-                      "created_utc": [], "redditID": [], "subredditName": [], "rPostUrl": []}
-
-    reddit_set_helper = (("redditTitle", "title"), ("redditURL", "permalink"), ("reddit_user", "r_user"),
-                         ("created_utc", "created_utc"), ("redditID", "id"), ("subredditName", "subreddit"),
-                         ("rPostUrl", "r_post_url"))
-
-    for url in new_dl_list:
-        audio_dl = dl_dict[url]
-
-        if audio_dl.downloaded:
-            df_append_dict["Date"].append(audio_dl.date)
-            df_append_dict["Time"].append(audio_dl.time)
-            df_append_dict["Local_filename"].append(audio_dl.filename_local)
-            df_append_dict["Description"].append(audio_dl.descr)
-            df_append_dict["Title"].append(audio_dl.title)
-            df_append_dict["URL"].append(audio_dl.url_to_file)
-            df_append_dict["URLsg"].append(audio_dl.page_url)
-            df_append_dict["sgasm_user"].append(audio_dl.name_usr)
-
-            # append all the reddit info if set
-            if audio_dl.reddit_info:
-                for col, r_dkey in reddit_set_helper:
-                    df_append_dict[col].append(audio_dl.reddit_info[r_dkey])
-            # make sure we write all the columns -> append "" or none as reddit info
-            else:
-                for col, r_dkey in reddit_set_helper:
-                    df_append_dict[col].append("")
 
 
 def rip_usr_to_files(currentusr):
@@ -1013,7 +1051,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
         # then write missing info to df and write selftext to file
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
-            dl_dict[dup].set_sgasm_info()
+            dl_dict[dup].call_host_get_file_info()
             set_missing_values_db(db_con, dl_dict[dup])
             dl_dict[dup].write_selftext_file(ROOTDIR)
     if dup_titles:
@@ -1265,7 +1303,28 @@ def write_config_module():
         config.write(config_file)
 
 
-def backup_db(df, force_bu=False):
+def export_csv_from_sql(filename, db_con):
+    """
+    Fetches and writes all rows (with all cols) in db_con's database to the file filename using
+    writerows() from the csv module
+    :param filename:
+    :param db_con:
+    :return:
+    """
+    # newline="" <- important otherwise weird behaviour with multiline cells (adding \r) etc.
+    with open(filename, "w", newline="", encoding="utf-8") as csvfile:
+        # excel dialect -> which line terminator(\r\n), delimiter(,) to use, when to quote cells etc.
+        csvwriter = csv.writer(csvfile, dialect="excel", delimiter=";")
+
+        # get rows from db
+        c = db_con.execute("SELECT * FROM Downloads")
+        rows = c.fetchall()
+
+        # write the all the rows to the file
+        csvwriter.writerows(rows)
+
+
+def backup_db(db_path, force_bu=False):
     bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     if not os.path.exists(bu_dir):
         os.makedirs(bu_dir)
