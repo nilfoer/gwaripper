@@ -1025,6 +1025,16 @@ def parse_subreddit(subreddit, sort, limit, time_filter=None):
 
 
 def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
+    """
+    Search subreddit(subname) with searchstring and return limit number of submission with
+    sorting method = sort. Passes along kwargs to praw's search method.
+    :param subname: Name of subreddit
+    :param searchstring: Searchstring in lucene syntax, see https://www.reddit.com/wiki/search
+    :param limit: Max number of submissions to get
+    :param sort: Sorting method -> relevance, hot, top, new, comments
+    :param kwargs: Kwargs to pass along to search method of praw
+    :return: List containing found praw Submission obj
+    """
     # sort: relevance, hot, top, new, comments (default: relevance).
     # syntax: cloudsearch, lucene, plain (default: lucene) in praw4 cloud
     # time_filter – Can be one of: all, day, hour, month, week, year (default: all)
@@ -1056,6 +1066,23 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 
 # deactivted LASTDLTIME check by default
 def parse_submissions_for_links(sublist, fromtxt=True):
+    """
+    Searches .url and .selftext_html of submissions in sublist for supported urls, if its title
+    doesnt contain banned tags
+
+    Checks if submission title contains banned tags and if we're downloading from hot (fromtxt=False)
+    check if submission time is newer than last_dl_time loaded from config
+
+    Check if url contains part of supported hoster urls -> add to found_urls as tuple (host, url)
+    Search all <a> tags with set href in selftext_html and if main part of support host url is contained
+    -> add to found_urls
+
+    Create dict of reddit info and append AudioDownload/s init with found url, host, and reddit_info to
+    dl_list and return it once all submissions have been searched
+    :param sublist: List of submission obj
+    :param fromtxt: False -> check if submission time is newer than last dl time
+    :return: List of AudioDownload instances
+    """
     dl_list = []
     if not fromtxt:
         # get new lastdltime from cfg
@@ -1116,7 +1143,7 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                         else:
                             found_urls.append(("eraudica", href))
                         logger.info("eraudica link found in text, in submission: " + submission.title)
-            else:
+            else:  # TODO refactor since were not checking if soundgasm.net is in selftext anymore + docstr
                 logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
@@ -1136,6 +1163,7 @@ def parse_submissions_for_links(sublist, fromtxt=True):
 
 
 def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None):
+    # TODO docstr
     # checks submissions title for banned words contained in keywordlist
     # returns True if it finds a match
     subtitle = submission.title.lower()
@@ -1154,6 +1182,11 @@ def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None):
 
 
 def write_last_dltime():
+    """
+    Sets last dl time in config, creating the "Time" section if it doesnt exist and then
+    writes it to the config file
+    :return: None
+    """
     if config.has_section("Time"):
         config["Time"]["LAST_DL_TIME"] = str(time.time())
     else:
@@ -1163,10 +1196,18 @@ def write_last_dltime():
 
 
 def reload_config():
+    """
+    Convenience function to update values in config by reading config file
+    :return: None
+    """
     config.read(os.path.join(MODULE_PATH, "config.ini"))
 
 
 def write_config_module():
+    """
+    Convenience function to write config file
+    :return: None
+    """
     with open(os.path.join(MODULE_PATH, "config.ini"), "w") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)
@@ -1226,6 +1267,12 @@ def backup_db(df, force_bu=False):
 
 
 def check_submission_time(submission, lastdltime):
+    """
+    Check if utc timestamp of submission is greater (== older) than lastdltime
+    :param submission: praw Submission obj
+    :param lastdltime: utc timestamp (float)
+    :return: True if submission is newer than lastdltime else False
+    """
     if submission.created_utc > lastdltime:
         logger.info("Submission is newer than lastdltime")
         return True
