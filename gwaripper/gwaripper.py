@@ -446,6 +446,7 @@ def cl_config(args):
 
 
 class AudioDownload:
+    # TODO class doscstring?
     def __init__(self, page_url, host, reddit_info=None):
         self.page_url = page_url
         self.host = host
@@ -465,6 +466,10 @@ class AudioDownload:
         self.time = None
 
     def call_host_get_file_info(self):
+        """
+        Calls appropriate method to get file info for host type
+        :return: None
+        """
         if self.host == "sgasm":
             self.set_sgasm_info()
         elif self.host == "chirb.it":
@@ -473,6 +478,14 @@ class AudioDownload:
             self.set_eraudica_info()
 
     def set_chirbit_url(self):
+        """
+        Gets and sets the direct url for downloading the audio file on self.page_url, the file type and
+        removes special chars from filename
+
+        Use bs4 to get a reversed base64 encoded string from <i> tag's data-fd attribute
+        Reverse it with a slice and decode it with base64.b64decode
+        :return: None
+        """
         site = urllib.request.urlopen(self.page_url)
         html = site.read().decode('utf-8')
         site.close()
@@ -569,7 +582,7 @@ class AudioDownload:
             # set downloaded
             self.downloaded = True
 
-            try:
+            try:  # TODO use with db_con here
                 # func passed as kwarg reporthook gets called once on establishment of the network connection
                 # and once after each block read thereafter. The hook will be passed three arguments;
                 # a count of blocks transferred so far, a block size in bytes, and the total size of the file
@@ -591,6 +604,11 @@ class AudioDownload:
             return curfnr
 
     def write_selftext_file(self, dl_root):
+        """
+        Write selftext to a text file if not None
+        :param dl_root: Path of root directory where all downloads are saved to (in username folders)
+        :return: None
+        """
         if self.reddit_info["selftext"]:
             # write_to_txtf uses append mode, but we'd have the selftext several times in the file since
             # there are reddit posts with multiple sgasm files
@@ -610,6 +628,18 @@ class AudioDownload:
 # http://stackoverflow.com/questions/3160699/python-progress-bar
 # by Brian Khuu
 def prog_bar_dl(blocknum, blocksize, totalsize):
+    """
+    Displays a progress bar to sys.stdout
+
+    blocknum * blocksize == bytes read so far
+    Only display MB read when total size is -1
+    Calc percentage of file download, number of blocks to display is bar length * percent/100
+    String to display is Downloading: xx.x% [#*block_nr + "-"*(bar_len-block_nr)] xx.xx MB
+    :param blocknum: Count of blocks transferred so far
+    :param blocksize: Block size in bytes
+    :param totalsize: Total size of the file in bytes
+    :return: None
+    """
     bar_len = 25  # Modify this to change the length of the progress bar
     # blocknum is current block, blocksize the size of each block in bytes
     readsofar = blocknum * blocksize
@@ -634,12 +664,23 @@ def prog_bar_dl(blocknum, blocksize, totalsize):
 
 
 def txt_to_list(path, txtfilename):
+    """
+    Reads in file, splits at newline and returns that list
+    :param path: Path to dir the file is in
+    :param txtfilename: Filename
+    :return: List with lines of read text file as elements
+    """
     with open(os.path.join(path, txtfilename), "r", encoding="UTF-8") as f:
         llist = f.read().split()
         return llist
 
 
 def get_sub_from_reddit_urls(urllist):
+    """
+    Filters duplicate urls and returns a list of Submission obj, that the urls are pointing to
+    :param urllist: List with urls point to reddit submissions
+    :return: List with Submission obj that were obtained from the urls in urllist
+    """
     urls_unique = set(urllist)
     sublist = []
     for url in urls_unique:
@@ -649,6 +690,11 @@ def get_sub_from_reddit_urls(urllist):
 
 # avoid too many function calls since they are expensive in python
 def gen_audiodl_from_sglink(sglinks):
+    """
+    Generates AudioDownload instances initiated with the sgasm links and returns them in a list
+    :param sglinks: Links to soundgasm.net posts
+    :return: List containing AudioDownload instances that were created with the urls in sglinks
+    """
     dl_list = []
     # set -> remove duplicates
     for link in set(sglinks):
@@ -659,15 +705,16 @@ def gen_audiodl_from_sglink(sglinks):
 
 def rip_audio_dls(dl_list):
     """
-    Accepts list of AudioDownload instances and filters them for new downloads and saves them to disk by
-    calling download method
+    Accepts list of AudioDownload instances, loads sqlite db and fetches downloaded urls from it.
+    Filters them for new downloads and saves them to disk by calling call_host_get_file_info and download method.
+    Calls backup_db to do automatic backups after all operations are done.
     :param dl_list: List of AudioDownload instances
     """
-    # when assigning instance Attributs of classes like self.url
+    # when assigning instance Attributes of classes like self.url
     # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
     # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
     # could just work with dicts instead since theres no perf loss, but using classes may be easier to
-    # implement new featueres
+    # implement new features
 
     # load dataframe
     # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
@@ -705,6 +752,12 @@ def rip_audio_dls(dl_list):
 
 
 def load_sql_db(filename):
+    """
+    Creates connection to sqlite3 db and a cursor object. Creates the table if it doesnt exist yet since,
+    the connect function creates the file if it doesnt exist but it doesnt contain any tables then.
+    :param filename: Filename string/path to file
+    :return: connection to sqlite3 db and cursor instance
+    """
     conn = sqlite3.connect(filename)
     c = conn.cursor()
     # create table if it doesnt exist
@@ -753,6 +806,11 @@ def add_dl_to_db(db_con, new_dl_list, dl_dict):
 
 
 def rip_usr_to_files(currentusr):
+    """
+    Calls functions to download all the files of sgasm user to disk
+    :param currentusr: soundgasm.net username string
+    :return: None
+    """
     sgasm_usr_url = "https://soundgasm.net/u/{}".format(currentusr)
     logger.info("Ripping user %s" % currentusr)
 
@@ -762,6 +820,14 @@ def rip_usr_to_files(currentusr):
 
 
 def rip_usr_links(sgasm_usr_url):
+    """
+    Gets all the links to soundgasm.net posts of the user/at user url and returns them in a list
+
+     Use bs4 to select all <a> tags directly beneath <div> with class sound-details
+     Writes content of href attributes of found tags to list and return it
+    :param sgasm_usr_url: Url to soundgasm.net user site
+    :return: List of links to soundgasm.net user's posts
+    """
     site = urllib.request.urlopen(sgasm_usr_url)
     html = site.read().decode('utf-8')
     site.close()
@@ -778,6 +844,7 @@ def rip_usr_links(sgasm_usr_url):
 
 
 def set_missing_values_db(db_con, audiodl_obj):
+    # TODO docstring
     # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
     db_con.row_factory = sqlite3.Row
     # we need to create new cursor after changing row_factory
@@ -829,6 +896,13 @@ def set_missing_values_db(db_con, audiodl_obj):
 
 
 def write_to_txtf(wstring, filename, currentusr):
+    """
+    Appends wstring to filename in dir named currentusr in ROOTDIR
+    :param wstring: String to write to file
+    :param filename: Filename
+    :param currentusr: soundgasm.net user name
+    :return: None
+    """
     mypath = os.path.join(ROOTDIR, currentusr)
     if not os.path.exists(mypath):
         os.makedirs(mypath)
@@ -862,12 +936,24 @@ def check_direct_url_for_dl(df, direct_url, current_usr=None, grped_df=None):
 
 
 def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
+    """
+    Filters out already downloaded urls and returns a set of new urls
+    Intersects downloaded_urls with dict keys -> elements that are in both sets (duplicates)
+    Then build the symmetric_difference between dict keys and duplicates -> set with elements that
+    are in either of the sets but not both -> duplicates get filtered out
+    Logs duplicate downloads
+    :param downloaded_urls: set of downloaded urls
+    :param dl_dict: dict with urls as keys and the corresponding AudioDownload obj as values
+    :param db_con: connection to sqlite3 db
+    :return: set of new urls
+    """
     to_filter = dl_dict.keys()
     # Return the intersection of two sets as a new set. (i.e. all elements that are in both sets.)
     duplicate = downloaded_urls.intersection(to_filter)
 
     dup_titles = ""
     for dup in duplicate:
+        # TODO wont work on not sgasm links
         dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
         # TODO We can leave this in if we supply a config option for it, but we need to change set_missing_values_db
         # to use url instead of url so we dont have to get sgasm_info (new users will always have url)
@@ -890,6 +976,14 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
 
 
 def watch_clip(domain):
+    """
+    Watches clipboard for links of domain
+
+    Convert string to python code to be able to pass function to check if clipboard content is
+    what we're looking for to ClipboardWatcher init
+    :param domain: keyword that points to function is_domain_url in clipwatcher_single module
+    :return: List of found links, None if there None
+    """
     # function is_domain_url will be predicate
     # eval: string -> python code
     dm = eval("clipwatcher_single.is_" + domain + "_url")
@@ -912,6 +1006,14 @@ def watch_clip(domain):
 
 
 def parse_subreddit(subreddit, sort, limit, time_filter=None):
+    """
+    Return limit number of submissions in subreddit with sorting method provided with sort
+    :param subreddit: Name of subreddit
+    :param sort: Sorting method, only "hot" or "top"
+    :param limit: Number of submissions to get (1000 max by reddit, 100 per request)
+    :param time_filter: Time period to use, can be all, day, hour, month, week, year
+    :return: praw.ListingGenerator
+    """
     sub = reddit_praw.subreddit(subreddit)
     if sort == "hot":
         return sub.hot(limit=limit)
