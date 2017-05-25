@@ -500,9 +500,7 @@ class AudioDownload:
         # this link EXPIRES so get it right b4 downloading
         self.url_to_file = base64.b64decode(str_b64_rev).decode("utf-8")
         self.file_type = self.url_to_file.split("?")[0][-4:]
-        # [^\w\-_\.,\[\] ] -> match not(^) any of \w \- _  and whitepsace etc.,
-        # replace any that isnt in the  [] with _
-        self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
+        self.title = self.reddit_info["title"]
 
     def set_eraudica_info(self):
         site = urllib.request.urlopen(self.page_url)
@@ -523,8 +521,8 @@ class AudioDownload:
         fname = url_quote(fname)  # renamed so i dont accidentally create a func with same name
 
         self.url_to_file = "{}/fd/{}/{}".format(server, dl_token, fname)
+        self.title = self.reddit_info["title"]
         self.file_type = fname[-4:]
-        self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", self.reddit_info["title"][0:110]) + self.file_type
 
     def set_sgasm_info(self):
         # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
@@ -544,64 +542,102 @@ class AudioDownload:
                 self.url_to_file = re.search("m4a: \"(.+)\"", html).group(1)
                 self.file_type = ".m4a"
                 self.title = title
-                self.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", title[0:110]) + ".m4a"
                 self.descr = soup.select_one("div.jp-description > p").text
             except urllib.request.HTTPError:
                 logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
+
+    # From Hitchhiker's Guide to Python:
+    # When a function grows in complexity it is not uncommon to use multiple return statements inside the function’s
+    # body. However, in order to keep a clear intent and a sustainable readability level, it is preferable to avoid
+    # returning meaningful values from many output points in the body.
+    # [...] [2 main reasons for return -> when it has been processed normally, and the error cases
+    # If you do not wish to raise exceptions for the second case -> return None or False -> return as early
+    # as possible -> flatten structure ->  all the code after the return­because­of­error statement can
+    # assume the condition is met to further compute the function’s main result -> often multiple such returns
+    # are necessary]
+    # When a function has multiple main exit points for its normal course, it becomes difficult to debug the
+    # returned result, so it may be preferable to keep a single exit point. This will also help factoring out
+    # some code paths, and the multiple exit points are a probable indication that such a refactoring is needed.
+    def gen_filename(self, db_con, dl_root):
+        # [^\w\-_\.,\[\] ] -> match not(^) any of \w \- _  and whitepsace etc.,
+        # replace any that isnt in the  [] with _
+        filename = re.sub("[^\w\-_.,\[\] ]", "_", self.title[0:110])
+        ftype = self.file_type
+
+        mypath = os.path.join(dl_root, self.name_usr)
+        if not os.path.exists(mypath):
+            os.makedirs(mypath)
+        # file cant exist since
+        else:
+            if os.path.isfile(os.path.join(mypath, filename + ftype)):
+                if check_direct_url_for_dl(db_con, self.url_to_file, self.name_usr):
+                    # TODO Temporary
+                    # set filename since we need it to update in db
+                    self.filename_local = filename + ftype
+                    set_missing_values_db(db_con, self)
+                    logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
+                                   "--> not renaming --> SKIPPING")
+                    # No need to return filename since file was already downloaded
+                    # mb refactor so we dont have to function exits, e.g. setting filename to None and at end of func
+                    # return with if-else...
+                    return None
+                else:
+                    i = 0
+
+                    # You don't need to copy a Python string. They are immutable, so concatenating or slicing
+                    # returns a new string
+                    filename_old = filename
+
+                    # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
+                    # or the ending is different (since fname got cut off, so we dont exceed win path limit)
+                    # count up i till file doesnt exist anymore
+                    while os.path.isfile(os.path.join(mypath, filename + ftype)):
+                        i += 1
+                        # :02d -> pad number with 0 to a width of 2, d -> digit(int)
+                        filename = "{}_{:02d}".format(filename_old, i)
+                    logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
+
+        return filename + ftype
+
 
     def download(self, db_con, curfnr, maxfnr, dl_root):
         if self.url_to_file is not None:
             curfnr += 1
 
-            filename = self.filename_local
             mypath = os.path.join(dl_root, self.name_usr)
-            if not os.path.exists(mypath):
-                os.makedirs(mypath)
-            if os.path.isfile(os.path.join(mypath, filename)):
-                if check_direct_url_for_dl(df, self.url_to_file, self.name_usr):
-                    # TODO Temporary
-                    set_missing_values_db(db_con, self)
-                    logger.warning("!!! File already exists and was found in direct url_file but not in urls!\n"
-                                   "--> not renaming --> SKIPPING")
-                    return curfnr
-                else:
-                    i = 0
-                    logger.info("FILE ALREADY EXISTS - RENAMING:")
-                    # file alrdy exists but it wasnt in the url databas -> prob same titles only one tag
-                    # or the ending is different (since fname got cut off, so we dont exceed win path limit)
-                    # count up i till file doesnt exist anymore
-                    while os.path.isfile(os.path.join(mypath, filename)):
-                        i += 1
-                        filename = self.filename_local[:-len(self.file_type)] + "_" + str(i).zfill(3) + self.file_type
-                    # set filename on AudioDownload instance
-                    self.filename_local = filename
+            self.filename_local = self.gen_filename(db_con, dl_root)
 
-            logger.info("Downloading: " + filename + ", File " + str(curfnr) + " of " + str(maxfnr))
-            self.date = time.strftime("%d/%m/%Y")
-            self.time = time.strftime("%H:%M:%S")
-            # set downloaded
-            self.downloaded = True
+            if self.filename_local:
+                logger.info("Downloading: {}..., File {} of {}".format(self.filename_local, curfnr, maxfnr))
+                self.date = time.strftime("%d/%m/%Y")
+                self.time = time.strftime("%H:%M:%S")
+                # set downloaded
+                self.downloaded = True
 
-            try:  # TODO use with db_con here
-                # func passed as kwarg reporthook gets called once on establishment of the network connection
-                # and once after each block read thereafter. The hook will be passed three arguments;
-                # a count of blocks transferred so far, a block size in bytes, and the total size of the file
-                # total size is -1 if unknown
-                urllib.request.urlretrieve(self.url_to_file, os.path.abspath(os.path.join(mypath, filename)),
-                                           reporthook=prog_bar_dl)
-            except urllib.request.HTTPError:
-                # dl failed set downloaded
-                self.downloaded = False
-                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.url_to_file)
+                try:
+                    # automatically commits changes to db_con if everything succeeds or does a rollback if an
+                    # exception is raised
+                    with db_con:
+                        add_dl_to_db()
+                        # func passed as kwarg reporthook gets called once on establishment of the network connection
+                        # and once after each block read thereafter. The hook will be passed three arguments;
+                        # a count of blocks transferred so far, a block size in bytes, and the total size of the file
+                        # total size is -1 if unknown
+                        urllib.request.urlretrieve(self.url_to_file,
+                                                   os.path.abspath(os.path.join(mypath, self.filename_local)),
+                                                   reporthook=prog_bar_dl)
+                except urllib.request.HTTPError:
+                    # dl failed set downloaded
+                    self.downloaded = False
+                    logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.url_to_file)
 
-            if self.reddit_info:
-                # also write reddit selftext in txtfile with same name as audio
-                self.write_selftext_file(dl_root)
-
-            return curfnr
+                if self.reddit_info:
+                    # also write reddit selftext in txtfile with same name as audio
+                    self.write_selftext_file(dl_root)
         else:
             logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
-            return curfnr
+
+        return curfnr
 
     def write_selftext_file(self, dl_root):
         """
@@ -622,11 +658,20 @@ class AudioDownload:
                     w.write(self.reddit_info["selftext"])
 
 
-# http://stackoverflow.com/questions/13881092/download-progressbar-for-python-3
-# by J.F. Sebastian
-# combined with:
-# http://stackoverflow.com/questions/3160699/python-progress-bar
-# by Brian Khuu
+# Docstrings = How to use code
+#
+# Comments = Why (rationale) & how code works
+#
+# Docstrings explain how to use code, and are for the users of your code. Uses of docstrings:
+# Explain the purpose of the function even if it seems obvious to you, because it might not be obvious to
+# someone else later on.
+# Describe the parameters expected, the return values, and any exceptions raised.
+# If the method is tightly coupled with a single caller, make some mention of the caller
+# (though be careful as the caller might change later).
+# Comments explain why, and are for the maintainers of your code. Examples include notes to yourself, like:
+# !!! BUG: ...
+# !!! FIX: This is a hack
+# ??? Why is this here?
 def prog_bar_dl(blocknum, blocksize, totalsize):
     """
     Displays a progress bar to sys.stdout
@@ -635,6 +680,13 @@ def prog_bar_dl(blocknum, blocksize, totalsize):
     Only display MB read when total size is -1
     Calc percentage of file download, number of blocks to display is bar length * percent/100
     String to display is Downloading: xx.x% [#*block_nr + "-"*(bar_len-block_nr)] xx.xx MB
+
+    http://stackoverflow.com/questions/13881092/download-progressbar-for-python-3
+    by J.F. Sebastian
+    combined with:
+    http://stackoverflow.com/questions/3160699/python-progress-bar
+    by Brian Khuu
+    and modified
     :param blocknum: Count of blocks transferred so far
     :param blocksize: Block size in bytes
     :param totalsize: Total size of the file in bytes
