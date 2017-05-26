@@ -76,6 +76,12 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
                           client_secret=None,
                           user_agent=config["Reddit"]["USER_AGENT"])
 
+SUPPORTED_HOSTS = {
+                "sgasm": "soundgasm.net",  # may replace this with regex pattern
+                "chirb.it": "chirb.it/",
+                "eraudica": "eraudica.com/"
+            }
+
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
 # load from config ini, split at comma, strip whitespaces, ensure that they are lowercase with .lower()
 KEYWORDLIST = [x.strip().lower() for x in config["Settings"]["tag_filter"].split(",")]
@@ -187,6 +193,9 @@ def main():
                             default="top")
     parser_sub.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
                             choices=("all", "day", "hour", "month", "week", "year"))
+    parser_sub.add_argument("-on", "--only-newer", nargs="?", default=True, type=float,
+                            help="Only download submission if creation time is newer than provided utc"
+                                 "timestamp or last_dl_time from config if none provided")
     parser_sub.set_defaults(func=cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
@@ -367,7 +376,7 @@ def cl_sub(args):
         adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter))
     else:
         # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
-        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), fromtxt=False)
+        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), time_check=args.only_newer)
         write_last_dltime()
     rip_audio_dls(adl_list)
 
@@ -579,7 +588,7 @@ class AudioDownload:
         mypath = os.path.join(dl_root, self.name_usr)
         # isfile works without checking if dir exists first
         if os.path.isfile(os.path.join(mypath, filename + ftype)):
-            if check_direct_url_for_dl(db_con, self.url_to_file, self.name_usr):
+            if check_direct_url_for_dl(db_con, self.url_to_file):
                 # TODO Temporary, missing in docstring
                 # set filename since we need it to update in db
                 self.filename_local = filename + ftype
@@ -869,8 +878,10 @@ def rip_audio_dls(dl_list):
 
         dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
 
+    # export db to csv -> human readable without tools
+    export_csv_from_sql(os.path.join(ROOTDIR, "gwarip_db_exp.csv"), conn)
     conn.close()
-    # TODO export to csv(b4 close) + bu
+
     # auto backup
     backup_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
 
@@ -934,7 +945,13 @@ def rip_usr_links(sgasm_usr_url):
 
 
 def set_missing_values_db(db_con, audiodl_obj):
-    # TODO docstring
+    """
+    Updates row of file entry in db with information from audiodl_obj like page_url, filename_local
+    and reddit_info dict, only sets values if previous entry was NULL/None
+    :param db_con: Connection to sqlite db
+    :param audiodl_obj: instance of AudioDownload whose entry should be updated
+    :return: None
+    """
     # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
     db_con.row_factory = sqlite3.Row
     # we need to create new cursor after changing row_factory
@@ -1000,29 +1017,24 @@ def write_to_txtf(wstring, filename, currentusr):
         w.write(wstring)
 
 
-def check_direct_url_for_dl(df, direct_url, current_usr=None, grped_df=None):
+def check_direct_url_for_dl(db_con, direct_url):
     """
-    Returns True if file was already downloaded
-    :param df: DataFrame in which to look for url
-    :param direct_url: direct URL to m4a file
-    :param current_usr: User when doing full user rip
-    :param grped_df: GroupByObject of df to use when downloading a user
-    :return: True if m4aurl is in df in col URL, else False
+    Fetches url_file col from db and unpacks the 1-tuples, then checks if direct_url
+    is in the list, if found return True
+    :param db_con: Connection to sqlite db
+    :param direct_url: String of direct url to file
+    :return: True if direct_url is in col url_file of db else False
     """
-    if current_usr and grped_df:
-        try:
-            if direct_url in grped_df.get_group(current_usr)["URL"].values:
-                return True
-            else:
-                return False
-        except KeyError:
-            logger.debug("User '{}' not yet in database!".format(current_usr))
-            return False
+    c = db_con.execute("SELECT url_file FROM Downloads")
+    # converting to set would take just as long (for ~10k entries) as searching for it in list
+    # returned as list of 1-tuples, use generator to unpack, so when we find direct_url b4
+    # the last row we dont have to generate the remaining tuples and we only use it once
+    # only minimally faster (~2ms for 10k rows)
+    file_urls = (tup[0] for tup in c.fetchall())
+    if direct_url in file_urls:
+        return True
     else:
-        if direct_url in df["URL"].values:
-            return True
-        else:
-            return False
+        return False
 
 
 def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
@@ -1041,10 +1053,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     # Return the intersection of two sets as a new set. (i.e. all elements that are in both sets.)
     duplicate = downloaded_urls.intersection(to_filter)
 
-    dup_titles = ""
     for dup in duplicate:
-        # TODO wont work on not sgasm links
-        dup_titles += " ".join(dl_dict[dup].page_url[24:].split("-")) + "\n"
         # TODO We can leave this in if we supply a config option for it, but we need to change set_missing_values_db
         # to use url instead of url so we dont have to get sgasm_info (new users will always have url)
         # when we got reddit info get sgasm info even if this file was already downloaded b4
@@ -1054,8 +1063,9 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
             dl_dict[dup].call_host_get_file_info()
             set_missing_values_db(db_con, dl_dict[dup])
             dl_dict[dup].write_selftext_file(ROOTDIR)
-    if dup_titles:
-        logger.info("{} files were already downloaded: \n{}".format(len(duplicate), dup_titles))
+    if duplicate:
+        logger.info("{} files were already downloaded!".format(len(duplicate)))
+        logger.debug("Already downloaded urls:\n{}".format("\n".join(duplicate)))
 
     # set.symmetric_difference()
     # Return a new set with elements in either the set or other but not both.
@@ -1155,28 +1165,32 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 
 
 # deactivted LASTDLTIME check by default
-def parse_submissions_for_links(sublist, fromtxt=True):
+def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
     """
     Searches .url and .selftext_html of submissions in sublist for supported urls, if its title
     doesnt contain banned tags
 
-    Checks if submission title contains banned tags and if we're downloading from hot (fromtxt=False)
-    check if submission time is newer than last_dl_time loaded from config
+    Checks if submission title contains banned tags and if time_check check if submission time is
+    newer than last_dl_time loaded from config or utc timestamp if supplied with time_check
 
     Check if url contains part of supported hoster urls -> add to found_urls as tuple (host, url)
     Search all <a> tags with set href in selftext_html and if main part of support host url is contained
     -> add to found_urls
 
+    If no urls were found log it and append links to html file named like reddit_nurl_%Y-%m-%d_%Hh.html
+    so the user is able to check the subs himself for links
+
     Create dict of reddit info and append AudioDownload/s init with found url, host, and reddit_info to
     dl_list and return it once all submissions have been searched
     :param sublist: List of submission obj
-    :param fromtxt: False -> check if submission time is newer than last dl time
+    :param time_check: True -> check if submission time is newer than last dl time from config, type float use
+    this as lastdltime, False or None dont check submission time at all
     :return: List of AudioDownload instances
     """
     dl_list = []
-    if not fromtxt:
-        # get new lastdltime from cfg
-        reload_config()
+
+    # Jon blow has talked about how SOME annotation reeaally helps programmer understanding, but too much is real bad.
+
     # all values stored as strings, configparser wont convert automatically so we do it with float(config[]..)
     # or use provided getfloat, getint method
     # provide fallback value if key isnt available
@@ -1185,32 +1199,50 @@ def parse_submissions_for_links(sublist, fromtxt=True):
     # configparser provides also a legacy API with explicit get/set methods. While there are valid use cases for the
     # methods outlined below, mapping protocol access is preferred for new projects
     # -> when we dont need fallback value use config["Time"]["last_dl_time"] etc.
-    lastdltime = config.getfloat("Time", "last_dl_time", fallback=0.0)
+
+    # time_check can be True, False, or a float, only load dltime if True -> use is True
+    if time_check is True:
+        # get new lastdltime from cfg
+        reload_config()
+        lastdltime = config.getfloat("Time", "last_dl_time", fallback=0.0)
+    elif type(time_check) is float:
+        lastdltime = time_check
+    else:
+        lastdltime = None
+
     for submission in sublist:
-        # TODO take out sub time check? or refactor
-        if (not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2) and
-                (fromtxt or check_submission_time(submission, lastdltime))):
+
+        # lastdltime gets evaluated first -> only calls func if lastdltime not None
+        if lastdltime and not check_submission_time(submission, lastdltime):
+            # submission is older than lastdltime -> next sub
+            continue
+
+        if not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2):
 
             found_urls = []
             sub_url = submission.url
-            # TODO Refactor do this in separate function?
-            if "soundgasm.net" in sub_url:
-                found_urls.append(("sgasm", sub_url))
-                logger.info("SGASM link found in URL of: " + submission.title)
-            elif "chirb.it/" in sub_url:
-                found_urls.append(("chirb.it", sub_url))
-                logger.info("chirb.it link found in URL of: " + submission.title)
-            elif "eraudica.com/" in sub_url:
-                # remove gwa so we can access dl link directly
-                if sub_url.endswith("/gwa"):
-                    found_urls.append(("eraudica", sub_url[:-4]))
-                else:
-                    found_urls.append(("eraudica", sub_url))
-                logger.info("eraudica link found in URL of: " + submission.title)
-            elif submission.selftext_html is not None:
+
+            for host, search_for in supported_hosts.items():
+                if search_for in sub_url:
+                    found_urls.append((host, sub_url))
+                    logger.info("{} link found in URL of: {}".format(host, submission.title))
+                    break
+
+            # TODO /gwa remove in _set_eraudica.., update docstr
+
+            # elif "eraudica.com/" in sub_url:
+            #     # remove gwa so we can access dl link directly
+            #     if sub_url.endswith("/gwa"):
+            #         found_urls.append(("eraudica", sub_url[:-4]))
+            #     else:
+            #         found_urls.append(("eraudica", sub_url))
+            #     logger.info("eraudica link found in URL of: " + submission.title)
+
+            # only search selftext if we havent already found url in sub_url and selftext isnt None
+            if not found_urls and (submission.selftext_html is not None):  # TODO refactor into sep func?
                 soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
 
-                # selftext_html is not like the normal it starts with <div class="md"..
+                # selftext_html is not like the normal html it starts with <div class="md"..
                 # so i can just go through all a
                 # css selector -> tag a with set href attribute
                 sgasmlinks = soup.select('a[href]')
@@ -1233,13 +1265,16 @@ def parse_submissions_for_links(sublist, fromtxt=True):
                         else:
                             found_urls.append(("eraudica", href))
                         logger.info("eraudica link found in text, in submission: " + submission.title)
-            else:  # TODO refactor since were not checking if soundgasm.net is in selftext anymore + docstr
-                logger.info("No soundgsam link in \"" + submission.shortlink + "\"")
+
+            if not found_urls:
+                logger.info("No supported link in \"{}\"".format(submission.shortlink))
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
-                    w.write("<h3><a href=\"https://reddit.com{}\">{}</a><br/>by {}</h3>\n".format(submission.permalink,
-                                                                                                  submission.title,
-                                                                                                  submission.author))
+                    w.write("<h3><a href=\"https://reddit.com{}\">{}"
+                            "</a><br/>by {}</h3>\n".format(submission.permalink, submission.title, submission.author))
+                # found_urls empty we can skip to next sub
+                continue
+
             reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
                            "selftext": submission.selftext, "r_user": submission.author.name,
                            "created_utc": submission.created_utc, "id": submission.id,
@@ -1253,14 +1288,28 @@ def parse_submissions_for_links(sublist, fromtxt=True):
 
 
 def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None):
-    # TODO docstr
+    """
+    Checks praw Submission obj for banned tags (case-insensitive) from keywordlist in title
+    returns True if tag is contained. Also returns True if one of the first tags in the tag-combos
+    in tag1_but_not_2 is contained but the second isnt.
+
+    Example:    tag1:"[f4f" tag2:"4m]"
+                title: "[F4F][F4M] For both male and female listeners.." -> return False
+                title: "[F4F] For female listeners.." -> return True
+    :param submission: praw Submission obj to scan for banned tags in title
+    :param keywordlist: banned keywords/tags
+    :param tag1_but_not_2: List of 2-tuples, first tag(str) is only banned if second isn't contained
+    :return: True if submission is banned from downloading else False
+    """
     # checks submissions title for banned words contained in keywordlist
     # returns True if it finds a match
     subtitle = submission.title.lower()
+
     for keyword in keywordlist:
         if keyword in subtitle:
             logger.info("Banned keyword '{}' in: {}\n\t slink: {}".format(keyword, subtitle, submission.shortlink))
             return True
+
     if tag1_but_not_2:
         for tag_b, tag_in in tag1_but_not_2:
             # tag_b is only banned if tag_in isnt found in subtitle
@@ -1307,9 +1356,11 @@ def export_csv_from_sql(filename, db_con):
     """
     Fetches and writes all rows (with all cols) in db_con's database to the file filename using
     writerows() from the csv module
-    :param filename:
-    :param db_con:
-    :return:
+
+    writer kwargs: dialect='excel', delimiter=";"
+    :param filename: Filename or path to file
+    :param db_con: Connection to sqlite db
+    :return: None
     """
     # newline="" <- important otherwise weird behaviour with multiline cells (adding \r) etc.
     with open(filename, "w", newline="", encoding="utf-8") as csvfile:
