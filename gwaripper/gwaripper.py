@@ -238,7 +238,7 @@ def main():
                             metavar="TAGCOMBO", nargs="+")
     parser_cfg.set_defaults(func=cl_config)
 
-    # TODO implement verbosity with: stdohandler.setLevel(logging.INFO)?
+    # TOCONSIDER implement verbosity with: stdohandler.setLevel(logging.INFO)?
     # -> for this to make sense change some logging lvls
     # parser.add_argument("-v", "--verbosity", help="How much information is  printed in the console")
     parser.add_argument("-te", "--test", action="store_true")
@@ -545,7 +545,7 @@ class AudioDownload:
         self.file_type = fname[-4:]
 
     def _set_sgasm_info(self):
-        # TODO Temporary? check if we alrdy called this so we dont call it twice when we call it to fill
+        # TORELEASE Temporary check if we alrdy called this so we dont call it twice when we call it to fill
         # in missing information in the df
         if not self.url_to_file:
             logger.info("Getting soundgasm info of: %s" % self.page_url)
@@ -598,7 +598,7 @@ class AudioDownload:
         # isfile works without checking if dir exists first
         if os.path.isfile(os.path.join(mypath, filename + ftype)):
             if check_direct_url_for_dl(db_con, self.url_to_file):
-                # TODO Temporary, missing in docstring
+                # TORELEASE Temporary, missing in docstring
                 # set filename since we need it to update in db
                 self.filename_local = filename + ftype
                 set_missing_values_db(db_con, self)
@@ -1078,8 +1078,9 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     duplicate = downloaded_urls.intersection(to_filter)
 
     for dup in duplicate:
-        # TODO We can leave this in if we supply a config option for it, but we need to change set_missing_values_db
-        # to use url instead of url so we dont have to get sgasm_info (new users will always have url)
+        # TORELEASE We can leave this in if we supply a config option for it, but we need to change
+        # set_missing_values_db to use url instead of url_file so we dont have to get sgasm_info
+        # (new users will always have url)
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to df and write selftext to file
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
