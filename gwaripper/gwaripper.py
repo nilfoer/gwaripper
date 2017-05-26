@@ -76,8 +76,8 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
                           client_secret=None,
                           user_agent=config["Reddit"]["USER_AGENT"])
 
-SUPPORTED_HOSTS = {
-                "sgasm": "soundgasm.net",  # may replace this with regex pattern
+SUPPORTED_HOSTS = { # host type keyword: string/regex pattern to search for
+                "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
                 "chirb.it": "chirb.it/",
                 "eraudica": "eraudica.com/"
             }
@@ -480,6 +480,7 @@ class AudioDownload:
     def call_host_get_file_info(self):
         """
         Calls appropriate method to get file info for host type
+
         :return: None
         """
         if self.host == "sgasm":
@@ -496,6 +497,7 @@ class AudioDownload:
 
         Use bs4 to get a reversed base64 encoded string from <i> tag's data-fd attribute
         Reverse it with a slice and decode it with base64.b64decode
+
         :return: None
         """
         site = urllib.request.urlopen(self.page_url)
@@ -515,6 +517,9 @@ class AudioDownload:
         self.title = self.reddit_info["title"]
 
     def _set_eraudica_info(self):
+        # strip /gwa from end of link so we can access file download
+        self.page_url = self.page_url.strip("/gwa")
+
         site = urllib.request.urlopen(self.page_url)
         html = site.read().decode('utf-8')
         site.close()
@@ -576,6 +581,7 @@ class AudioDownload:
          \w(regex) - , . _ [ ] or a whitespace(" ")
         with an underscore and limiting its length. If file exists it adds a number padded
         to a width of 2 starting at one till there is no file with that name
+
         :param db_con: Connection to sqlite db
         :param dl_root: Path to root dir of the script (where all the downloads etc. are saved)
         :return: String with filename and added extension
@@ -623,6 +629,7 @@ class AudioDownload:
         Calls self.gen_filename to get a valid filename and sets date and time of the download.
         Also calls method to add dl to db commits when download is successful, does a rollback
         when not (exception raised). Calls self.write_selftext_file if reddit_info is not None
+
         :param db_con: Connection to sqlite db
         :param curfnr: Current file number
         :param maxfnr: Max files to download
@@ -677,6 +684,7 @@ class AudioDownload:
         parameters with a dictionary.
         DOESN'T COMMIT the transaction, since the context manager in self.download() needs to be
         able to do a rollback if the dl fails, will be commited in
+
         :param db_con: Connection obj to sqlite db
         :return: None
         """
@@ -723,6 +731,7 @@ class AudioDownload:
     def write_selftext_file(self, dl_root):
         """
         Write selftext to a text file if not None, reddit_info must not be None!!
+
         :param dl_root: Path of root directory where all downloads are saved to (in username folders)
         :return: None
         """
@@ -768,6 +777,7 @@ def prog_bar_dl(blocknum, blocksize, totalsize):
     http://stackoverflow.com/questions/3160699/python-progress-bar
     by Brian Khuu
     and modified
+
     :param blocknum: Count of blocks transferred so far
     :param blocksize: Block size in bytes
     :param totalsize: Total size of the file in bytes
@@ -799,6 +809,7 @@ def prog_bar_dl(blocknum, blocksize, totalsize):
 def txt_to_list(path, txtfilename):
     """
     Reads in file, splits at newline and returns that list
+
     :param path: Path to dir the file is in
     :param txtfilename: Filename
     :return: List with lines of read text file as elements
@@ -811,6 +822,7 @@ def txt_to_list(path, txtfilename):
 def get_sub_from_reddit_urls(urllist):
     """
     Filters duplicate urls and returns a list of Submission obj, that the urls are pointing to
+
     :param urllist: List with urls point to reddit submissions
     :return: List with Submission obj that were obtained from the urls in urllist
     """
@@ -825,6 +837,7 @@ def get_sub_from_reddit_urls(urllist):
 def gen_audiodl_from_sglink(sglinks):
     """
     Generates AudioDownload instances initiated with the sgasm links and returns them in a list
+
     :param sglinks: Links to soundgasm.net posts
     :return: List containing AudioDownload instances that were created with the urls in sglinks
     """
@@ -841,6 +854,7 @@ def rip_audio_dls(dl_list):
     Accepts list of AudioDownload instances, loads sqlite db and fetches downloaded urls from it.
     Filters them for new downloads and saves them to disk by calling call_host_get_file_info and download method.
     Calls backup_db to do automatic backups after all operations are done.
+
     :param dl_list: List of AudioDownload instances
     """
     # when assigning instance Attributes of classes like self.url
@@ -890,6 +904,7 @@ def load_sql_db(filename):
     """
     Creates connection to sqlite3 db and a cursor object. Creates the table if it doesnt exist yet since,
     the connect function creates the file if it doesnt exist but it doesnt contain any tables then.
+
     :param filename: Filename string/path to file
     :return: connection to sqlite3 db and cursor instance
     """
@@ -909,6 +924,7 @@ def load_sql_db(filename):
 def rip_usr_to_files(currentusr):
     """
     Calls functions to download all the files of sgasm user to disk
+
     :param currentusr: soundgasm.net username string
     :return: None
     """
@@ -926,6 +942,7 @@ def rip_usr_links(sgasm_usr_url):
 
      Use bs4 to select all <a> tags directly beneath <div> with class sound-details
      Writes content of href attributes of found tags to list and return it
+
     :param sgasm_usr_url: Url to soundgasm.net user site
     :return: List of links to soundgasm.net user's posts
     """
@@ -948,6 +965,7 @@ def set_missing_values_db(db_con, audiodl_obj):
     """
     Updates row of file entry in db with information from audiodl_obj like page_url, filename_local
     and reddit_info dict, only sets values if previous entry was NULL/None
+
     :param db_con: Connection to sqlite db
     :param audiodl_obj: instance of AudioDownload whose entry should be updated
     :return: None
@@ -1005,6 +1023,7 @@ def set_missing_values_db(db_con, audiodl_obj):
 def write_to_txtf(wstring, filename, currentusr):
     """
     Appends wstring to filename in dir named currentusr in ROOTDIR
+
     :param wstring: String to write to file
     :param filename: Filename
     :param currentusr: soundgasm.net user name
@@ -1021,6 +1040,7 @@ def check_direct_url_for_dl(db_con, direct_url):
     """
     Fetches url_file col from db and unpacks the 1-tuples, then checks if direct_url
     is in the list, if found return True
+
     :param db_con: Connection to sqlite db
     :param direct_url: String of direct url to file
     :return: True if direct_url is in col url_file of db else False
@@ -1044,6 +1064,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     Then build the symmetric_difference between dict keys and duplicates -> set with elements that
     are in either of the sets but not both -> duplicates get filtered out
     Logs duplicate downloads
+
     :param downloaded_urls: set of downloaded urls
     :param dl_dict: dict with urls as keys and the corresponding AudioDownload obj as values
     :param db_con: connection to sqlite3 db
@@ -1081,6 +1102,7 @@ def watch_clip(domain):
 
     Convert string to python code to be able to pass function to check if clipboard content is
     what we're looking for to ClipboardWatcher init
+
     :param domain: keyword that points to function is_domain_url in clipwatcher_single module
     :return: List of found links, None if there None
     """
@@ -1108,6 +1130,7 @@ def watch_clip(domain):
 def parse_subreddit(subreddit, sort, limit, time_filter=None):
     """
     Return limit number of submissions in subreddit with sorting method provided with sort
+
     :param subreddit: Name of subreddit
     :param sort: Sorting method, only "hot" or "top"
     :param limit: Number of submissions to get (1000 max by reddit, 100 per request)
@@ -1128,6 +1151,7 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     """
     Search subreddit(subname) with searchstring and return limit number of submission with
     sorting method = sort. Passes along kwargs to praw's search method.
+
     :param subname: Name of subreddit
     :param searchstring: Searchstring in lucene syntax, see https://www.reddit.com/wiki/search
     :param limit: Max number of submissions to get
@@ -1164,14 +1188,18 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
 # than expected.
 
 
-# deactivted LASTDLTIME check by default
+# there must be a blank line between description of func in docstr and :param descriptions
+# otherwise presentation of docstr by pycharm will be off, also if the descr of a :param
+# is multiline the following lines must be indented(tab) till next :param or :return
 def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
     """
-    Searches .url and .selftext_html of submissions in sublist for supported urls, if its title
-    doesnt contain banned tags
+    Searches .url and .selftext_html of submissions in sublist for supported urls. Checks for
+    every host-type in supported_hosts by searching for the string/regex pattern contained
+    as values
 
-    Checks if submission title contains banned tags and if time_check check if submission time is
-    newer than last_dl_time loaded from config or utc timestamp if supplied with time_check
+    Checks if submission title contains banned tags and if time_check doesnt evaluate to False
+    check if submission time is newer than last_dl_time loaded from config or utc timestamp
+    if supplied with time_check
 
     Check if url contains part of supported hoster urls -> add to found_urls as tuple (host, url)
     Search all <a> tags with set href in selftext_html and if main part of support host url is contained
@@ -1182,9 +1210,11 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
 
     Create dict of reddit info and append AudioDownload/s init with found url, host, and reddit_info to
     dl_list and return it once all submissions have been searched
+
     :param sublist: List of submission obj
+    :param supported_hosts: Dict of host-type keywords as keys and strings/regex patterns as values
     :param time_check: True -> check if submission time is newer than last dl time from config, type float use
-    this as lastdltime, False or None dont check submission time at all
+        this as lastdltime, False or None dont check submission time at all
     :return: List of AudioDownload instances
     """
     dl_list = []
@@ -1211,60 +1241,38 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
         lastdltime = None
 
     for submission in sublist:
-
         # lastdltime gets evaluated first -> only calls func if lastdltime not None
         if lastdltime and not check_submission_time(submission, lastdltime):
             # submission is older than lastdltime -> next sub
             continue
 
         if not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2):
-
             found_urls = []
             sub_url = submission.url
 
             for host, search_for in supported_hosts.items():
-                if search_for in sub_url:
+                if re.search(search_for, sub_url):
                     found_urls.append((host, sub_url))
                     logger.info("{} link found in URL of: {}".format(host, submission.title))
                     break
 
-            # TODO /gwa remove in _set_eraudica.., update docstr
-
-            # elif "eraudica.com/" in sub_url:
-            #     # remove gwa so we can access dl link directly
-            #     if sub_url.endswith("/gwa"):
-            #         found_urls.append(("eraudica", sub_url[:-4]))
-            #     else:
-            #         found_urls.append(("eraudica", sub_url))
-            #     logger.info("eraudica link found in URL of: " + submission.title)
-
             # only search selftext if we havent already found url in sub_url and selftext isnt None
-            if not found_urls and (submission.selftext_html is not None):  # TODO refactor into sep func?
+            if not found_urls and (submission.selftext_html is not None):
                 soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
-
                 # selftext_html is not like the normal html it starts with <div class="md"..
                 # so i can just go through all a
                 # css selector -> tag a with set href attribute
                 sgasmlinks = soup.select('a[href]')
-                usrcheck = re.compile("/u/.+/.+", re.IGNORECASE)
 
                 for link in sgasmlinks:
                     href = link["href"]
-                    # make sure we dont get an user link
-                    if ("soundgasm.net" in href) and usrcheck.search(href):
-                        # appends href-attribute of tag object link
-                        found_urls.append(("sgasm", href))
-                        logger.info("SGASM link found in text, in submission: " + submission.title)
-                    elif "chirb.it/" in href:
-                        found_urls.append(("chirb.it", href))
-                        logger.info("chirb.it link found in text, in submission: " + submission.title)
-                    elif "eraudica.com/" in href:
-                        # remove gwa so we can access dl link directly
-                        if href.endswith("/gwa"):
-                            found_urls.append(("eraudica", href[:-4]))
-                        else:
-                            found_urls.append(("eraudica", href))
-                        logger.info("eraudica link found in text, in submission: " + submission.title)
+                    for host, search_for in supported_hosts.items():
+                        if re.search(search_for, href):
+                            # appends href-attribute of tag object link
+                            found_urls.append((host, href))
+                            logger.info("{} link found in selftext of: {}".format(host, submission.title))
+                            # matched supported host, search next href
+                            break
 
             if not found_urls:
                 logger.info("No supported link in \"{}\"".format(submission.shortlink))
@@ -1296,6 +1304,7 @@ def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None):
     Example:    tag1:"[f4f" tag2:"4m]"
                 title: "[F4F][F4M] For both male and female listeners.." -> return False
                 title: "[F4F] For female listeners.." -> return True
+
     :param submission: praw Submission obj to scan for banned tags in title
     :param keywordlist: banned keywords/tags
     :param tag1_but_not_2: List of 2-tuples, first tag(str) is only banned if second isn't contained
@@ -1324,6 +1333,7 @@ def write_last_dltime():
     """
     Sets last dl time in config, creating the "Time" section if it doesnt exist and then
     writes it to the config file
+
     :return: None
     """
     if config.has_section("Time"):
@@ -1337,6 +1347,7 @@ def write_last_dltime():
 def reload_config():
     """
     Convenience function to update values in config by reading config file
+
     :return: None
     """
     config.read(os.path.join(MODULE_PATH, "config.ini"))
@@ -1345,6 +1356,7 @@ def reload_config():
 def write_config_module():
     """
     Convenience function to write config file
+
     :return: None
     """
     with open(os.path.join(MODULE_PATH, "config.ini"), "w") as config_file:
@@ -1358,6 +1370,7 @@ def export_csv_from_sql(filename, db_con):
     writerows() from the csv module
 
     writer kwargs: dialect='excel', delimiter=";"
+
     :param filename: Filename or path to file
     :param db_con: Connection to sqlite db
     :return: None
@@ -1431,6 +1444,7 @@ def backup_db(db_path, force_bu=False):
 def check_submission_time(submission, lastdltime):
     """
     Check if utc timestamp of submission is greater (== older) than lastdltime
+
     :param submission: praw Submission obj
     :param lastdltime: utc timestamp (float)
     :return: True if submission is newer than lastdltime else False
