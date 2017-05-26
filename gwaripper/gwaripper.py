@@ -4,6 +4,7 @@ import base64
 import configparser
 import logging
 import os
+import shutil
 import re
 import sys
 import time
@@ -76,7 +77,7 @@ reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
                           client_secret=None,
                           user_agent=config["Reddit"]["USER_AGENT"])
 
-SUPPORTED_HOSTS = { # host type keyword: string/regex pattern to search for
+SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
                 "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
                 "chirb.it": "chirb.it/",
                 "eraudica": "eraudica.com/"
@@ -317,7 +318,7 @@ def cl_link(args):
         rip_audio_dls(llist)
     else:
         llist = get_sub_from_reddit_urls(args.links)
-        adl_list = parse_submissions_for_links(llist)
+        adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
         rip_audio_dls(adl_list)
 
 
@@ -332,7 +333,7 @@ def cl_redditor(args):
             sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
         else:  # just get new posts if input doesnt match hot or top
             sublist = redditor.submissions.new(limit=limit)
-        adl_list = parse_submissions_for_links(sublist)
+        adl_list = parse_submissions_for_links(sublist, SUPPORTED_HOSTS)
         if adl_list:
             rip_audio_dls(adl_list)
         else:
@@ -373,10 +374,12 @@ def cl_sub(args):
     limit = args.limit
     time_filter = args.timefilter
     if sort == "top":
-        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter))
+        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter),
+                                               SUPPORTED_HOSTS)
     else:
         # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
-        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), time_check=args.only_newer)
+        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), SUPPORTED_HOSTS,
+                                               time_check=args.only_newer)
         write_last_dltime()
     rip_audio_dls(adl_list)
 
@@ -868,7 +871,7 @@ def rip_audio_dls(dl_list):
 
     # also possible to use .execute() methods on connection, which then create a cursor object and calls the
     # corresponding mehtod with given params and returns the cursor
-    conn, c = load_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
+    conn, c = load_or_create_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
 
     # load already downloaded urls -> list -> to set since searching in set is A LOT faster
     c.execute("SELECT url FROM Downloads")
@@ -900,7 +903,7 @@ def rip_audio_dls(dl_list):
     backup_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
 
 
-def load_sql_db(filename):
+def load_or_create_sql_db(filename):
     """
     Creates connection to sqlite3 db and a cursor object. Creates the table if it doesnt exist yet since,
     the connect function creates the file if it doesnt exist but it doesnt contain any tables then.
@@ -1388,7 +1391,20 @@ def export_csv_from_sql(filename, db_con):
         csvwriter.writerows(rows)
 
 
-def backup_db(db_path, force_bu=False):
+def backup_db(db_path, csv_path=None, force_bu=False):
+    """
+    Backups db_path and csv_path (if not None) to dir "_db-autobu" in root dir (from cfg file)
+    if the time since last backup is greater than db_bu_freq (in days, also from cfg) or force_bu is True
+    Updates last_db_bu time in cfg and deletes oldest backup along with csv (if present) if
+    number of sqlite files in backup dir > max_db_bu in cfg
+
+    If next backup isnt due yet announce when next bu will be
+
+    :param db_path: Path to .sqlite db
+    :param csv_path: Optional, path to csv file thats been exported from sqlite db
+    :param force_bu: True -> force backup no matter last_db_bu time
+    :return: None
+    """
     bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     if not os.path.exists(bu_dir):
         os.makedirs(bu_dir)
@@ -1403,8 +1419,22 @@ def backup_db(db_path, force_bu=False):
     # time.time() is in gmt/utc whereas time.strftime() uses localtime
     if (elapsed_time > freq_secs) or force_bu:
         time_str = time.strftime("%Y-%m-%d")
-        logger.info("Writing backup of database!")
-        os.path.join(ROOTDIR, "_db-autobu", "{}_sgasm_rip_db.csv".format(time_str))
+        logger.info("Writing backup of database to ./_db-autobu/")
+        con = sqlite3.connect(db_path)
+
+        # by confused00 https://codereview.stackexchange.com/questions/78643/create-sqlite-backups
+        # Lock database before making a backup
+        # After a BEGIN IMMEDIATE, no other database connection will be able to write to the database
+        # persists until the next COMMIT or ROLLBACK
+        con.execute('begin immediate')
+        # Make new backup file
+        shutil.copy2(db_path, os.path.join(ROOTDIR, "_db-autobu", "{}_gwarip_db.sqlite".format(time_str)))
+        # Unlock database
+        con.rollback()
+        con.close()
+
+        if csv_path:
+            shutil.copy2(csv_path, os.path.join(ROOTDIR, "_db-autobu", "{}_gwarip_db_exp.csv".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):
@@ -1414,8 +1444,10 @@ def backup_db(db_path, force_bu=False):
         # write config to file
         write_config_module()
 
+        # TOCONSIDER Assumption even if f ends with .sqlite it might stil be a dir
+        # -> we could check for if..and os.path.isfile(os.path.join(bu_dir, f))
         # iterate over listdir, add file to list if isfile returns true
-        bu_dir_list = [os.path.join(bu_dir, f) for f in os.listdir(bu_dir) if os.path.isfile(os.path.join(bu_dir, f))]
+        bu_dir_list = [os.path.join(bu_dir, f) for f in os.listdir(bu_dir) if f.endswith(".sqlite")]
         # we could also use list(filter(os.path.isfile, bu_dir_list)) but then we need to have a list with PATHS
         # but we need the paths for os.path.getctime anyway
         # filter returns iterator!! that yields items which function is true -> only files
@@ -1424,15 +1456,23 @@ def backup_db(db_path, force_bu=False):
         # WHEREAS you would use a simple if x == "bla" in the list comprehension, here prob same speed
 
         # if there are more files than number of bu allowed (2 files per bu atm)
-        if len(bu_dir_list) > (config.getint("Settings", "max_db_bu", fallback=5) * 2):
+        if len(bu_dir_list) > (config.getint("Settings", "max_db_bu", fallback=5)):
             # use creation time (getctime) for sorting, due to how name the files we could also sort alphabetically
             bu_dir_list = sorted(bu_dir_list, key=os.path.getctime)
 
-            logger.info("Too many backups, deleting the oldest one!")
-            # remove the oldest two files, keep deleting till nr of bu == max_db_bu? only relevant if user copied
-            # files in there
+            oldest = os.path.basename(bu_dir_list[0])
+            logger.info("Too many backups, deleting oldest one: {}".format(oldest))
+            # TOCONSIDER Robustness check if file is really the one (sqlite) we want to delete first?
+            # TOCONSIDER keep deleting till nr of bu == max_db_bu? only relevant if user copied files in there
             os.remove(bu_dir_list[0])
-            os.remove(bu_dir_list[1])
+            # try to delete csv of same day, since bu of csv is optional
+            try:
+                os.remove(os.path.join(bu_dir, oldest[:-7] + "_exp.csv"))
+            except FileNotFoundError:
+                logger.debug("No csv file backup of that day")
+            # if the try clause does not raise an exception
+            else:
+                logger.info("Also deleted csv backup, that was created on the same day!")
     else:
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
@@ -1450,10 +1490,10 @@ def check_submission_time(submission, lastdltime):
     :return: True if submission is newer than lastdltime else False
     """
     if submission.created_utc > lastdltime:
-        logger.info("Submission is newer than lastdltime")
+        logger.debug("Submission is newer than lastdltime")
         return True
     else:
-        logger.info("Submission is older than lastdltime")
+        logger.debug("Submission is older than lastdltime")
         return False
 
 
