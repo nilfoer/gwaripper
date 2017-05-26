@@ -150,12 +150,12 @@ def main():
     parser_lnk.add_argument("type", help="Reddit(r) or sgasm(sg) link/s", choices=("r", "sg"))
     parser_lnk.add_argument("links", help="Links to process. Provide type of links as flag!", nargs="+")
     # set funct to call when subcommand is used
-    parser_lnk.set_defaults(func=cl_link)
+    parser_lnk.set_defaults(func=_cl_link)
 
     parser_sgusr = subparsers.add_parser('sguser', help='Rip sgasm user/s')
     # nargs="+" -> one or more arguments
     parser_sgusr.add_argument("names", help="Names of users to rip.", nargs="+")
-    parser_sgusr.set_defaults(func=cl_rip_users)
+    parser_sgusr.set_defaults(func=_cl_rip_users)
     # Required options are generally considered bad form because users expect options to be optional,
     # and thus they should be avoided when possible.
 
@@ -167,7 +167,7 @@ def main():
                              help="Reddit post sorting method")
     parser_rusr.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
                              choices=("all", "day", "hour", "month", "week", "year"))
-    parser_rusr.set_defaults(func=cl_redditor)
+    parser_rusr.set_defaults(func=_cl_redditor)
     # we could set a function to call with these args parser_foo.set_defaults(func=foo)
     # call with args.func(args) -> let argparse handle which func to call instead of long if..elif
     # However, if it is necessary to check the name of the subparser that was invoked, the dest keyword argument
@@ -177,12 +177,12 @@ def main():
     parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file located in _linkcol')
     parser_txt.add_argument("type", help="Reddit(r) or sgasm(sg) link/s in txt", choices=("r", "sg"))
     parser_txt.add_argument("filename", help="Filename of txt file in _linkcol folder")
-    parser_txt.set_defaults(func=cl_fromtxt)
+    parser_txt.set_defaults(func=_cl_fromtxt)
 
     parser_clip = subparsers.add_parser('watch', help='Watch clipboard for sgasm/reddit links and save them to txt;'
                                                       ' option to process them immediately')
     parser_clip.add_argument("type", help="Type of links to watch for: sgasm(sg) or reddit(r)", choices=("sg", "r"))
-    parser_clip.set_defaults(func=cl_watch)
+    parser_clip.set_defaults(func=_cl_watch)
 
     # provide shorthands or alt names with aliases
     parser_sub = subparsers.add_parser('subreddit', aliases=["sub"],
@@ -197,7 +197,7 @@ def main():
     parser_sub.add_argument("-on", "--only-newer", nargs="?", default=True, type=float,
                             help="Only download submission if creation time is newer than provided utc"
                                  "timestamp or last_dl_time from config if none provided")
-    parser_sub.set_defaults(func=cl_sub)
+    parser_sub.set_defaults(func=_cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
     # parser normally uses name of dest=name (which u use to access value with args.name) var for refering to
@@ -221,7 +221,7 @@ def main():
                            default="top")
     parser_se.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
                            choices=("all", "day", "hour", "month", "week", "year"))
-    parser_se.set_defaults(func=cl_search)
+    parser_se.set_defaults(func=_cl_search)
 
     parser_cfg = subparsers.add_parser("config", help="Configure script: save location etc.")
     parser_cfg.add_argument("-p", "--path", help="Set path to root directory, "
@@ -236,7 +236,7 @@ def main():
                                                                "Tag1 is only banned when Tag2 isnt found, synatx"
                                                                "is: Tag1&!Tag2 Tag3&!Tag4",
                             metavar="TAGCOMBO", nargs="+")
-    parser_cfg.set_defaults(func=cl_config)
+    parser_cfg.set_defaults(func=_cl_config)
 
     # TOCONSIDER implement verbosity with: stdohandler.setLevel(logging.INFO)?
     # -> for this to make sense change some logging lvls
@@ -304,15 +304,15 @@ def main():
         else:
             # call func that was selected for subparser/command
             args.func(args)
-    # rootdir istn set but we want to call cl_config
+    # rootdir istn set but we want to call _cl_config
     elif not ROOTDIR and args.subcmd == "config":
-        cl_config(args)
+        _cl_config(args)
     else:
         print("root_path not set in config.ini, use command config -p 'C:\\absolute\\path' to specify where the"
               "files will be downloaded to")
 
 
-def cl_link(args):
+def _cl_link(args):
     if args.type == "sg":
         llist = gen_audiodl_from_sglink(args.links)
         rip_audio_dls(llist)
@@ -322,7 +322,7 @@ def cl_link(args):
         rip_audio_dls(adl_list)
 
 
-def cl_redditor(args):
+def _cl_redditor(args):
     limit = args.limit
     time_filter = args.timefilter
     for usr in args.names:
@@ -340,12 +340,12 @@ def cl_redditor(args):
             logger.warning("No subs recieved from user {} with time_filter {}".format(usr, args.timefilter))
 
 
-def cl_rip_users(args):
+def _cl_rip_users(args):
     for usr in args.names:
         rip_usr_to_files(usr)
 
 
-def cl_fromtxt(args):
+def _cl_fromtxt(args):
     mypath = os.path.join(ROOTDIR, "_linkcol")
     if args.type == "sg":
         rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, args.filename)))
@@ -355,7 +355,7 @@ def cl_fromtxt(args):
         rip_audio_dls(adl_list)
 
 
-def cl_watch(args):
+def _cl_watch(args):
     if args.type == "sg":
         found = watch_clip("sgasm")
         if found:
@@ -369,7 +369,7 @@ def cl_watch(args):
             rip_audio_dls(adl_list)
 
 
-def cl_sub(args):
+def _cl_sub(args):
     sort = args.sort
     limit = args.limit
     time_filter = args.timefilter
@@ -384,7 +384,7 @@ def cl_sub(args):
     rip_audio_dls(adl_list)
 
 
-def cl_search(args):
+def _cl_search(args):
     sort = args.sort
     limit = args.limit
     time_filter = args.timefilter
@@ -398,7 +398,7 @@ def cl_search(args):
         logger.warning("No matching subs/links found in {}, with: '{}'".format(args.subname, args.sstr))
 
 
-def cl_config(args):
+def _cl_config(args):
     changed = False
     if args.path:
         # normalize path, remove double \ and convert / to \ on windows
@@ -460,7 +460,7 @@ def cl_config(args):
 
 class AudioDownload:
     """
-    Represents an audio post that is
+    Represents an audio post that is normally listened to
     """
     def __init__(self, page_url, host, reddit_info=None):
         self.page_url = page_url
