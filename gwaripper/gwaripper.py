@@ -458,7 +458,7 @@ def _cl_config(args):
     write_config_module()
 
 
-class AudioDownload:
+class AudioDownload:  # TODO docstr
     """
     Represents an audio post that is normally listened to
     """
@@ -1095,7 +1095,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     # set.symmetric_difference()
     # Return a new set with elements in either the set or other but not both.
     # -> duplicates will get removed from unique_urls
-    result = to_filter.symmetric_difference(duplicate)
+    result = duplicate.symmetric_difference(to_filter)
 
     return result
 

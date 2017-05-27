@@ -1,5 +1,5 @@
 import pytest
-from gwaripper.gwaripper import parse_submissions_for_links, check_submission_banned_tags, get_sub_from_reddit_urls
+from gwaripper.gwaripper import parse_submissions_for_links, check_submission_banned_tags, get_sub_from_reddit_urls, SUPPORTED_HOSTS
 
 @pytest.mark.parametrize("title, keywordlist, tag1_but_not_2, expected", [
     ("[M4F] This should be banned", ["[m4", "[cuck"], None, True),
@@ -30,17 +30,19 @@ def get_subs_adls():
         "https://www.reddit.com/r/gonewildaudio/comments/5k3k41/f4m_my_virginity_will_be_your_christmas_present/",
         # eraudica in text
         "https://www.reddit.com/r/gonewildaudio/comments/6b5j18/f4m_nurse_eve_and_dr_eve_double_team_tlc/",
-        # no url found
-        "https://www.reddit.com/r/gonewildaudio/comments/4r33ek/f4m_a_lesbian_does_her_male_friend_a_favor_script/"
+        # banned kw
+        "https://www.reddit.com/r/gonewildaudio/comments/4r33ek/f4m_a_lesbian_does_her_male_friend_a_favor_script/",
+        # non supported link (literotica)
+        "https://www.reddit.com/r/gonewildaudio/comments/69evvm/f4mcougarstrangers_a_new_neighbor_moves_in_next/"
     ]
 
     r_found_urls = {
         urls[0]: "https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-Slut-Mother-RapeBlackmailFacefuckingSlap-my-face-with-that-thick-cockInnocent-to-sluttyRoughDirty-TalkFuck-Me-Into-The-MatressCreampieImpregMultiple-Real-Orgasms",
         urls[1]: "http://chirb.it/s80vbt",
-        urls[2]: "http://eraudica.com/e/eve/2015/Nurse-Eve-Time-For-Your-Physical",
+        urls[2]: "http://eraudica.com/e/eve/2015/Nurse-Eve-Time-For-Your-Physical/gwa",
         urls[3]: "https://soundgasm.net/u/belle_in_the_woods/F4M-Please-Make-Me-a-Mommy-impregwet-soundscreampiefuck-me-deeppaint-my-insidesdirty-talkbeggingwhispersASMRstereo-recording",
         urls[4]: "http://chirb.it/Op55m7",
-        urls[5]: "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp",
+        urls[5]: "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp/gwa",
     }
 
     sublist = get_sub_from_reddit_urls(urls)
@@ -49,7 +51,8 @@ def get_subs_adls():
 
 def test_parse_sub(get_subs_adls):
     sublist, found_man = get_subs_adls
-    result = parse_submissions_for_links(sublist, True)
+    # TODO not testing time_check
+    result = parse_submissions_for_links(sublist, SUPPORTED_HOSTS)
     # TODO only checking page url not rest of AudioDownload: host, reddit_info
     assert len(result) == len(found_man) + 1 # since in post there are 2 sgasm urls (identical)
     for adl in result:
