@@ -15,7 +15,7 @@ testdir = os.path.normpath("N:\\_archive\\test\\trans\soundgasmNET\\_dev\\_sgasm
 urls = [
         ("sgasm", "https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-Slut-Mother-RapeBlackmailFacefuckingSlap-my-face-with-that-thick-cockInnocent-to-sluttyRoughDirty-TalkFuck-Me-Into-The-MatressCreampieImpregMultiple-Real-Orgasms"),
         ("chirb.it", "http://chirb.it/s80vbt"),
-        ("eraudica", "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp")
+        ("eraudica", "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp"),
     ]
 
 r_infos = [{
@@ -70,6 +70,15 @@ def gen_audiodl_sgasm():
         os.remove(os.path.join(testdir, a.name_usr, a.filename_local + ".txt"))
         os.rmdir(os.path.join(testdir, a.name_usr))
     del a
+
+
+@pytest.fixture
+def gen_audiodl_failed():
+    a = AudioDownload("https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-FAILED", "sgasm")
+    a.url_to_file = "https://soundgasm.net/sounds/e764a6235fa9ca989721d97fc724dgdfg2d.m4a"
+    a.title = "F4M-Im-your-Pornstar-Cumdumpster-FAILED"
+    a.file_type = ".m4a"
+    return a, testdir
 
 
 @pytest.fixture
@@ -245,6 +254,32 @@ def test_eraudica(gen_audiodl_eraudica, create_db_missing, create_new_test_con):
 
     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
         assert f.read() == "Testing selftext"
+
+
+def test_download_failed(gen_audiodl_failed, create_db_missing, create_new_test_con):
+    fn = "F4M-Im-your-Pornstar-Cumdumpster-FAILED.m4a"
+    con, c = create_db_missing
+    a, dir = gen_audiodl_failed
+
+    a.download(con, 0, 0, dir)
+    assert not os.path.isfile(os.path.join(dir, a.name_usr, fn))
+    assert a.downloaded is False
+
+    new_con, new_c = create_new_test_con  # testing if visible from other con
+    # testing if rollback happened on exception raised
+    expected = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile',
+                 'https://hostdomain.com/sub/TESTURL/', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None,
+                 'TESTTEDDITUSER', 'TESTUSER', None), (
+                    2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0,
+                    None,
+                    'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')
+                ]
+    new_c.execute("SELECT * FROM Downloads")
+    assert new_c.fetchall() == expected
+
+    # selftext written correctly
+    assert not os.path.isfile(os.path.join(dir, a.name_usr, fn + ".txt"))
+
 
 
 @pytest.fixture
