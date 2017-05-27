@@ -1,20 +1,12 @@
 import pytest  # for fixture otherwise not needed
 import sqlite3
 import os
-from gwaripper.gwaripper import AudioDownload, filter_alrdy_downloaded, check_direct_url_for_dl
+from gwaripper.gwaripper import AudioDownload, filter_alrdy_downloaded, check_direct_url_for_dl, set_missing_values_db
 
 testdir = os.path.normpath("N:\\_archive\\test\\trans\soundgasmNET\\_dev\\_sgasm-repo\\tests\\test_res")
 
 @pytest.fixture
 def create_dl_dict():
-    # import pandas as pd
-    # df_dummy = pd.DataFrame(
-    #     data=[['Date', 'Description: DummyLine', 'Local_filename', 'Time', 'Title: DummyTitle', 'URL',
-    #            'URLsg', 'redditURL', 'sgasm_user', 'reddit_user', 0, 'redditTitle',
-    #            1234.0, 'redditID', 'subredditName', 'rPostUrl']],
-    #     columns=['Date', 'Description', 'Local_filename', 'Time', 'Title', 'URL',
-    #              'URLsg', 'redditURL', 'sgasm_user', 'reddit_user', 'filenr', 'redditTitle',
-    #              'created_utc', 'redditID', 'subredditName', 'rPostUrl'])
     reddit_info = {"title": "testtitle", "permalink": "testperm",
                    "selftext": "testself", "r_user": "testruser",
                    "created_utc": 12345.0, "id": "test123",
@@ -64,13 +56,13 @@ def create_db():
         "url_file": "https://hostdomain.com/sub/TESTURL/TESTURLFILE.mp3",
         "url": "https://hostdomain.com/sub/TESTURL/",
         "sgasm_user": "TESTUSER",
-        "created_utc": "NULL",
-        "r_post_url": "NULL",
-        "reddit_id": "NULL",
-        "reddit_title": "NULL",
-        "reddit_url": "NULL",
-        "reddit_user": "NULL",
-        "subreddit_name": "NULL"
+        "created_utc": None,
+        "r_post_url": None,
+        "reddit_id": None,
+        "reddit_title": None,
+        "reddit_url": None,
+        "reddit_user": None,
+        "subreddit_name": None
     }
 
     for i in range(6):

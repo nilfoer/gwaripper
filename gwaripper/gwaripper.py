@@ -601,7 +601,7 @@ class AudioDownload:  # TODO docstr
                 # TORELEASE Temporary, missing in docstring
                 # set filename since we need it to update in db
                 self.filename_local = filename + ftype
-                set_missing_values_db(db_con, self)
+                self.set_missing_values_db(db_con)
                 logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
                                "--> not renaming --> SKIPPING")
                 # No need to return filename since file was already downloaded
@@ -692,7 +692,7 @@ class AudioDownload:  # TODO docstr
         :return: None
         """
         # create dict with keys that correspond to the named parameters in the SQL query
-        # set vals contained in reddit_info to NULL
+        # set vals contained in reddit_info to None(Python -> SQLITE: NULL)
         val_dict = {
             "date": self.date,
             "time": self.time,
@@ -702,13 +702,13 @@ class AudioDownload:  # TODO docstr
             "url_file": self.url_to_file,
             "url": self.page_url,
             "sgasm_user": self.name_usr,
-            "created_utc": "NULL",
-            "r_post_url": "NULL",
-            "reddit_id": "NULL",
-            "reddit_title": "NULL",
-            "reddit_url": "NULL",
-            "reddit_user": "NULL",
-            "subreddit_name": "NULL"
+            "created_utc": None,
+            "r_post_url": None,
+            "reddit_id": None,
+            "reddit_title": None,
+            "reddit_url": None,
+            "reddit_user": None,
+            "subreddit_name": None
         }
 
         # reddit_info not None -> update dict with actual vals from reddit_info dict
@@ -730,6 +730,64 @@ class AudioDownload:  # TODO docstr
                        ":description, :local_filename, :title, :url_file, :url, :created_utc, "
                        ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
                        ":sgasm_user, :subreddit_name)", val_dict)
+
+    def set_missing_values_db(self, db_con):
+        """
+        Updates row of file entry in db with information from self like page_url, filename_local
+        and reddit_info dict, only sets values if previous entry was NULL/None
+
+        :param db_con: Connection to sqlite db
+        :param self: instance of AudioDownload whose entry should be updated
+        :return: None
+        """
+        # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
+        db_con.row_factory = sqlite3.Row
+        # we need to create new cursor after changing row_factory
+        c = db_con.cursor()
+
+        # even though Row class can be accessed both by index (like tuples) and case-insensitively by name
+        # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
+        # new_c will always fetch Row obj and cursor will fetch tuples
+        db_con.row_factory = None
+        c.execute("SELECT * FROM Downloads WHERE url_file = ?", (self.url_to_file,))
+        # get row
+        row_cont = c.fetchone()
+
+        set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"), ("reddit_user", "r_user"),
+                      ("created_utc", "created_utc"), ("reddit_id", "id"), ("subreddit_name", "subreddit"),
+                      ("r_post_url", "r_post_url"))
+
+        upd_cols = []
+        upd_vals = []
+        if row_cont["url"] is None:
+            # add col = ? strings to list -> join them later to SQL query
+            upd_cols.append("url = ?")
+            upd_vals.append(self.page_url)
+        if row_cont["local_filename"] is None:
+            upd_cols.append("local_filename = ?")
+            upd_vals.append(self.filename_local)
+        if self.reddit_info:
+            for col, key in set_helper:
+                if row_cont[col] is None:
+                    upd_cols.append("{} = ?".format(col))
+                    upd_vals.append(self.reddit_info[key])
+
+        if upd_cols:
+            logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
+            # append url since upd_vals need to include all the param substitutions for ?
+            upd_vals.append(self.url_to_file)
+            # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
+            # so not a good idea
+            # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(",".join(upd_cols),
+            #                                                               ",".join("?"*len(upd_cols))))
+
+            # Connection objects can be used as context managers that automatically commit or rollback transactions.
+            # In the event of an exception, the transaction is rolled back; otherwise, the transaction is committed
+            # Unlike with open() etc. connection WILL NOT GET CLOSED
+            with db_con:
+                # join only inserts the string to join on in-between the elements of the iterable (none at the end)
+                # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ? WHERE url_file = ?
+                c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
 
     def write_selftext_file(self, dl_root):
         """
@@ -964,65 +1022,6 @@ def rip_usr_links(sgasm_usr_url):
     return user_files
 
 
-def set_missing_values_db(db_con, audiodl_obj):
-    """
-    Updates row of file entry in db with information from audiodl_obj like page_url, filename_local
-    and reddit_info dict, only sets values if previous entry was NULL/None
-
-    :param db_con: Connection to sqlite db
-    :param audiodl_obj: instance of AudioDownload whose entry should be updated
-    :return: None
-    """
-    # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
-    db_con.row_factory = sqlite3.Row
-    # we need to create new cursor after changing row_factory
-    c = db_con.cursor()
-
-    # even though Row class can be accessed both by index (like tuples) and case-insensitively by name
-    # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
-    # new_c will always fetch Row obj and cursor will fetch tuples
-    db_con.row_factory = None
-    c.execute("SELECT * FROM Downloads WHERE url_file = ?", (audiodl_obj.url_to_file,))
-    # get row
-    row_cont = c.fetchone()
-
-    set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"), ("reddit_user", "r_user"),
-                  ("created_utc", "created_utc"), ("reddit_id", "id"), ("subreddit_name", "subreddit"),
-                  ("r_post_url", "r_post_url"))
-
-    upd_cols = []
-    upd_vals = []
-    if row_cont["url"] is None:
-        # add col = ? strings to list -> join them later to SQL query
-        upd_cols.append("url = ?")
-        upd_vals.append(audiodl_obj.page_url)
-    if row_cont["local_filename"] is None:
-        upd_cols.append("local_filename = ?")
-        upd_vals.append(audiodl_obj.filename_local)
-    if audiodl_obj.reddit_info:
-        for col, key in set_helper:
-            if row_cont[col] is None:
-                upd_cols.append("{} = ?".format(col))
-                upd_vals.append(audiodl_obj.reddit_info[key])
-
-    if upd_cols:
-        logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
-        # append url since upd_vals need to include all the param substitutions for ?
-        upd_vals.append(audiodl_obj.url_to_file)
-        # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
-        # so not a good idea
-        # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(",".join(upd_cols),
-        #                                                               ",".join("?"*len(upd_cols))))
-
-        # Connection objects can be used as context managers that automatically commit or rollback transactions.
-        # In the event of an exception, the transaction is rolled back; otherwise, the transaction is committed
-        # Unlike with open() etc. connection WILL NOT GET CLOSED
-        with db_con:
-            # join only inserts the string to join on in-between the elements of the iterable (none at the end)
-            # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ? WHERE url_file = ?
-            c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
-
-
 def write_to_txtf(wstring, filename, currentusr):
     """
     Appends wstring to filename in dir named currentusr in ROOTDIR
@@ -1086,7 +1085,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
         if dl_dict[dup].reddit_info and ("soundgasm" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
             dl_dict[dup].call_host_get_file_info()
-            set_missing_values_db(db_con, dl_dict[dup])
+            dl_dict[dup].set_missing_values_db(db_con)
             dl_dict[dup].write_selftext_file(ROOTDIR)
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))
