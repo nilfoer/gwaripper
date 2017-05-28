@@ -78,7 +78,8 @@ def gen_audiodl_failed():
     a.url_to_file = "https://soundgasm.net/sounds/e764a6235fa9ca989721d97fc724dgdfg2d.m4a"
     a.title = "F4M-Im-your-Pornstar-Cumdumpster-FAILED"
     a.file_type = ".m4a"
-    return a, testdir
+    yield a, testdir
+    os.rmdir(os.path.join(testdir, "miyu213"))
 
 
 @pytest.fixture
@@ -277,7 +278,6 @@ def test_download_failed(gen_audiodl_failed, create_db_missing, create_new_test_
     new_c.execute("SELECT * FROM Downloads")
     assert new_c.fetchall() == expected
 
-    # selftext written correctly
     assert not os.path.isfile(os.path.join(dir, a.name_usr, fn + ".txt"))
 
 

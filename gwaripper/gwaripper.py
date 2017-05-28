@@ -1391,10 +1391,10 @@ def export_csv_from_sql(filename, db_con):
         csvwriter.writerows(rows)
 
 
-def backup_db(db_path, csv_path=None, force_bu=False):
+def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDIR, "_db-autobu")):
     """
-    Backups db_path and csv_path (if not None) to dir "_db-autobu" in root dir (from cfg file)
-    if the time since last backup is greater than db_bu_freq (in days, also from cfg) or force_bu is True
+    Backups db_path and csv_path (if not None) to bu_dir if the time since last backup is greater
+    than db_bu_freq (in days, also from cfg) or force_bu is True
     Updates last_db_bu time in cfg and deletes oldest backup along with csv (if present) if
     number of sqlite files in backup dir > max_db_bu in cfg
 
@@ -1403,15 +1403,14 @@ def backup_db(db_path, csv_path=None, force_bu=False):
     :param db_path: Path to .sqlite db
     :param csv_path: Optional, path to csv file thats been exported from sqlite db
     :param force_bu: True -> force backup no matter last_db_bu time
+    :param bu_dir: Path to location of backup
     :return: None
     """
-    bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     if not os.path.exists(bu_dir):
         os.makedirs(bu_dir)
     # time.time() get utc number
     now = time.time()
     # freq in days convert to secs since utc time is in secs since epoch
-    # get freq from config.ini use fallback value 3 days
     freq_secs = config.getfloat("Settings", "db_bu_freq", fallback=5.0) * 24 * 60 * 60
     elapsed_time = now - config.getfloat("Time", "last_db_bu", fallback=0.0)
 
@@ -1419,7 +1418,7 @@ def backup_db(db_path, csv_path=None, force_bu=False):
     # time.time() is in gmt/utc whereas time.strftime() uses localtime
     if (elapsed_time > freq_secs) or force_bu:
         time_str = time.strftime("%Y-%m-%d")
-        logger.info("Writing backup of database to ./_db-autobu/")
+        logger.info("Writing backup of database to {}".format(bu_dir))
         con = sqlite3.connect(db_path)
 
         # by confused00 https://codereview.stackexchange.com/questions/78643/create-sqlite-backups
@@ -1428,13 +1427,13 @@ def backup_db(db_path, csv_path=None, force_bu=False):
         # persists until the next COMMIT or ROLLBACK
         con.execute('begin immediate')
         # Make new backup file
-        shutil.copy2(db_path, os.path.join(ROOTDIR, "_db-autobu", "{}_gwarip_db.sqlite".format(time_str)))
+        shutil.copy2(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
         # Unlock database
         con.rollback()
         con.close()
 
         if csv_path:
-            shutil.copy2(csv_path, os.path.join(ROOTDIR, "_db-autobu", "{}_gwarip_db_exp.csv".format(time_str)))
+            shutil.copy2(csv_path, os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):
