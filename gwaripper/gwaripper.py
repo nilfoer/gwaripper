@@ -164,8 +164,8 @@ def main():
     parser_rusr.add_argument("names", help="Names of users to rip.", nargs="+")
     # choices -> available options -> error if not contained; default -> default value if not supplied
     parser_rusr.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
-                             help="Reddit post sorting method")
-    parser_rusr.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+                             help="Reddit post sorting method (default: top)")
+    parser_rusr.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
                              choices=("all", "day", "hour", "month", "week", "year"))
     parser_rusr.set_defaults(func=_cl_redditor)
     # we could set a function to call with these args parser_foo.set_defaults(func=foo)
@@ -190,13 +190,16 @@ def main():
 
     parser_sub.add_argument("sub", help="Name of subreddit")
     parser_sub.add_argument("limit", type=int, help="How many posts to download")
-    parser_sub.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method",
+    parser_sub.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method (default: top)",
                             default="top")
-    parser_sub.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+    parser_sub.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
                             choices=("all", "day", "hour", "month", "week", "year"))
-    parser_sub.add_argument("-on", "--only-newer", nargs="?", default=True, type=float,
+    # nargs=? One argument will be consumed from the command line if possible
+    # no command-line argument -> default
+    # optional arguments -> option string is present but not followed by a command-line argument -> value from const
+    parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=True, type=float,
                             help="Only download submission if creation time is newer than provided utc"
-                                 "timestamp or last_dl_time from config if none provided")
+                                 "timestamp or last_dl_time from config if none provided (default: True)")
     parser_sub.set_defaults(func=_cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
@@ -217,9 +220,9 @@ def main():
     parser_se.add_argument("sstr", help="'searchstring' in QUOTES: https://www.reddit.com/wiki/search",
                            metavar="searchstring")
     parser_se.add_argument("limit", type=int, help="How many posts to download")
-    parser_se.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method",
+    parser_se.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method (default: top)",
                            default="top")
-    parser_se.add_argument("-t", "--timefilter", help="Value for time filter", default="all",
+    parser_se.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
                            choices=("all", "day", "hour", "month", "week", "year"))
     parser_se.set_defaults(func=_cl_search)
 
