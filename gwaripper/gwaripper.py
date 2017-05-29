@@ -58,6 +58,7 @@ except FileNotFoundError:
             "tag_filter": "[request], [script offer]",
             "db_bu_freq": "5",
             "max_db_bu": "5",
+            "set_missing_reddit": "true"
         },
         "Time": {
             "last_db_bu": str(time.time()),
@@ -102,6 +103,8 @@ except KeyError:
     pass
 
 DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
+
+REQUEST_SLEEP = 3
 
 # configure logging
 # logfn = time.strftime("%Y-%m-%d.log")
@@ -239,6 +242,9 @@ def main():
                                                                "Tag1 is only banned when Tag2 isnt found, synatx"
                                                                "is: Tag1&!Tag2 Tag3&!Tag4",
                             metavar="TAGCOMBO", nargs="+")
+    parser_cfg.add_argument("-smr", "--set-missing-reddit", type=bool,
+                            help="Should gwaripper get the info of soundgasm.net-files when coming from reddit even "
+                                 "thouth they already have been downloaded, so missing info can be fille into the DB")
     parser_cfg.set_defaults(func=_cl_config)
 
     # TOCONSIDER implement verbosity with: stdohandler.setLevel(logging.INFO)?
@@ -449,6 +455,15 @@ def _cl_config(args):
             config["Settings"] = {"tag1_in_but_not_tag2": t12_str}
         changed = True
         print("Banned tag combos were set to: {}".format(t12_str))
+    if args.set_missing_reddit:
+        try:
+            config["Settings"]["set_missing_reddit"] = str(args.set_missing_reddit)
+        except KeyError:
+            # settings setciton not present
+            config["Settings"] = {"set_missing_reddit": str(args.set_missing_reddit)}
+        changed = True
+        print("Gwaripper will try to fill in missing reddit info of "
+              "soundgasm.net files: {}".format(args.set_missing_reddit))
     if not changed:
         # print current cfg
         for sec in config.sections():
@@ -601,10 +616,10 @@ class AudioDownload:  # TODO docstr
         # isfile works without checking if dir exists first
         if os.path.isfile(os.path.join(mypath, filename + ftype)):
             if check_direct_url_for_dl(db_con, self.url_to_file):
-                # TORELEASE Temporary, missing in docstring
+                # TORELEASE remove
                 # set filename since we need it to update in db
                 self.filename_local = filename + ftype
-                self.set_missing_values_db(db_con)
+                self.set_missing_values_db(db_con, url_type="file")
                 logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
                                "--> not renaming --> SKIPPING")
                 # No need to return filename since file was already downloaded
@@ -734,13 +749,14 @@ class AudioDownload:  # TODO docstr
                        ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
                        ":sgasm_user, :subreddit_name)", val_dict)
 
-    def set_missing_values_db(self, db_con):
+    def set_missing_values_db(self, db_con, url_type="page"):
         """
         Updates row of file entry in db with information from self like page_url, filename_local
         and reddit_info dict, only sets values if previous entry was NULL/None
 
         :param db_con: Connection to sqlite db
         :param self: instance of AudioDownload whose entry should be updated
+        :param url_type: Use either "page" url or direct "file" url to find row
         :return: None
         """
         # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
@@ -752,7 +768,12 @@ class AudioDownload:  # TODO docstr
         # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
         # new_c will always fetch Row obj and cursor will fetch tuples
         db_con.row_factory = None
-        c.execute("SELECT * FROM Downloads WHERE url_file = ?", (self.url_to_file,))
+
+        url_type_file = True if url_type == "file" else False
+        if url_type_file:
+            c.execute("SELECT * FROM Downloads WHERE url_file = ?", (self.url_to_file,))
+        else:
+            c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
         # get row
         row_cont = c.fetchone()
 
@@ -778,7 +799,10 @@ class AudioDownload:  # TODO docstr
         if upd_cols:
             logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
             # append url since upd_vals need to include all the param substitutions for ?
-            upd_vals.append(self.url_to_file)
+            if url_type_file:
+                upd_vals.append(self.url_to_file)
+            else:
+                upd_vals.append(self.page_url)
             # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
             # so not a good idea
             # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(",".join(upd_cols),
@@ -790,7 +814,10 @@ class AudioDownload:  # TODO docstr
             with db_con:
                 # join only inserts the string to join on in-between the elements of the iterable (none at the end)
                 # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ? WHERE url_file = ?
-                c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
+                if url_type_file:
+                    c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
+                else:
+                    c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
 
     def write_selftext_file(self, dl_root):
         """
@@ -1080,15 +1107,12 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     duplicate = downloaded_urls.intersection(to_filter)
 
     for dup in duplicate:
-        # TORELEASE We can leave this in if we supply a config option for it, but we need to change
-        # set_missing_values_db to use url instead of url_file so we dont have to get sgasm_info
-        # (new users will always have url)
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to df and write selftext to file
-        if dl_dict[dup].reddit_info and ("soundgasm" in dup):
+        if config["Settings"]["set_missing_reddit"] and dl_dict[dup].reddit_info and ("soundgasm.net" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
-            dl_dict[dup].call_host_get_file_info()
-            dl_dict[dup].set_missing_values_db(db_con)
+            dl_dict[dup].call_host_get_file_info()  # TORELEASE remove
+            dl_dict[dup].set_missing_values_db(db_con, url_type="file")  # TORELEASE remove url_type
             dl_dict[dup].write_selftext_file(ROOTDIR)
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))

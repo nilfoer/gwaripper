@@ -311,7 +311,7 @@ def create_db_missing():
         "local_filename": None,
         "title": "TESTTITLE",
         "url_file": "testfile",
-        "url": "https://hostdomain.com/sub/TESTURL/",
+        "url": "https://soundsm.net/u/TESTNOTREPL",
         "sgasm_user": "TESTUSER",
         "created_utc": None,
         "r_post_url": "TESTPOSTURL",
@@ -340,19 +340,31 @@ def create_db_missing():
         "subreddit_name": "TESTSUBR"
     }
 
-    c.execute("INSERT INTO Downloads(date, time, description, local_filename, "
+    val_dict3 = {
+        "date": "TESTDATE",
+        "time": "TESTIME",
+        "description": "TESTDESCR",
+        "local_filename": "TESTFILENAME",
+        "title": "TESTTITLE",
+        "url_file": "testfile3",
+        "url": "https://soundsm.net/u/testu3/testfile3",
+        "sgasm_user": "TESTUSER",
+        "created_utc": 12345.0,
+        "r_post_url": None,
+        "reddit_id": "test6a48d",
+        "reddit_title": None,
+        "reddit_url": "TESTREDDITURL",
+        "reddit_user": None,
+        "subreddit_name": "TESTSUBR"
+    }
+
+    for vdict in (val_dict, val_dict2, val_dict3):
+        c.execute("INSERT INTO Downloads(date, time, description, local_filename, "
                            "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
                            "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
                            ":description, :local_filename, :title, :url_file, :url, :created_utc, "
                            ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
-                           ":sgasm_user, :subreddit_name)", val_dict)
-
-    c.execute("INSERT INTO Downloads(date, time, description, local_filename, "
-              "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
-              "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
-              ":description, :local_filename, :title, :url_file, :url, :created_utc, "
-              ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
-              ":sgasm_user, :subreddit_name)", val_dict2)
+                           ":sgasm_user, :subreddit_name)", vdict)
     # commit changes
     conn.commit()
 
@@ -375,6 +387,10 @@ def create_adl_missing():
                     "selftext": "testself2", "r_user": "testruser2",
                     "created_utc": 123456.0, "id": "test1232",
                     "subreddit": "testsub2", "r_post_url": "testpurl2"}
+    reddit_info3 = {"title": "testtitle3", "permalink": "testperm3",
+                    "selftext": "testself3", "r_user": "testruser3",
+                    "created_utc": 1234567.0, "id": "test1233",
+                    "subreddit": "testsub3", "r_post_url": "testpurl3"}
 
     adl = AudioDownload("https://soundsm.net/u/testu1/test1", "sgasm", reddit_info=reddit_info)
     adl.url_to_file = "testfile"
@@ -384,6 +400,7 @@ def create_adl_missing():
     adl.descr = "testdescr"
     adl.date = "testd"
     adl.time = "testt"
+
     adl2 = AudioDownload("https://soundgasm.net/u/testu2/test2", "sgasm", reddit_info=reddit_info2)
     adl2.url_to_file = "testfile2"
     adl2.downloaded = True
@@ -392,43 +409,47 @@ def create_adl_missing():
     adl2.descr = "testdescr2"
     adl2.date = "testd2"
     adl2.time = "testt2"
-    return adl, adl2
+
+    adl3 = AudioDownload("https://soundsm.net/u/testu3/testfile3", "sgasm", reddit_info=reddit_info3)
+    adl3.url_to_file = "testfile3"
+    adl3.downloaded = True
+    adl3.title = "testtit3"
+    adl3.filename_local = "testfn3"
+    adl3.descr = "testdescr3"
+    adl3.date = "testd3"
+    adl3.time = "testt3"
+    return adl, adl2, adl3
 
 
 def test_set_missing_vals(create_db_missing, create_adl_missing):
     con, c = create_db_missing
-    adl, adl2 = create_adl_missing
-    val_dict = {
-        "date": "TESTDATE",
-        "time": "TESTIME",
-        "description": "TESTDESCR",
-        "local_filename": None,
-        "title": "TESTTITLE",
-        "url_file": "testfile",
-        "url": "https://hostdomain.com/sub/TESTURL/",
-        "sgasm_user": "TESTUSER",
-        "created_utc": None,
-        "r_post_url": "TESTPOSTURL",
-        "reddit_id": None,
-        "reddit_title": "TESTREDDITTITLE",
-        "reddit_url": None,
-        "reddit_user": "TESTTEDDITUSER",
-        "subreddit_name": None
-    }
-    start = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile', 'https://hostdomain.com/sub/TESTURL/', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None, 'TESTTEDDITUSER', 'TESTUSER', None), (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
-    fill_one = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://hostdomain.com/sub/TESTURL/', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"), (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
-    fill_two = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://hostdomain.com/sub/TESTURL/', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"), (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR')]
+    adl, adl2, adl3 = create_adl_missing
+
+    start = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None, 'TESTTEDDITUSER', 'TESTUSER', None),
+             (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
+             (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
+
+    fill_one = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
+                (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
+                (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
+    fill_two = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
+                (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
+                (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
+    fill_three = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
+                  (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
+                  (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, "testpurl3", 'test6a48d', "testtitle3", 'TESTREDDITURL', "testruser3", 'TESTUSER', 'TESTSUBR')]
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == start
-    adl.set_missing_values_db(con)
+    adl.set_missing_values_db(con, url_type="file")
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_one
-    adl2.set_missing_values_db(con)
+    adl2.set_missing_values_db(con, url_type="file")
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_two
+    adl3.set_missing_values_db(con)
 
 @pytest.mark.parametrize("title, expected", [
     ("file_dled_but_no_url", None),
