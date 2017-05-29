@@ -3,14 +3,17 @@ import pandas as pd
 import os
 
 def reorder_date(date_str):
-    if "/" in date_str:
-        l = date_str.split("/")
-    elif "." in date_str:
-        l = date_str.split(".")
+    if type(date_str) is str:
+        if "/" in date_str:
+            l = date_str.split("/")
+        elif "." in date_str:
+            l = date_str.split(".")
+        else:
+            return date_str
+        new_date_str = "{year}-{month}-{day}".format(year=l[2], month=l[1], day=l[0])
+        return new_date_str
     else:
         return date_str
-    new_date_str = "{year}-{month}-{day}".format(year=l[2], month=l[1], day=l[0])
-    return new_date_str
 
 r_path = os.getcwd()  # "N:\_archive\\test\\trans\soundgasmNET\_dev"
 
