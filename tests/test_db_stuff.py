@@ -215,8 +215,6 @@ def create_db_for_bu():
 
 
 
-
-
 def md5(fname):
     import hashlib
     # construct a hash object by calling the appropriate constructor function

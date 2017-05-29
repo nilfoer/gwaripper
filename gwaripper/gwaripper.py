@@ -649,7 +649,7 @@ class AudioDownload:  # TODO docstr
 
             if self.filename_local:
                 logger.info("Downloading: {}..., File {} of {}".format(self.filename_local, curfnr, maxfnr))
-                self.date = time.strftime("%d/%m/%Y")
+                self.date = time.strftime("%Y-%m-%d")
                 self.time = time.strftime("%H:%M:%S")
                 # set downloaded
                 self.downloaded = True

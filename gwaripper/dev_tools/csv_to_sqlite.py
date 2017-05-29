@@ -2,7 +2,17 @@ import sqlite3
 import pandas as pd
 import os
 
-r_path = os.getcwd()
+def reorder_date(date_str):
+    if "/" in date_str:
+        l = date_str.split("/")
+    elif "." in date_str:
+        l = date_str.split(".")
+    else:
+        return date_str
+    new_date_str = "{year}-{month}-{day}".format(year=l[2], month=l[1], day=l[0])
+    return new_date_str
+
+r_path = os.getcwd()  # "N:\_archive\\test\\trans\soundgasmNET\_dev"
 
 df = pd.read_csv(os.path.join(r_path, "sgasm_rip_db.csv"), sep=";", encoding="utf-8", index_col=0)
 
@@ -12,6 +22,9 @@ df = pd.read_csv(os.path.join(r_path, "sgasm_rip_db.csv"), sep=";", encoding="ut
 # df["Description"] = df["Description"].str.replace("\r+\n", "\r\n")
 # pandas to_csv just adds one new extra \r -> rather remove all \r
 df["Description"] = df["Description"].str.replace("\r", "")
+
+# reorder date str (dd/mm/YYYY) to match sql format YYYY-mm-dd, time is already in correct format
+df["Date"] = df["Date"].apply(reorder_date)
 
 df.to_csv("sgasm_rip_db_rfix.csv", sep=";", encoding="utf-8")
 
@@ -54,4 +67,9 @@ with conn:
     DROP TABLE Downloads;
     ALTER TABLE my_table_copy RENAME TO Downloads;""")
 
+# cur.execute("SELECT * FROM Downloads LIMIT 50")
+# print(cur.fetchall())
+
 conn.close()
+
+
