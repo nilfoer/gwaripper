@@ -105,11 +105,17 @@ except KeyError:
 
 DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
 
-rqd = utils.RequestDelayer(0.25, 0.5)
+rqd = utils.RequestDelayer(0.25, 0.75)
 
 # configure logging
 # logfn = time.strftime("%Y-%m-%d.log")
-logger = logging.getLogger(__name__)
+# __name__ = 'gwaripper.gwaripper' -> logging of e.g. 'gwaripper.utils' (when callin getLogger with __name__
+# in utils module) wont be considered a child of this logger
+# we could use logging.config.fileConfig to configure our loggers (call it in main() for example, but with
+# 'disable_existing_loggers': False, otherwise all loggers created by getLogger at module-level will be disabled)
+# or we could configure our logging in __init__.py of our package (top-most level) with __name__ since that is
+# just 'gwaripper' or we can configure our logger for the package by calling getLogger with 'gwaripper'
+logger = logging.getLogger("gwaripper")
 logger.setLevel(logging.DEBUG)
 
 # only log to file if ROOTDIR is set up so we dont clutter the cwd or the module dir
@@ -1120,6 +1126,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
         if dl_dict[dup].reddit_info and config.getboolean("Settings", "set_missing_reddit") and ("soundgasm.net/" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
             adl = dl_dict[dup]
+            rqd.delay_request()  # TORELEASE remove
             adl.call_host_get_file_info()  # TORELEASE remove
             # gen filename manually since calling gen_filename would rename it with _00i since file already exists
             adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
@@ -1128,7 +1135,6 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
             if adl.filename_local is None:  # TORELEASE remove
                 adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
             adl.write_selftext_file(ROOTDIR)
-            rqd.delay_request()  # TORELEASE remove
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))
         logger.debug("Already downloaded urls:\n{}".format("\n".join(duplicate)))

@@ -1,24 +1,28 @@
 import time
 import os
+import logging
 
 import pyperclip
+
+logger = logging.getLogger(__name__)
+
 
 def is_sgasm_url(url):
     if url.startswith("htt") and "soundgasm" in url:
         return True
-    print("NO SGASM URL: " + url)
+    logger.info("NO SGASM URL: " + url)
     return False
 
 
 def is_reddit_url(url):
     if url.startswith("htt") and "reddit" in url:
         return True
-    print("NO REDDIT URL: " + url)
+    logger.info("NO REDDIT URL: " + url)
     return False
 
 
 def print_to_stdout(clipboard_content):
-    print("Found url: %s" % str(clipboard_content))
+    logger.info("Found url: %s" % str(clipboard_content))
 
 
 def print_write_to_txtf(wstring, linkdir, txtname):
@@ -48,7 +52,6 @@ class ClipboardWatcher:
         self.txtname = time.strftime("%Y-%m-%d_%Hh.txt")
         self.found = []
 
-
     def run(self):
         recent_value = ""
         while not self._stopping:
@@ -73,13 +76,12 @@ def main():
                                0.1)
 
     try:
-        print("Watching clipboard...")
+        logger.info("Watching clipboard...")
         watcher.run()
     except KeyboardInterrupt:
         watcher.stop()
-        print("Stopped watching clipboard!")
-        print("URLs were saved in: {}\n".format(watcher.txtname))
-
+        logger.info("Stopped watching clipboard!")
+        logger.info("URLs were saved in: {}\n".format(watcher.txtname))
 
 
 if __name__ == "__main__":

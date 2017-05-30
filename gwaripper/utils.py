@@ -3,6 +3,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class RequestDelayer:
     """
     Helper class to sleep delay seconds if time_gap number of seconds have passed since
@@ -42,6 +43,8 @@ class RequestDelayer:
                 logger.debug("Delaying by {} seconds".format(self.delay))
                 time.sleep(self.delay)
                 self.last_delay = now
+            else:
+                logger.debug("Not delayed: time since last delay {} s".format(now - self.last_delay))
         else:
             time.sleep(self.delay)
             self.last_delay = now
@@ -54,6 +57,9 @@ class RequestDelayer:
             if (now - self.last_request) < self.time_gap:
                 logger.debug("Delaying by {} seconds".format(self.delay))
                 time.sleep(self.delay)
+                self.last_request = now
+            else:
+                logger.debug("Not delayed: time since last request {} s".format(now - self.last_request))
                 self.last_request = now
         else:
             # dont sleep on first request
