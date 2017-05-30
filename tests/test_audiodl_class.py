@@ -506,45 +506,31 @@ def test_set_missing_vals(create_db_missing, create_adl_missing):
              (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
              (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
 
-    fill_one = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
-                (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
-                (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
-    fill_two = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
-                (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
-                (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
-    fill_three = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
-                  (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
+    fill_three = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None, 'TESTTEDDITUSER', 'TESTUSER', None),
+                  (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
                   (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, "testpurl3", 'test6a48d', "testtitle3", 'TESTREDDITURL', "testruser3", 'TESTUSER', 'TESTSUBR')]
+
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == start
     # test returned filename
-    assert adl.set_missing_values_db(con, url_type="file") is None
-    c.execute("SELECT * FROM Downloads")
-    result = c.fetchall()
-    assert result == fill_one
-    assert adl2.set_missing_values_db(con, url_type="file") == 'TESTFILENAME'
-    c.execute("SELECT * FROM Downloads")
-    result = c.fetchall()
-    assert result == fill_two
     assert adl3.set_missing_values_db(con) == 'TESTFILENAME'
+    c.execute("SELECT * FROM Downloads")
+    result = c.fetchall()
+    assert result == fill_three
 
 @pytest.mark.parametrize("title, expected", [
-    ("file_dled_but_no_url", None),
     ("[same]_file-name:but\\new_dl", "[same]_file-name_but_new_dl_01.txt"),
     ("[F4M] This, gonna.be good!! Gimme $$", "[F4M] This, gonna.be good__ Gimme __.txt"),
     # TODO also replace äüö?
     ("[F4M] This gonna be good [fun!] [not so äüö'#*?}]", "[F4M] This gonna be good [fun_] [not so äüö_____].txt"),
 ])
-def test_gen_fn(title, expected, create_db_missing): # [^\w\-_.,\[\] ]
+def test_gen_fn(title, expected): # [^\w\-_.,\[\] ]
     adl = AudioDownload("https://soundgasm.net/u/testu1/blabla", "sgasm")
     adl.title = title
     adl.file_type = ".txt"
-    if title == "file_dled_but_no_url":
-        adl.url_to_file = "testfile"
-    con, c = create_db_missing
 
-    assert adl.gen_filename(con, testdir) == expected
+    assert adl.gen_filename(testdir) == expected
 
 
 

@@ -314,8 +314,7 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            tit = "[F4F][F4M][Daddy] Hypno for both sexes"
-            print(check_submission_banned_tags(tit, KEYWORDLIST, TAG1_BUT_NOT_TAG2))
+            pass
 
         else:
             # call func that was selected for subparser/command
@@ -485,9 +484,6 @@ def _cl_config(args):
 
 
 class AudioDownload:  # TODO docstr
-    """
-    Represents an audio post that is normally listened to
-    """
     def __init__(self, page_url, host, reddit_info=None):
         self.page_url = page_url
         self.host = host
@@ -571,26 +567,23 @@ class AudioDownload:  # TODO docstr
         self.file_type = fname[-4:]
 
     def _set_sgasm_info(self):
-        # TORELEASE Temporary check if we alrdy called this so we dont call it twice when we call it to fill
-        # in missing information in the df
-        if not self.url_to_file:
-            logger.info("Getting soundgasm info of: %s" % self.page_url)
-            try:
-                site = urllib.request.urlopen(self.page_url)
-                html = site.read().decode('utf-8')
-                site.close()
+        logger.info("Getting soundgasm info of: %s" % self.page_url)
+        try:
+            site = urllib.request.urlopen(self.page_url)
+            html = site.read().decode('utf-8')
+            site.close()
 
-                soup = bs4.BeautifulSoup(html, "html.parser")
+            soup = bs4.BeautifulSoup(html, "html.parser")
 
-                title = soup.select_one("div.jp-title").text
+            title = soup.select_one("div.jp-title").text
 
-                # set instance values
-                self.url_to_file = re.search("m4a: \"(.+)\"", html).group(1)
-                self.file_type = ".m4a"
-                self.title = title
-                self.descr = soup.select_one("div.jp-description > p").text
-            except urllib.request.HTTPError:
-                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
+            # set instance values
+            self.url_to_file = re.search("m4a: \"(.+)\"", html).group(1)
+            self.file_type = ".m4a"
+            self.title = title
+            self.descr = soup.select_one("div.jp-description > p").text
+        except urllib.request.HTTPError:
+            logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
 
     # From Hitchhiker's Guide to Python:
     # When a function grows in complexity it is not uncommon to use multiple return statements inside the function’s
@@ -604,14 +597,13 @@ class AudioDownload:  # TODO docstr
     # When a function has multiple main exit points for its normal course, it becomes difficult to debug the
     # returned result, so it may be preferable to keep a single exit point. This will also help factoring out
     # some code paths, and the multiple exit points are a probable indication that such a refactoring is needed.
-    def gen_filename(self, db_con, dl_root):
+    def gen_filename(self, dl_root):
         """
         Generates filename to save file locally by replacing chars in the title that are not:
          \w(regex) - , . _ [ ] or a whitespace(" ")
         with an underscore and limiting its length. If file exists it adds a number padded
         to a width of 2 starting at one till there is no file with that name
 
-        :param db_con: Connection to sqlite db
         :param dl_root: Path to root dir of the script (where all the downloads etc. are saved)
         :return: String with filename and added extension
         """
@@ -623,32 +615,20 @@ class AudioDownload:  # TODO docstr
         mypath = os.path.join(dl_root, self.name_usr)
         # isfile works without checking if dir exists first
         if os.path.isfile(os.path.join(mypath, filename + ftype)):
-            if check_direct_url_for_dl(db_con, self.url_to_file):
-                # TORELEASE remove
-                # set filename since we need it to update in db
-                self.filename_local = filename + ftype
-                self.set_missing_values_db(db_con, url_type="file")
-                logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
-                               "--> not renaming --> SKIPPING")
-                # No need to return filename since file was already downloaded
-                # mb refactor so we dont have to function exits, e.g. setting filename to None and at end of func
-                # return with if-else...
-                return None
-            else:
-                i = 0
+            i = 0
 
-                # You don't need to copy a Python string. They are immutable, so concatenating or slicing
-                # returns a new string
-                filename_old = filename
+            # You don't need to copy a Python string. They are immutable, so concatenating or slicing
+            # returns a new string
+            filename_old = filename
 
-                # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
-                # or the ending is different (since fname got cut off, so we dont exceed win path limit)
-                # count up i till file doesnt exist anymore
-                while os.path.isfile(os.path.join(mypath, filename + ftype)):
-                    i += 1
-                    # :02d -> pad number with 0 to a width of 2, d -> digit(int)
-                    filename = "{}_{:02d}".format(filename_old, i)
-                logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
+            # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
+            # or the ending is different (since fname got cut off, so we dont exceed win path limit)
+            # count up i till file doesnt exist anymore
+            while os.path.isfile(os.path.join(mypath, filename + ftype)):
+                i += 1
+                # :02d -> pad number with 0 to a width of 2, d -> digit(int)
+                filename = "{}_{:02d}".format(filename_old, i)
+            logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
 
         return filename + ftype
 
@@ -670,7 +650,7 @@ class AudioDownload:  # TODO docstr
 
             mypath = os.path.join(dl_root, self.name_usr)
             os.makedirs(mypath, exist_ok=True)
-            self.filename_local = self.gen_filename(db_con, dl_root)
+            self.filename_local = self.gen_filename(dl_root)
 
             if self.filename_local:
                 logger.info("Downloading: {}..., File {} of {}".format(self.filename_local, curfnr, maxfnr))
@@ -756,14 +736,13 @@ class AudioDownload:  # TODO docstr
                        ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
                        ":sgasm_user, :subreddit_name)", val_dict)
 
-    def set_missing_values_db(self, db_con, url_type="page"):
+    def set_missing_values_db(self, db_con):
         """
         Updates row of file entry in db with information from self like page_url, filename_local
         and reddit_info dict, only sets values if previous entry was NULL/None
 
         :param db_con: Connection to sqlite db
         :param self: instance of AudioDownload whose entry should be updated
-        :param url_type: Use either "page" url or direct "file" url to find row
         :return: Filename string in db-column local_filename
         """
         # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
@@ -776,11 +755,7 @@ class AudioDownload:  # TODO docstr
         # new_c will always fetch Row obj and cursor will fetch tuples
         db_con.row_factory = None
 
-        url_type_file = True if url_type == "file" else False
-        if url_type_file:
-            c.execute("SELECT * FROM Downloads WHERE url_file = ?", (self.url_to_file,))
-        else:
-            c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
+        c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
         # get row
         row_cont = c.fetchone()
 
@@ -790,14 +765,6 @@ class AudioDownload:  # TODO docstr
 
         upd_cols = []
         upd_vals = []
-        # TORELEASE remove url_file stuff
-        if row_cont["url"] is None:
-            # add col = ? strings to list -> join them later to SQL query
-            upd_cols.append("url = ?")
-            upd_vals.append(self.page_url)
-        if row_cont["local_filename"] is None:
-            upd_cols.append("local_filename = ?")
-            upd_vals.append(self.filename_local)
         if self.reddit_info:
             for col, key in set_helper:
                 if row_cont[col] is None:
@@ -807,10 +774,7 @@ class AudioDownload:  # TODO docstr
         if upd_cols:
             logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
             # append url since upd_vals need to include all the param substitutions for ?
-            if url_type_file:
-                upd_vals.append(self.url_to_file)
-            else:
-                upd_vals.append(self.page_url)
+            upd_vals.append(self.page_url)
             # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
             # so not a good idea
             # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(",".join(upd_cols),
@@ -822,10 +786,7 @@ class AudioDownload:  # TODO docstr
             with db_con:
                 # join only inserts the string to join on in-between the elements of the iterable (none at the end)
                 # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ? WHERE url_file = ?
-                if url_type_file:
-                    c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
-                else:
-                    c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
+                c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
         return row_cont["local_filename"]
 
     def write_selftext_file(self, dl_root):
@@ -995,7 +956,7 @@ def rip_audio_dls(dl_list):
 
         # sleep between requests so we dont stress the server to much or get banned
         # using helper class -> only sleep .25s when last request time was less than .5s ago
-        rqd.delay_request()  # TODO test with sleep + set_missing_reddit
+        rqd.delay_request()
         dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
 
     # export db to csv -> human readable without tools
@@ -1126,14 +1087,9 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
         if dl_dict[dup].reddit_info and config.getboolean("Settings", "set_missing_reddit") and ("soundgasm.net/" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
             adl = dl_dict[dup]
-            rqd.delay_request()  # TORELEASE remove
-            adl.call_host_get_file_info()  # TORELEASE remove
-            # gen filename manually since calling gen_filename would rename it with _00i since file already exists
-            adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
+
             # get filename from db to write selftext
-            adl.filename_local = adl.set_missing_values_db(db_con, url_type="file")  # TORELEASE remove url_type
-            if adl.filename_local is None:  # TORELEASE remove
-                adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
+            adl.filename_local = adl.set_missing_values_db(db_con)
             adl.write_selftext_file(ROOTDIR)
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))
