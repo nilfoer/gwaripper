@@ -28,6 +28,7 @@ import praw
 # and run package with python -m gwaripper or use helper file gwaripper-runner.py that just imports main
 # and does if __name__ == "__main__": main() and run that file as script
 from . import clipwatcher_single
+from . import utils
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # cmd                                               output
@@ -58,7 +59,7 @@ except FileNotFoundError:
             "tag_filter": "[request], [script offer]",
             "db_bu_freq": "5",
             "max_db_bu": "5",
-            "set_missing_reddit": "true"
+            "set_missing_reddit": "True"
         },
         "Time": {
             "last_db_bu": str(time.time()),
@@ -104,7 +105,7 @@ except KeyError:
 
 DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
 
-REQUEST_SLEEP = 3
+rqd = utils.RequestDelayer(0.25, 0.5)
 
 # configure logging
 # logfn = time.strftime("%Y-%m-%d.log")
@@ -242,7 +243,7 @@ def main():
                                                                "Tag1 is only banned when Tag2 isnt found, synatx"
                                                                "is: Tag1&!Tag2 Tag3&!Tag4",
                             metavar="TAGCOMBO", nargs="+")
-    parser_cfg.add_argument("-smr", "--set-missing-reddit", type=bool,
+    parser_cfg.add_argument("-smr", "--set-missing-reddit", type=int, choices=(0, 1),
                             help="Should gwaripper get the info of soundgasm.net-files when coming from reddit even "
                                  "thouth they already have been downloaded, so missing info can be fille into the DB")
     parser_cfg.set_defaults(func=_cl_config)
@@ -455,15 +456,16 @@ def _cl_config(args):
             config["Settings"] = {"tag1_in_but_not_tag2": t12_str}
         changed = True
         print("Banned tag combos were set to: {}".format(t12_str))
-    if args.set_missing_reddit:
+    if args.set_missing_reddit is not None:  # since 0 evaluates to False
+        smr_bool = bool(args.set_missing_reddit)
         try:
-            config["Settings"]["set_missing_reddit"] = str(args.set_missing_reddit)
+            config["Settings"]["set_missing_reddit"] = str(smr_bool)
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"set_missing_reddit": str(args.set_missing_reddit)}
+            config["Settings"] = {"set_missing_reddit": str(smr_bool)}
         changed = True
         print("Gwaripper will try to fill in missing reddit info of "
-              "soundgasm.net files: {}".format(args.set_missing_reddit))
+              "soundgasm.net files: {}".format(smr_bool))
     if not changed:
         # print current cfg
         for sec in config.sections():
@@ -661,8 +663,7 @@ class AudioDownload:  # TODO docstr
             curfnr += 1
 
             mypath = os.path.join(dl_root, self.name_usr)
-            if not os.path.exists(mypath):
-                os.makedirs(mypath)
+            os.makedirs(mypath, exist_ok=True)
             self.filename_local = self.gen_filename(db_con, dl_root)
 
             if self.filename_local:
@@ -757,7 +758,7 @@ class AudioDownload:  # TODO docstr
         :param db_con: Connection to sqlite db
         :param self: instance of AudioDownload whose entry should be updated
         :param url_type: Use either "page" url or direct "file" url to find row
-        :return: None
+        :return: Filename string in db-column local_filename
         """
         # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
         db_con.row_factory = sqlite3.Row
@@ -783,6 +784,7 @@ class AudioDownload:  # TODO docstr
 
         upd_cols = []
         upd_vals = []
+        # TORELEASE remove url_file stuff
         if row_cont["url"] is None:
             # add col = ? strings to list -> join them later to SQL query
             upd_cols.append("url = ?")
@@ -818,6 +820,7 @@ class AudioDownload:  # TODO docstr
                     c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
                 else:
                     c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
+        return row_cont["local_filename"]
 
     def write_selftext_file(self, dl_root):
         """
@@ -831,12 +834,13 @@ class AudioDownload:  # TODO docstr
             # there are reddit posts with multiple sgasm files
             # write_to_txtf(self.reddit_info["selftext"], self.filename_local + ".txt", self.name_usr)
             mypath = os.path.join(dl_root, self.name_usr)
-            if not os.path.exists(mypath):
-                os.makedirs(mypath)
+            os.makedirs(mypath, exist_ok=True)
             # if selftext file doesnt already exists
             if not os.path.isfile(os.path.join(mypath, self.filename_local + ".txt")):
                 with open(os.path.join(mypath, self.filename_local + ".txt"), "w", encoding="UTF-8") as w:
-                    w.write(self.reddit_info["selftext"])
+                    w.write("Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(self.reddit_info["title"],
+                                                                               self.reddit_info["permalink"],
+                                                                               self.reddit_info["selftext"]))
 
 
 # Docstrings = How to use code
@@ -978,9 +982,14 @@ def rip_audio_dls(dl_list):
 
     for url in new_dls:
         audio_dl = dl_dict[url]
+
+        rqd.delay_request()
         # get appropriate func for host to get direct url, sgasm title etc.
         audio_dl.call_host_get_file_info()
 
+        # sleep between requests so we dont stress the server to much or get banned
+        # using helper class -> only sleep .25s when last request time was less than .5s ago
+        rqd.delay_request()  # TODO test with sleep + set_missing_reddit
         dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
 
     # export db to csv -> human readable without tools
@@ -1062,8 +1071,7 @@ def write_to_txtf(wstring, filename, currentusr):
     :return: None
     """
     mypath = os.path.join(ROOTDIR, currentusr)
-    if not os.path.exists(mypath):
-        os.makedirs(mypath)
+    os.makedirs(mypath, exist_ok=True)
     with open(os.path.join(mypath, filename), "a", encoding="UTF-8") as w:
         w.write(wstring)
 
@@ -1109,11 +1117,18 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     for dup in duplicate:
         # when we got reddit info get sgasm info even if this file was already downloaded b4
         # then write missing info to df and write selftext to file
-        if config["Settings"]["set_missing_reddit"] and dl_dict[dup].reddit_info and ("soundgasm.net" in dup):
+        if dl_dict[dup].reddit_info and config.getboolean("Settings", "set_missing_reddit") and ("soundgasm.net/" in dup):
             logger.info("Filling in missing reddit info: TEMPORARY")
-            dl_dict[dup].call_host_get_file_info()  # TORELEASE remove
-            dl_dict[dup].set_missing_values_db(db_con, url_type="file")  # TORELEASE remove url_type
-            dl_dict[dup].write_selftext_file(ROOTDIR)
+            adl = dl_dict[dup]
+            adl.call_host_get_file_info()  # TORELEASE remove
+            # gen filename manually since calling gen_filename would rename it with _00i since file already exists
+            adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
+            # get filename from db to write selftext
+            adl.filename_local = adl.set_missing_values_db(db_con, url_type="file")  # TORELEASE remove url_type
+            if adl.filename_local is None:  # TORELEASE remove
+                adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
+            adl.write_selftext_file(ROOTDIR)
+            rqd.delay_request()  # TORELEASE remove
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))
         logger.debug("Already downloaded urls:\n{}".format("\n".join(duplicate)))
@@ -1433,8 +1448,7 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDI
     :param bu_dir: Path to location of backup
     :return: None
     """
-    if not os.path.exists(bu_dir):
-        os.makedirs(bu_dir)
+    os.makedirs(bu_dir, exist_ok=True)
     # time.time() get utc number
     now = time.time()
     # freq in days convert to secs since utc time is in secs since epoch

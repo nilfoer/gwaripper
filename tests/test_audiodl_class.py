@@ -441,15 +441,16 @@ def test_set_missing_vals(create_db_missing, create_adl_missing):
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == start
-    adl.set_missing_values_db(con, url_type="file")
+    # test returned filename
+    assert adl.set_missing_values_db(con, url_type="file") is None
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_one
-    adl2.set_missing_values_db(con, url_type="file")
+    assert adl2.set_missing_values_db(con, url_type="file") == 'TESTFILENAME'
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_two
-    adl3.set_missing_values_db(con)
+    assert adl3.set_missing_values_db(con) == 'TESTFILENAME'
 
 @pytest.mark.parametrize("title, expected", [
     ("file_dled_but_no_url", None),
