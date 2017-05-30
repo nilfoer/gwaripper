@@ -133,8 +133,8 @@ def test_soundgasm_info(gen_audiodl_sgasm):
 
 
 @pytest.mark.dltest
-def test_soundgasm(gen_audiodl_sgasm, create_db_missing, create_new_test_con):
-    con, c = create_db_missing
+def test_soundgasm(gen_audiodl_sgasm, create_db_download, create_new_test_con):
+    con, c = create_db_download
     fn = "[F4M] I_m your Pornstar Cumdumpster Slut Mother [Rape][Blackmail][Facefucking][Slap my face with that thick cock][Innocent to slutty][Rough][Dirty Talk][Fuck Me Into The Matress][Creampie][Impreg][Multiple Real Orgasms]"[0:110] + ".m4a"
     a, dir = gen_audiodl_sgasm
     a.call_host_get_file_info()
@@ -165,7 +165,9 @@ def test_soundgasm(gen_audiodl_sgasm, create_db_missing, create_new_test_con):
 
     # selftext written correctly
     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
-        assert f.read() == "Testing selftext"
+        assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
+                                                                               a.reddit_info["permalink"],
+                                                                               a.reddit_info["selftext"])
 
 
 def test_chirbit_info(gen_audiodl_chirbit):
@@ -177,8 +179,8 @@ def test_chirbit_info(gen_audiodl_chirbit):
 
 
 @pytest.mark.dltest
-def test_chirbit(gen_audiodl_chirbit, create_db_missing, create_new_test_con):
-    con, c = create_db_missing
+def test_chirbit(gen_audiodl_chirbit, create_db_download, create_new_test_con):
+    con, c = create_db_download
     fn = "[FF4M] It_s not what you think, brother_ [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with _u_alwaysslightlysleepy]"[0:110] + ".mp3"
     a, dir = gen_audiodl_chirbit
     a.call_host_get_file_info()
@@ -209,7 +211,9 @@ def test_chirbit(gen_audiodl_chirbit, create_db_missing, create_new_test_con):
     assert new_c.fetchall() == expected
 
     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
-        assert f.read() == "Testing selftext"
+        assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
+                                                                               a.reddit_info["permalink"],
+                                                                               a.reddit_info["selftext"])
 
 
 def test_eraudica_info(gen_audiodl_eraudica):
@@ -220,8 +224,8 @@ def test_eraudica_info(gen_audiodl_eraudica):
 
 
 @pytest.mark.dltest
-def test_eraudica(gen_audiodl_eraudica, create_db_missing, create_new_test_con):
-    con, c = create_db_missing
+def test_eraudica(gen_audiodl_eraudica, create_db_download, create_new_test_con):
+    con, c = create_db_download
     fn = "[F4M] Nurse Eve and Dr. Eve Double Team TLC_ [twins][binaural][medical][sucking and licking and fucking and cumming_][face sitting][riding your cock] [repost]"[0:110] + ".mp3"
     a, dir = gen_audiodl_eraudica
     a.call_host_get_file_info()
@@ -254,12 +258,14 @@ def test_eraudica(gen_audiodl_eraudica, create_db_missing, create_new_test_con):
     assert new_c.fetchall() == expected
 
     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
-        assert f.read() == "Testing selftext"
+        assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
+                                                                               a.reddit_info["permalink"],
+                                                                               a.reddit_info["selftext"])
 
 
-def test_download_failed(gen_audiodl_failed, create_db_missing, create_new_test_con):
+def test_download_failed(gen_audiodl_failed, create_db_download, create_new_test_con):
     fn = "F4M-Im-your-Pornstar-Cumdumpster-FAILED.m4a"
-    con, c = create_db_missing
+    con, c = create_db_download
     a, dir = gen_audiodl_failed
 
     a.download(con, 0, 0, dir)
@@ -292,6 +298,77 @@ def create_new_test_con():
         os.remove(os.path.join(testdir, "testdb.sqlite"))
     except PermissionError:
         pass
+
+
+@pytest.fixture
+def create_db_download():
+    conn = sqlite3.connect(os.path.join(testdir, "testdb.sqlite"))
+    c = conn.cursor()
+    # create table if it doesnt exist
+    c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
+              "description TEXT, local_filename TEXT, title TEXT, url_file TEXT, url TEXT, created_utc REAL, "
+              "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
+              "sgasm_user TEXT, subreddit_name TEXT)")
+
+    val_dict = {
+        "date": "TESTDATE",
+        "time": "TESTIME",
+        "description": "TESTDESCR",
+        "local_filename": None,
+        "title": "TESTTITLE",
+        "url_file": "testfile",
+        "url": "https://hostdomain.com/sub/TESTURL/",
+        "sgasm_user": "TESTUSER",
+        "created_utc": None,
+        "r_post_url": "TESTPOSTURL",
+        "reddit_id": None,
+        "reddit_title": "TESTREDDITTITLE",
+        "reddit_url": None,
+        "reddit_user": "TESTTEDDITUSER",
+        "subreddit_name": None
+    }
+
+    val_dict2 = {
+        "date": "TESTDATE",
+        "time": "TESTIME",
+        "description": "TESTDESCR",
+        "local_filename": "TESTFILENAME",
+        "title": "TESTTITLE",
+        "url_file": "testfile2",
+        "url": None,
+        "sgasm_user": "TESTUSER",
+        "created_utc": 12345.0,
+        "r_post_url": None,
+        "reddit_id": "test6f78d",
+        "reddit_title": None,
+        "reddit_url": "TESTREDDITURL",
+        "reddit_user": None,
+        "subreddit_name": "TESTSUBR"
+    }
+
+    c.execute("INSERT INTO Downloads(date, time, description, local_filename, "
+                           "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
+                           "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
+                           ":description, :local_filename, :title, :url_file, :url, :created_utc, "
+                           ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
+                           ":sgasm_user, :subreddit_name)", val_dict)
+
+    c.execute("INSERT INTO Downloads(date, time, description, local_filename, "
+              "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
+              "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
+              ":description, :local_filename, :title, :url_file, :url, :created_utc, "
+              ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
+              ":sgasm_user, :subreddit_name)", val_dict2)
+    # commit changes
+    conn.commit()
+
+    yield conn, c
+
+    conn.close()
+    try:
+        os.remove(os.path.join(testdir, "testdb.sqlite"))
+    except PermissionError:
+        print("!!!!!!!!!!TEST DB FILE HASNT BEEN DELETED!!!!!!!!")
 
 
 @pytest.fixture

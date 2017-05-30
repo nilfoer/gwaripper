@@ -10,14 +10,14 @@ logger = logging.getLogger(__name__)
 def is_sgasm_url(url):
     if url.startswith("htt") and "soundgasm" in url:
         return True
-    logger.info("NO SGASM URL: " + url)
+    logger.debug("NO SGASM URL: " + url)
     return False
 
 
 def is_reddit_url(url):
     if url.startswith("htt") and "reddit" in url:
         return True
-    logger.info("NO REDDIT URL: " + url)
+    logger.debug("NO REDDIT URL: " + url)
     return False
 
 
