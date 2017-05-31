@@ -4,11 +4,14 @@ long_descr = """Script to rip audio files mainly from soundgasm.net but it also 
 eraudica.com audios. Able download single links or entire users. Links can also be obtained by scanning subs in
 the subreddits gonewilaudio and pillowtalkaudio. Going through reddits preferred since more post information can
 be saved, if a selftext is present it will be saved alongside the audio file. Searching reddit and downloading
-submissions by certain redditors is also supported. Saves the info of downloaded files in a csv and json file."""
+submissions by certain redditors is also supported. Saves the info of downloaded files in a sqlite database but
+also exports it to csv to be human-readable.
+
+Call script with -h to show info of available commands!"""
 
 setuptools.setup(
     name="GWARipper",
-    version="0.1.0.a1",
+    version="0.1.0a1",
     description="A script that rips and downloads audio files from the gonewildaudio subreddit.",
     long_description=long_descr,
     url="",
@@ -18,7 +21,7 @@ setuptools.setup(
     classifiers=[],
     keywords="script rip gonewildaudio download scraping",
     packages=setuptools.find_packages(exclude=['gwaripper.pyperclip', '*pyperclip', 'tests*']),
-    install_requires=["pyperclip", "praw", "bs4", "pandas"],
+    install_requires=["pyperclip", "praw", "bs4"],
     package_data={
         'gwaripper': ['config.ini'],
     },
