@@ -207,9 +207,9 @@ def main():
     # nargs=? One argument will be consumed from the command line if possible
     # no command-line argument -> default
     # optional arguments -> option string is present but not followed by a command-line argument -> value from const
-    parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=True, type=float,
+    parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=False, type=float,
                             help="Only download submission if creation time is newer than provided utc"
-                                 "timestamp or last_dl_time from config if none provided (default: True)")
+                                 "timestamp or last_dl_time from config if none provided (default: False)")
     parser_sub.set_defaults(func=_cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
@@ -419,6 +419,7 @@ def _cl_config(args):
     if args.path:
         # normalize path, remove double \ and convert / to \ on windows
         path_in = os.path.normpath(args.path)
+        os.makedirs(path_in, exist_ok=True)
         # i dont need to change cwd and ROOTDIR since script gets restarted anyway
         try:
             config["Settings"]["root_path"] = path_in
@@ -995,7 +996,7 @@ def rip_audio_dls(dl_list):
 
         # sleep between requests so we dont stress the server to much or get banned
         # using helper class -> only sleep .25s when last request time was less than .5s ago
-        rqd.delay_request()  # TODO test with sleep + set_missing_reddit
+        rqd.delay_request()
         dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
 
     # export db to csv -> human readable without tools
@@ -1327,6 +1328,7 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
 
             if not found_urls:
                 logger.info("No supported link in \"{}\"".format(submission.shortlink))
+                os.makedirs(os.path.join(ROOTDIR, "_linkcol"), exist_ok=True)
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
                     w.write("<h3><a href=\"https://reddit.com{}\">{}"
@@ -1435,10 +1437,14 @@ def export_csv_from_sql(filename, db_con):
         c = db_con.execute("SELECT * FROM Downloads")
         rows = c.fetchall()
 
+        # cursor.description -> sequence of 7-item sequences each containing info describing one result column
+        col_names = [description[0] for description in c.description]
+        csvwriter.writerow(col_names)  # header
         # write the all the rows to the file
         csvwriter.writerows(rows)
 
 
+# cant use ROOTDIR in default of bu_dir since it is evaluated at module-level and ROOTDIR might still be None
 def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDIR, "_db-autobu")):
     """
     Backups db_path and csv_path (if not None) to bu_dir if the time since last backup is greater
@@ -1451,9 +1457,12 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDI
     :param db_path: Path to .sqlite db
     :param csv_path: Optional, path to csv file thats been exported from sqlite db
     :param force_bu: True -> force backup no matter last_db_bu time
-    :param bu_dir: Path to location of backup
+    :param bu_dir: Path to location of backup uses ROOTDIR/_db-autobu if None (default: None)
     :return: None
     """
+    if bu_dir is None:
+        # could also use dir of db_path instead of ROOTDIR
+        bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     os.makedirs(bu_dir, exist_ok=True)
     # time.time() get utc number
     now = time.time()
@@ -1474,13 +1483,16 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDI
         # persists until the next COMMIT or ROLLBACK
         con.execute('begin immediate')
         # Make new backup file
-        shutil.copy2(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
+        # shutil.copy2 also copies metadata -> ctime (Unix: time of the last metadata change, Win: creation time
+        # for path) doesnt change -> use mtime for sorting (doesnt change but we can assume oldest bu also has oldest
+        # mtime) whereas ctime could be the same for all) or use shutil.copy -> only copies permission not m,ctime etc
+        shutil.copy(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
         # Unlock database
         con.rollback()
         con.close()
 
         if csv_path:
-            shutil.copy2(csv_path, os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
+            shutil.copy(csv_path, os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):

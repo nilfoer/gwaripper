@@ -231,7 +231,9 @@ def md5(fname):
 
 
 def test_export_csv(create_db_for_export):
-    expected = [["1", "TESTDATE", "TESTIME", "Mutli-line\nDescription, also containing\r\nCarriag returns\r\nTEST",
+    expected = [['id','date', 'time', 'description', 'local_filename', 'title', 'url_file', 'url', 'created_utc',
+                 'r_post_url','reddit_id', 'reddit_title', 'reddit_url', 'reddit_user', 'sgasm_user', 'subreddit_name'],
+                ["1", "TESTDATE", "TESTIME", "Mutli-line\nDescription, also containing\r\nCarriag returns\r\nTEST",
                  "TESTFILENAME","TESTTITLE", "https://hostdomain.com/sub/TESTURL/TESTURLFILE0.mp3",
                  "https://hostdomain.com/sub/TESTURL/", "", "", "", "", "", "", "TESTUSER", ""],
                 ["2", "TESTDATE", "TESTIME", "Mutli-line\nDescription, also containing\r\nCarriag returns\r\nTEST",

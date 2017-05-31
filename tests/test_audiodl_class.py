@@ -528,6 +528,9 @@ def test_set_missing_vals(create_db_missing, create_adl_missing):
     result = c.fetchall()
     assert result == fill_two
     assert adl3.set_missing_values_db(con) == 'TESTFILENAME'
+    c.execute("SELECT * FROM Downloads")
+    result = c.fetchall()
+    assert result == fill_three
 
 @pytest.mark.parametrize("title, expected", [
     ("file_dled_but_no_url", None),
