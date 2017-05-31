@@ -92,8 +92,8 @@ KEYWORDLIST = [x.strip().lower() for x in config["Settings"]["tag_filter"].split
 # tag1 is only banned if tag2 isnt there, in cfg file: tag1 &! tag2; tag3 &! tag4;...
 TAG1_BUT_NOT_TAG2 = []
 if config.has_option("Settings", "tag1_in_but_not_tag2"):
-    for tag_comb in config["Settings"]["tag1_in_but_not_tag2"].split(";"):
-        tag1, tag2 = tag_comb.split("&!")
+    for tag_comb in config["Settings"]["tag1_in_but_not_tag2"].split(";,"):
+        tag1, tag2 = tag_comb.strip().split(";")
         TAG1_BUT_NOT_TAG2.append((tag1.strip().lower(), tag2.strip().lower()))
 
 # path to dir where the soundfiles will be stored in subfolders
@@ -247,7 +247,7 @@ def main():
                             metavar="TAG")
     parser_cfg.add_argument("-tco", "--tag-combo-filter", help="Set banned tag when other isnt present: "
                                                                "Tag1 is only banned when Tag2 isnt found, synatx"
-                                                               "is: Tag1&!Tag2 Tag3&!Tag4",
+                                                               "is: Tag1;Tag2 Tag3;Tag4",
                             metavar="TAGCOMBO", nargs="+")
     parser_cfg.add_argument("-smr", "--set-missing-reddit", type=int, choices=(0, 1),
                             help="Should gwaripper get the info of soundgasm.net-files when coming from reddit even "
@@ -366,7 +366,7 @@ def _cl_fromtxt(args):
         rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, args.filename)))
     else:
         llist = get_sub_from_reddit_urls(txt_to_list(mypath, args.filename))
-        adl_list = parse_submissions_for_links(llist, True)
+        adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
         rip_audio_dls(adl_list)
 
 
@@ -380,7 +380,7 @@ def _cl_watch(args):
         found = watch_clip("reddit")
         if found:
             llist = get_sub_from_reddit_urls(found)
-            adl_list = parse_submissions_for_links(llist, True)
+            adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
             rip_audio_dls(adl_list)
 
 
@@ -392,7 +392,6 @@ def _cl_sub(args):
         adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter),
                                                SUPPORTED_HOSTS)
     else:
-        # fromtxt False -> check lastdltime against submission date of posts when dling from hot posts
         adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), SUPPORTED_HOSTS,
                                                time_check=args.only_newer)
         write_last_dltime()
@@ -406,7 +405,7 @@ def _cl_search(args):
 
     found_subs = search_subreddit(args.subname, args.sstr, limit=limit, time_filter=time_filter,
                                   sort=sort)
-    adl_list = parse_submissions_for_links(found_subs, True)
+    adl_list = parse_submissions_for_links(found_subs, SUPPORTED_HOSTS)
     if adl_list:
         rip_audio_dls(adl_list)
     else:
@@ -445,7 +444,8 @@ def _cl_config(args):
         changed = True
         print("{} backups will be kept from now on".format(args.backup_nr))
     if args.tagfilter:
-        tf_str = ", ".join(args.tagfilter).strip(", ")
+        # not needed: .strip(", ")
+        tf_str = ", ".join(args.tagfilter)
         try:
             config["Settings"]["tag_filter"] = tf_str
         except KeyError:
@@ -454,7 +454,7 @@ def _cl_config(args):
         changed = True
         print("Banned tags were set to: {}".format(tf_str))
     if args.tag_combo_filter:
-        t12_str = "; ".join(args.tag_combo_filter).strip("; ")
+        t12_str = ";, ".join(args.tag_combo_filter)
         try:
             config["Settings"]["tag1_in_but_not_tag2"] = t12_str
         except KeyError:
