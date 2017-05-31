@@ -418,6 +418,7 @@ def _cl_config(args):
     if args.path:
         # normalize path, remove double \ and convert / to \ on windows
         path_in = os.path.normpath(args.path)
+        os.makedirs(path_in, exist_ok=True)
         # i dont need to change cwd and ROOTDIR since script gets restarted anyway
         try:
             config["Settings"]["root_path"] = path_in
@@ -1395,7 +1396,8 @@ def export_csv_from_sql(filename, db_con):
         csvwriter.writerows(rows)
 
 
-def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDIR, "_db-autobu")):
+# cant use ROOTDIR in default of bu_dir since it is evaluated at module-level and ROOTDIR might still be None
+def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=None):
     """
     Backups db_path and csv_path (if not None) to bu_dir if the time since last backup is greater
     than db_bu_freq (in days, also from cfg) or force_bu is True
@@ -1407,9 +1409,12 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDI
     :param db_path: Path to .sqlite db
     :param csv_path: Optional, path to csv file thats been exported from sqlite db
     :param force_bu: True -> force backup no matter last_db_bu time
-    :param bu_dir: Path to location of backup
+    :param bu_dir: Path to location of backup uses ROOTDIR/_db-autobu if None (default: None)
     :return: None
     """
+    if bu_dir is None:
+        # could also use dir of db_path instead of ROOTDIR
+        bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     os.makedirs(bu_dir, exist_ok=True)
     # time.time() get utc number
     now = time.time()
@@ -1430,13 +1435,16 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDI
         # persists until the next COMMIT or ROLLBACK
         con.execute('begin immediate')
         # Make new backup file
-        shutil.copy2(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
+        # shutil.copy2 also copies metadata -> ctime (Unix: time of the last metadata change, Win: creation time
+        # for path) doesnt change -> use mtime for sorting (doesnt change but we can assume oldest bu also has oldest
+        # mtime) whereas ctime could be the same for all) or use shutil.copy -> only copies permission not m,ctime etc
+        shutil.copy(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
         # Unlock database
         con.rollback()
         con.close()
 
         if csv_path:
-            shutil.copy2(csv_path, os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
+            shutil.copy(csv_path, os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):
