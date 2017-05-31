@@ -207,9 +207,9 @@ def main():
     # nargs=? One argument will be consumed from the command line if possible
     # no command-line argument -> default
     # optional arguments -> option string is present but not followed by a command-line argument -> value from const
-    parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=True, type=float,
+    parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=False, type=float,
                             help="Only download submission if creation time is newer than provided utc"
-                                 "timestamp or last_dl_time from config if none provided (default: True)")
+                                 "timestamp or last_dl_time from config if none provided (default: False)")
     parser_sub.set_defaults(func=_cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
@@ -1284,6 +1284,7 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
 
             if not found_urls:
                 logger.info("No supported link in \"{}\"".format(submission.shortlink))
+                os.makedirs(os.path.join(ROOTDIR, "_linkcol"), exist_ok=True)
                 with open(os.path.join(ROOTDIR, "_linkcol", "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
                     w.write("<h3><a href=\"https://reddit.com{}\">{}"
@@ -1392,6 +1393,9 @@ def export_csv_from_sql(filename, db_con):
         c = db_con.execute("SELECT * FROM Downloads")
         rows = c.fetchall()
 
+        # cursor.description -> sequence of 7-item sequences each containing info describing one result column
+        col_names = [description[0] for description in c.description]
+        csvwriter.writerow(col_names)  # header
         # write the all the rows to the file
         csvwriter.writerows(rows)
 
