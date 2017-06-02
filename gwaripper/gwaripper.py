@@ -496,6 +496,8 @@ class AudioDownload:  # TODO docstr
         # use reddit user name if not sgasm
         if host == "sgasm":
             self.name_usr = self.page_url.split("/u/", 1)[1].split("/", 1)[0]
+        elif self.reddit_info["r_user"] is None:
+            self.name_usr = "deleted_users"
         else:
             self.name_usr = self.reddit_info["r_user"]
         self.downloaded = False
@@ -1336,10 +1338,17 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
                 # found_urls empty we can skip to next sub
                 continue
 
-            reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
-                           "selftext": submission.selftext, "r_user": submission.author.name,
-                           "created_utc": submission.created_utc, "id": submission.id,
-                           "subreddit": submission.subreddit.display_name, "r_post_url": sub_url}
+            try:
+                reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
+                               "selftext": submission.selftext, "r_user": submission.author.name,
+                               "created_utc": submission.created_utc, "id": submission.id,
+                               "subreddit": submission.subreddit.display_name, "r_post_url": sub_url}
+            except AttributeError:
+                logger.warning("Author of submission id {} has been deleted! Using None as r_user.")
+                reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
+                               "selftext": submission.selftext, "r_user": None,
+                               "created_utc": submission.created_utc, "id": submission.id,
+                               "subreddit": submission.subreddit.display_name, "r_post_url": sub_url}
 
             # create AudioDownload from found_urls
             for host, url in found_urls:
