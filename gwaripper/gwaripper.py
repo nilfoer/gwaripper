@@ -549,8 +549,13 @@ class AudioDownload:  # TODO docstr
         self.title = self.reddit_info["title"]
 
     def _set_eraudica_info(self):
-        # strip /gwa from end of link so we can access file download
-        self.page_url = self.page_url.strip("/gwa")
+        # strip("/gwa") doesnt strip the exact string "/gwa" from the end but instead it strips all the
+        # chars contained in that string from the end:
+        # "eve/Audio-extravaganza/gwa".strip("/gwa") ->  "eve/Audio-extravaganz"
+        # use slice instead (replace might remove that string even if its not at the end)
+        # remove /gwa from end of link so we can access file download
+        if self.page_url.endswith("/gwa"):
+            self.page_url = self.page_url[:-4]
 
         site = urllib.request.urlopen(self.page_url)
         html = site.read().decode('utf-8')
@@ -566,6 +571,10 @@ class AudioDownload:  # TODO docstr
         fname = re.search("var filename = \"(.+)\"", scripts).group(1)
         server = re.search("var playerServerURLAuthorityIncludingScheme = \"(.+)\"", scripts).group(1)
         dl_token = re.search("var downloadToken = \"(.+)\"", scripts).group(1)
+        # convert unicode escape sequences (\\u0027) that might be in the filename to str
+        # fname.encode("utf-8").decode("unicode-escape")
+        # bytes(fname, 'ascii').decode('unicode-escape')
+        fname = fname.encode("utf-8").decode("unicode-escape")
         # convert fname to make it url safe with urllib.quote (quote_plus replaces spaces with plus signs)
         fname = url_quote(fname)  # renamed so i dont accidentally create a func with same name
 
@@ -1344,7 +1353,8 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
                                "created_utc": submission.created_utc, "id": submission.id,
                                "subreddit": submission.subreddit.display_name, "r_post_url": sub_url}
             except AttributeError:
-                logger.warning("Author of submission id {} has been deleted! Using None as r_user.")
+                logger.warning("Author of submission id {} has been deleted! "
+                               "Using None as r_user.".format(submission.id))
                 reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
                                "selftext": submission.selftext, "r_user": None,
                                "created_utc": submission.created_utc, "id": submission.id,
