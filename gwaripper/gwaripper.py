@@ -1464,7 +1464,7 @@ def export_csv_from_sql(filename, db_con):
 
 
 # cant use ROOTDIR in default of bu_dir since it is evaluated at module-level and ROOTDIR might still be None
-def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=os.path.join(ROOTDIR, "_db-autobu")):
+def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=None):
     """
     Backups db_path and csv_path (if not None) to bu_dir if the time since last backup is greater
     than db_bu_freq (in days, also from cfg) or force_bu is True
