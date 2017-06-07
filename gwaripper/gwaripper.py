@@ -145,6 +145,19 @@ stdohandler.setFormatter(formatterstdo)
 logger.addHandler(stdohandler)
 
 
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logger.critical("Uncaught exception:", exc_info=(exc_type, exc_value, exc_traceback))
+
+# sys.excepthook is invoked every time an exception is raised and uncaught
+# set own custom function so we can log traceback etc to file
+# from: https://stackoverflow.com/questions/6234405/logging-uncaught-exceptions-in-python by gnu_lorien
+sys.excepthook = handle_exception
+
+
 def main():
     parser = argparse.ArgumentParser(description="Script to download gonewildaudio/pta posts from either reddit "
                                                  "or soundgasm.net directly.")
@@ -314,9 +327,21 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            tit = "[F4F][F4M][Daddy] Hypno for both sexes"
-            print(check_submission_banned_tags(tit, KEYWORDLIST, TAG1_BUT_NOT_TAG2))
+            adl_list = [
+                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
+                              "test_dl/u/exc_dl/soundgasm.net.html", "sgasm", {"r_user": None,
+                                                                               "permalink": "testurl"}),
+                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
+                              "test_dl/u/exc_dl/Chirbit.html", "chirb.it", {"r_user": None,
+                                                                            "permalink": "testurl"}),
+                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
+                              "test_dl/u/exc_dl/Eraudica.html", "eraudica", {"r_user": None,
+                                                                             "permalink": "testurl"}),
+                AudioDownload("https://soundgasm.net/u/justtolisten/F4M-Slippery-Redux-script-by-"
+                              "Lurkinfortrouble-with-sexy-sounds-by-GWAsub-HFOHypnoListen-to-me-stroke-"
+                              "you-sexyblow-jobSuckingWhispersLay-back-and-cum-for-me", "sgasm")]
 
+            rip_audio_dls(adl_list)
         else:
             # call func that was selected for subparser/command
             args.func(args)
@@ -511,7 +536,8 @@ class AudioDownload:  # TODO docstr
 
     def call_host_get_file_info(self):
         """
-        Calls appropriate method to get file info for host type
+        Calls appropriate method to get file info for host type, throws InfoExtractingError if
+        the calle function fails to extract the needed info (site structure probably changed)
 
         :return: None
         """
@@ -532,21 +558,31 @@ class AudioDownload:  # TODO docstr
 
         :return: None
         """
-        site = urllib.request.urlopen(self.page_url)
-        html = site.read().decode('utf-8')
-        site.close()
-        soup = bs4.BeautifulSoup(html, "html.parser")
+        try:
+            site = urllib.request.urlopen(self.page_url)
+        except urllib.request.HTTPError as err:
+            logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.page_url))
+        else:
+            html = site.read().decode('utf-8')
+            site.close()
+            soup = bs4.BeautifulSoup(html, "html.parser")
 
-        # selects ONE i tag with set data-fd attribute beneath tag with class .wavholder beneath div with id main
-        # then get attribute data-fd
-        str_b64 = soup.select_one('div#main .wavholder i[data-fd]')["data-fd"]
-        # reverse string using a slice -> string[start:stop:step], going through whole string with step -1 -> reverse
-        str_b64_rev = str_b64[::-1]
-        # decode base64 string to get url to file -> returns byte literal -> decode with appropriate encoding
-        # this link EXPIRES so get it right b4 downloading
-        self.url_to_file = base64.b64decode(str_b64_rev).decode("utf-8")
-        self.file_type = self.url_to_file.split("?")[0][-4:]
-        self.title = self.reddit_info["title"]
+            try:
+                # selects ONE i tag with set data-fd attribute beneath tag with class .wavholder beneath
+                # div with id main then get attribute data-fd
+                # TypeError when trying to subscript soup.select_one but its None
+                str_b64 = soup.select_one('div#main .wavholder i[data-fd]')["data-fd"]
+                # reverse string using a slice -> string[start:stop:step], going through whole string with step -1
+                str_b64_rev = str_b64[::-1]
+                # decode base64 string to get url to file -> returns byte literal -> decode with appropriate encoding
+                # this link EXPIRES so get it right b4 downloading
+                self.url_to_file = base64.b64decode(str_b64_rev).decode("utf-8")
+                self.file_type = self.url_to_file.split("?")[0][-4:]
+                self.title = self.reddit_info["title"]
+            except (AttributeError, IndexError, TypeError):
+                raise utils.InfoExtractingError("Error occured while extracting chirbit info - site structure "
+                                                "probably changed! See if there are updates available!",
+                                                self.page_url, html)
 
     def _set_eraudica_info(self):
         # strip("/gwa") doesnt strip the exact string "/gwa" from the end but instead it strips all the
@@ -557,43 +593,54 @@ class AudioDownload:  # TODO docstr
         if self.page_url.endswith("/gwa"):
             self.page_url = self.page_url[:-4]
 
-        site = urllib.request.urlopen(self.page_url)
-        html = site.read().decode('utf-8')
-        site.close()
-        soup = bs4.BeautifulSoup(html, "html.parser")
+        try:
+            site = urllib.request.urlopen(self.page_url)
+        except urllib.request.HTTPError as err:
+            logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.page_url))
+        else:
+            html = site.read().decode('utf-8')
+            site.close()
+            soup = bs4.BeautifulSoup(html, "html.parser")
 
-        # selects script tags beneath div with id main and div class post
-        # returns list of bs4.element.Tag -> access text with .text
-        scripts = soup.select("div#main div.post script")[1].text
-        # vars that are needed to gen dl link are included in script tag
-        # access group of RE (part in '()') with .group(index)
-        # Group 0 is always present; it’s the whole RE
-        fname = re.search("var filename = \"(.+)\"", scripts).group(1)
-        server = re.search("var playerServerURLAuthorityIncludingScheme = \"(.+)\"", scripts).group(1)
-        dl_token = re.search("var downloadToken = \"(.+)\"", scripts).group(1)
-        # convert unicode escape sequences (\\u0027) that might be in the filename to str
-        # fname.encode("utf-8").decode("unicode-escape")
-        # bytes(fname, 'ascii').decode('unicode-escape')
-        fname = fname.encode("utf-8").decode("unicode-escape")
-        # convert fname to make it url safe with urllib.quote (quote_plus replaces spaces with plus signs)
-        fname = url_quote(fname)  # renamed so i dont accidentally create a func with same name
+            try:
+                # selects script tags beneath div with id main and div class post
+                # returns list of bs4.element.Tag -> access text with .text
+                scripts = soup.select("div#main div.post script")[1].text
+                # vars that are needed to gen dl link are included in script tag
+                # access group of RE (part in '()') with .group(index)
+                # Group 0 is always present; it’s the whole RE
+                fname = re.search("var filename = \"(.+)\"", scripts).group(1)
+                server = re.search("var playerServerURLAuthorityIncludingScheme = \"(.+)\"", scripts).group(1)
+                dl_token = re.search("var downloadToken = \"(.+)\"", scripts).group(1)
+                # convert unicode escape sequences (\\u0027) that might be in the filename to str
+                # fname.encode("utf-8").decode("unicode-escape")
+                # bytes(fname, 'ascii').decode('unicode-escape')
+                fname = fname.encode("utf-8").decode("unicode-escape")
+                # convert fname to make it url safe with urllib.quote (quote_plus replaces spaces with plus signs)
+                fname = url_quote(fname)  # renamed so i dont accidentally create a func with same name
 
-        self.url_to_file = "{}/fd/{}/{}".format(server, dl_token, fname)
-        self.title = self.reddit_info["title"]
-        self.file_type = fname[-4:]
+                self.url_to_file = "{}/fd/{}/{}".format(server, dl_token, fname)
+                self.title = self.reddit_info["title"]
+                self.file_type = fname[-4:]
+            except (IndexError, AttributeError):
+                # type, value, traceback = sys.exc_info()
+                raise utils.InfoExtractingError("Error occured while extracting eraudica info - site structure "
+                                                "probably changed! See if there are updates available!",
+                                                self.page_url, html)  # from None -> get rid of Exceptions b4 this one
 
     def _set_sgasm_info(self):
-        # TORELEASE Temporary check if we alrdy called this so we dont call it twice when we call it to fill
-        # in missing information in the df
-        if not self.url_to_file:
-            logger.info("Getting soundgasm info of: %s" % self.page_url)
+        logger.info("Getting soundgasm info of: %s" % self.page_url)
+        try:
+            site = urllib.request.urlopen(self.page_url)
+        except urllib.request.HTTPError as err:
+            logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.page_url))
+        else:  # executes if try clause does not raise an exception
+            html = site.read().decode('utf-8')
+            site.close()
+
+            soup = bs4.BeautifulSoup(html, "html.parser")
+
             try:
-                site = urllib.request.urlopen(self.page_url)
-                html = site.read().decode('utf-8')
-                site.close()
-
-                soup = bs4.BeautifulSoup(html, "html.parser")
-
                 title = soup.select_one("div.jp-title").text
 
                 # set instance values
@@ -601,8 +648,10 @@ class AudioDownload:  # TODO docstr
                 self.file_type = ".m4a"
                 self.title = title
                 self.descr = soup.select_one("div.jp-description > p").text
-            except urllib.request.HTTPError:
-                logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.page_url)
+            except AttributeError:
+                raise utils.InfoExtractingError("Error occured while extracting sgasm info - site structure "
+                                                "probably changed! See if there are updates available!",
+                                                self.page_url, html)
 
     # From Hitchhiker's Guide to Python:
     # When a function grows in complexity it is not uncommon to use multiple return statements inside the function’s
@@ -693,7 +742,7 @@ class AudioDownload:  # TODO docstr
 
                 try:
                     # automatically commits changes to db_con if everything succeeds or does a rollback if an
-                    # exception is raised
+                    # exception is raised; exception is still raised and must be caught
                     with db_con:
                         # executes the SQL query but leaves commiting it to with db_con in line above
                         self._add_to_db(db_con)
@@ -704,14 +753,14 @@ class AudioDownload:  # TODO docstr
                         urllib.request.urlretrieve(self.url_to_file,
                                                    os.path.abspath(os.path.join(mypath, self.filename_local)),
                                                    reporthook=prog_bar_dl)
-                except urllib.request.HTTPError:
+                except urllib.request.HTTPError as err:
                     # dl failed set downloaded
                     self.downloaded = False
-                    logger.warning("HTTP Error 404: Not Found: \"%s\"" % self.url_to_file)
-
-                if self.reddit_info:
-                    # also write reddit selftext in txtfile with same name as audio
-                    self.write_selftext_file(dl_root)
+                    logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.url_to_file))
+                else:  # only write selftext if file was dled
+                    if self.reddit_info:
+                        # also write reddit selftext in txtfile with same name as audio
+                        self.write_selftext_file(dl_root)
         else:
             logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
 
@@ -1002,8 +1051,24 @@ def rip_audio_dls(dl_list):
         audio_dl = dl_dict[url]
 
         rqd.delay_request()
-        # get appropriate func for host to get direct url, sgasm title etc.
-        audio_dl.call_host_get_file_info()
+        try:
+            # get appropriate func for host to get direct url, sgasm title etc.
+            audio_dl.call_host_get_file_info()
+        except utils.InfoExtractingError as err:
+            # dont crash whole script just log exception with traceback and original error msg
+            if audio_dl.reddit_info:
+                # level: ERROR, Exception info is added, should only be called from an exception handler
+                # .exception() Exception info is added to msg with lvl ERROR
+                # should only be called from an exception handler
+                logger.exception("Error occured while trying to extract file information at {} from submission {}"
+                                 " -> SKIPPING".format(audio_dl.page_url, audio_dl.reddit_info["permalink"]))
+            else:
+                logger.exception("Error occured while trying to extract file information at {}"
+                                 " -> SKIPPING".format(audio_dl.page_url))
+
+            logger.debug("Recieved HTML at '{}':\n{}".format(err.url, err.html))
+
+            continue
 
         # sleep between requests so we dont stress the server to much or get banned
         # using helper class -> only sleep .25s when last request time was less than .5s ago

@@ -3,6 +3,7 @@ import os
 import hashlib
 import sqlite3
 from gwaripper.gwaripper import AudioDownload
+from gwaripper.utils import InfoExtractingError
 
 # mark module with dltest, all classes, funcs, methods get marked with that
 # usable on single classes/funcs.. with @pytest.mark.webtest
@@ -549,5 +550,15 @@ def test_gen_fn(title, expected, create_db_missing): # [^\w\-_.,\[\] ]
 
     assert adl.gen_filename(con, testdir) == expected
 
-
-
+@pytest.mark.parametrize("host, url, r_inf", [
+    ("sgasm", "file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_dl/u/exc_dl/soundgasm.net.html",
+     {"r_user": None}),
+    ("chirb.it", "file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_dl/u/exc_dl/Chirbit.html",
+     {"r_user": None}),
+    ("eraudica", "file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_dl/u/exc_dl/Eraudica.html",
+     {"r_user": None})
+])
+def test_info_extract_exc(host, url, r_inf):
+    a = AudioDownload(url, host, r_inf)
+    with pytest.raises(InfoExtractingError):
+        a.call_host_get_file_info()

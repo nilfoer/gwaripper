@@ -1,0 +1,15 @@
+adl_list = [
+                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
+                              "test_dl/u/exc_dl/soundgasm.net.html", "sgasm", {"r_user": None,
+                                                                            "permalink": "testurl"}),
+                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
+                              "test_dl/u/exc_dl/Chirbit.html", "chirb.it", {"r_user": None,
+                                                                            "permalink": "testurl"}),
+                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
+                              "test_dl/u/exc_dl/Eraudica.html", "eraudica", {"r_user": None,
+                                                                             "permalink": "testurl"}),
+                AudioDownload("https://soundgasm.net/u/justtolisten/F4M-Slippery-Redux-script-by-"
+                              "Lurkinfortrouble-with-sexy-sounds-by-GWAsub-HFOHypnoListen-to-me-stroke-"
+                              "you-sexyblow-jobSuckingWhispersLay-back-and-cum-for-me", "sgasm")]
+
+rip_audio_dls(adl_list)

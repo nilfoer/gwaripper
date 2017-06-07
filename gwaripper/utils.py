@@ -64,3 +64,17 @@ class RequestDelayer:
         else:
             # dont sleep on first request
             self.last_request = now
+
+
+class GWARipperError(Exception):
+    """Base exception for GWARipper"""
+    pass
+
+
+class InfoExtractingError(GWARipperError):
+    def __init__(self, msg, url, html):
+        # Call the base class constructor with the parameters it needs
+        super(InfoExtractingError, self).__init__(msg)  # read up on super
+        self.url = url
+        self.html = html
+
