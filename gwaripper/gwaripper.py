@@ -150,7 +150,44 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
 
-    logger.critical("Uncaught exception:", exc_info=(exc_type, exc_value, exc_traceback))
+    logger.critical("Uncaught exception: ", exc_info=(exc_type, exc_value, exc_traceback))
+
+    if exc_traceback is not None:
+        # printing locals by frame from: Python Cookbook p. 343/343 von Alex Martelli,Anna Ravenscroft,David Ascher
+        tb = exc_traceback
+        # get innermost traceback
+        while tb.tb_next:
+            tb = tb.tb_next
+
+        stack = []
+        frame = tb.tb_frame
+        # walk backwards to outermost frame -> innermost first in list
+        while frame:
+            stack.append(frame)
+            frame = frame.f_back
+        stack.reverse()  # remove if you want innermost frame first
+
+        # we could filter ouput by filename (frame.f_code.co_filename) so that we only print locals
+        # when we've reached the first frame of that file (could use part of __name__ (here: gwaripper.gwaripper))
+
+        # build debug string by creating list of lines and join them on \n instead of concatenation
+        # since adding strings together means creating a new string (and potentially destroying the old ones)
+        # for each addition
+        debug_strings = []
+        debug_strings.append("Locals by frame, innermost last")
+        for frame in stack:
+            debug_strings.append("Frame {} in {} at line {}\n{}\n".format(frame.f_code.co_name, frame.f_code.co_filename,
+                                                                  frame.f_lineno, "-"*100))
+            for key, val in frame.f_locals.items():
+                # we must absolutely avoid propagating exceptions, and str(value) could cause any
+                # exception, so we must catch any
+                try:
+                    debug_strings.append("\t{:>20} = {}".format(key, val))
+                except:
+                    debug_strings.append("ERROR WHILE PRINTING VALUES")
+            debug_strings.append("\n" + "-" * 100 + "\n")
+
+        logger.debug("\n".join(debug_strings))
 
 # sys.excepthook is invoked every time an exception is raised and uncaught
 # set own custom function so we can log traceback etc to file
@@ -623,7 +660,6 @@ class AudioDownload:  # TODO docstr
                 self.title = self.reddit_info["title"]
                 self.file_type = fname[-4:]
             except (IndexError, AttributeError):
-                # type, value, traceback = sys.exc_info()
                 raise utils.InfoExtractingError("Error occured while extracting eraudica info - site structure "
                                                 "probably changed! See if there are updates available!",
                                                 self.page_url, html)  # from None -> get rid of Exceptions b4 this one
@@ -1051,24 +1087,25 @@ def rip_audio_dls(dl_list):
         audio_dl = dl_dict[url]
 
         rqd.delay_request()
-        try:
-            # get appropriate func for host to get direct url, sgasm title etc.
-            audio_dl.call_host_get_file_info()
-        except utils.InfoExtractingError as err:
-            # dont crash whole script just log exception with traceback and original error msg
-            if audio_dl.reddit_info:
-                # level: ERROR, Exception info is added, should only be called from an exception handler
-                # .exception() Exception info is added to msg with lvl ERROR
-                # should only be called from an exception handler
-                logger.exception("Error occured while trying to extract file information at {} from submission {}"
-                                 " -> SKIPPING".format(audio_dl.page_url, audio_dl.reddit_info["permalink"]))
-            else:
-                logger.exception("Error occured while trying to extract file information at {}"
-                                 " -> SKIPPING".format(audio_dl.page_url))
-
-            logger.debug("Recieved HTML at '{}':\n{}".format(err.url, err.html))
-
-            continue
+        audio_dl.call_host_get_file_info()
+        # try:
+        #     # get appropriate func for host to get direct url, sgasm title etc.
+        #     audio_dl.call_host_get_file_info()
+        # except utils.InfoExtractingError as err:
+        #     # dont crash whole script just log exception with traceback and original error msg
+        #     if audio_dl.reddit_info:
+        #         # level: ERROR, Exception info is added, should only be called from an exception handler
+        #         # .exception() Exception info is added to msg with lvl ERROR
+        #         # should only be called from an exception handler
+        #         logger.exception("Error occured while trying to extract file information at {} from submission {}"
+        #                          " -> SKIPPING".format(audio_dl.page_url, audio_dl.reddit_info["permalink"]))
+        #     else:
+        #         logger.exception("Error occured while trying to extract file information at {}"
+        #                          " -> SKIPPING".format(audio_dl.page_url))
+        #
+        #     logger.debug("Recieved HTML at '{}':\n{}".format(err.url, err.html))
+        #
+        #     continue
 
         # sleep between requests so we dont stress the server to much or get banned
         # using helper class -> only sleep .25s when last request time was less than .5s ago
