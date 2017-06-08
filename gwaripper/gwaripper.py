@@ -173,18 +173,21 @@ def handle_exception(exc_type, exc_value, exc_traceback):
         # build debug string by creating list of lines and join them on \n instead of concatenation
         # since adding strings together means creating a new string (and potentially destroying the old ones)
         # for each addition
-        debug_strings = []
-        debug_strings.append("Locals by frame, innermost last")
+        # add first string in list literal instead of appending it in the next line -> would be bad practice
+        debug_strings = ["Locals by frame, innermost last"]
+
         for frame in stack:
-            debug_strings.append("Frame {} in {} at line {}\n{}\n".format(frame.f_code.co_name, frame.f_code.co_filename,
-                                                                  frame.f_lineno, "-"*100))
+            debug_strings.append("Frame {} in {} at line {}\n{}\n".format(frame.f_code.co_name,
+                                                                          frame.f_code.co_filename,
+                                                                          frame.f_lineno, "-"*100))
             for key, val in frame.f_locals.items():
-                # we must absolutely avoid propagating exceptions, and str(value) could cause any
-                # exception, so we must catch any
                 try:
                     debug_strings.append("\t{:>20} = {}".format(key, val))
+                # we must absolutely avoid propagating exceptions, and str(value) could cause any
+                # exception, so we must catch any
                 except:
                     debug_strings.append("ERROR WHILE PRINTING VALUES")
+
             debug_strings.append("\n" + "-" * 100 + "\n")
 
         logger.debug("\n".join(debug_strings))
