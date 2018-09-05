@@ -602,6 +602,7 @@ class AudioDownload:  # TODO docstr
             site = urllib.request.urlopen(self.page_url)
         except urllib.request.HTTPError as err:
             logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.page_url))
+            raise
         else:
             html = site.read().decode('utf-8')
             site.close()
@@ -637,6 +638,7 @@ class AudioDownload:  # TODO docstr
             site = urllib.request.urlopen(self.page_url)
         except urllib.request.HTTPError as err:
             logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.page_url))
+            raise
         else:
             html = site.read().decode('utf-8')
             site.close()
@@ -673,6 +675,7 @@ class AudioDownload:  # TODO docstr
             site = urllib.request.urlopen(self.page_url)
         except urllib.request.HTTPError as err:
             logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.page_url))
+            raise
         else:  # executes if try clause does not raise an exception
             html = site.read().decode('utf-8')
             site.close()
@@ -1090,7 +1093,13 @@ def rip_audio_dls(dl_list):
         audio_dl = dl_dict[url]
 
         rqd.delay_request()
-        audio_dl.call_host_get_file_info()
+        try:
+            audio_dl.call_host_get_file_info()
+        except urllib.request.HTTPError:
+            # page with file info doesnt exist
+            # nothing was added to db yet so we can just skip ahead
+            filestodl -= 1
+            continue
         # try:
         #     # get appropriate func for host to get direct url, sgasm title etc.
         #     audio_dl.call_host_get_file_info()
@@ -1244,7 +1253,11 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
             logger.info("Filling in missing reddit info: TEMPORARY")
             adl = dl_dict[dup]
             rqd.delay_request()  # TORELEASE remove
-            adl.call_host_get_file_info()  # TORELEASE remove
+            try:
+                adl.call_host_get_file_info()  # TORELEASE remove
+            except urllib.request.HTTPError:
+                # page with file info doesnt exist
+                continue
             # gen filename manually since calling gen_filename would rename it with _00i since file already exists
             adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
             # get filename from db to write selftext
