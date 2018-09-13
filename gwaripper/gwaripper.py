@@ -300,20 +300,9 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            adl_list = [
-                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
-                              "test_dl/u/exc_dl/soundgasm.net.html", "sgasm", {"r_user": None,
-                                                                               "permalink": "testurl"}),
-                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
-                              "test_dl/u/exc_dl/Chirbit.html", "chirb.it", {"r_user": None,
-                                                                            "permalink": "testurl"}),
-                AudioDownload("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/"
-                              "test_dl/u/exc_dl/Eraudica.html", "eraudica", {"r_user": None,
-                                                                             "permalink": "testurl"}),
-                AudioDownload("https://soundgasm.net/u/justtolisten/F4M-Slippery-Redux-script-by-"
-                              "Lurkinfortrouble-with-sexy-sounds-by-GWAsub-HFOHypnoListen-to-me-stroke-"
-                              "you-sexyblow-jobSuckingWhispersLay-back-and-cum-for-me", "sgasm")]
-
+            llist = get_sub_from_reddit_urls(["https://www.reddit.com/r/BraesBoudoir/comments/9dim20/check_out_my_first_collab/"])
+            a = reddit_praw.submission(id="9dg1bk")
+            adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
             rip_audio_dls(adl_list)
         else:
             # call func that was selected for subparser/command
