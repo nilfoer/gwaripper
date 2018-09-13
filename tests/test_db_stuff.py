@@ -3,7 +3,10 @@ import sqlite3
 import os
 import csv
 import time
-from gwaripper.gwaripper import AudioDownload, filter_alrdy_downloaded, check_direct_url_for_dl, export_csv_from_sql, backup_db, config, write_config_module
+from gwaripper.audio_dl import AudioDownload, check_direct_url_for_dl
+from gwaripper.gwaripper import filter_alrdy_downloaded
+from gwaripper.db import export_csv_from_sql, backup_db
+from gwaripper.config import config, write_config_module
 
 time_str = time.strftime("%Y-%m-%d")
 testdir = os.path.normpath("N:\\_archive\\test\\trans\soundgasmNET\\_dev\\_sgasm-repo\\tests\\test_res")

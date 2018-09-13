@@ -1,4 +1,8 @@
-save tags in db
-do the same audios from diff subreddits produce duplicated downloads?
-dl/print found img links (like imgur etc)
-refactor to use classes but prob too much work
+- save tags in db
+- dl/print found img links (like imgur etc)
+- make cross posts work
+- refactor to use classes but prob too much work
+
+
+--DONE----------------------------------------------------------------------------------------
+- do the same audios from diff subreddits produce duplicated downloads? -> NO

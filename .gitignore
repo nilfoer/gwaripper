@@ -30,3 +30,5 @@ build/
 .cache/
 tests/test_dl/
 tests/test_res/
+.*/
+*.swp

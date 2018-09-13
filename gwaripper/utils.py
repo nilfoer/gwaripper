@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 
@@ -78,3 +79,30 @@ class InfoExtractingError(GWARipperError):
         self.url = url
         self.html = html
 
+
+def txt_to_list(path, txtfilename):
+    """
+    Reads in file, splits at newline and returns that list
+
+    :param path: Path to dir the file is in
+    :param txtfilename: Filename
+    :return: List with lines of read text file as elements
+    """
+    with open(os.path.join(path, txtfilename), "r", encoding="UTF-8") as f:
+        llist = f.read().split()
+        return llist
+
+
+def write_to_txtf(wstring, filename, currentusr):
+    """
+    Appends wstring to filename in dir named currentusr in ROOTDIR
+
+    :param wstring: String to write to file
+    :param filename: Filename
+    :param currentusr: soundgasm.net user name
+    :return: None
+    """
+    mypath = os.path.join(ROOTDIR, currentusr)
+    os.makedirs(mypath, exist_ok=True)
+    with open(os.path.join(mypath, filename), "a", encoding="UTF-8") as w:
+        w.write(wstring)

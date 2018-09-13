@@ -1,5 +1,6 @@
 import pytest
-from gwaripper.gwaripper import parse_submissions_for_links, check_submission_banned_tags, get_sub_from_reddit_urls, SUPPORTED_HOSTS
+from gwaripper.reddit import parse_submissions_for_links, check_submission_banned_tags, get_sub_from_reddit_urls
+from gwaripper.config import SUPPORTED_HOSTS
 
 @pytest.mark.parametrize("title, keywordlist, tag1_but_not_2, expected", [
     ("[M4F] This should be banned", ["[m4", "[cuck"], None, True),
@@ -25,7 +26,7 @@ def get_subs_adls():
         # eraudica in url
         "https://www.reddit.com/r/gonewildaudio/comments/3gs9dm/f4m_nurse_eve_time_for_your_physical/",
         # sg in text
-        "https://www.reddit.com/r/gonewildaudio/comments/6b7aux/f4m_please_make_me_a_mommy_impregwet/",
+        "https://www.reddit.com/r/gonewildaudio/comments/6dvum7/f4m_my_daughter_is_an_idiot_for_breaking_up_with/",
         # chirbit in text
         "https://www.reddit.com/r/gonewildaudio/comments/5k3k41/f4m_my_virginity_will_be_your_christmas_present/",
         # eraudica in text
@@ -40,7 +41,7 @@ def get_subs_adls():
         urls[0]: "https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-Slut-Mother-RapeBlackmailFacefuckingSlap-my-face-with-that-thick-cockInnocent-to-sluttyRoughDirty-TalkFuck-Me-Into-The-MatressCreampieImpregMultiple-Real-Orgasms",
         urls[1]: "http://chirb.it/s80vbt",
         urls[2]: "http://eraudica.com/e/eve/2015/Nurse-Eve-Time-For-Your-Physical/gwa",
-        urls[3]: "https://soundgasm.net/u/belle_in_the_woods/F4M-Please-Make-Me-a-Mommy-impregwet-soundscreampiefuck-me-deeppaint-my-insidesdirty-talkbeggingwhispersASMRstereo-recording",
+        urls[3]: "https://soundgasm.net/u/sassmastah77/F4M-My-Daughter-is-an-Idiot-for-Breaking-Up-With-You-Let-Me-Help-You-Feel-Better",
         urls[4]: "http://chirb.it/Op55m7",
         urls[5]: "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp/gwa",
     }
@@ -54,7 +55,7 @@ def test_parse_sub(get_subs_adls):
     # TODO not testing time_check
     result = parse_submissions_for_links(sublist, SUPPORTED_HOSTS)
     # TODO only checking page url not rest of AudioDownload: host, reddit_info
-    assert len(result) == len(found_man) + 1 # since in post there are 2 sgasm urls (identical)
+    assert len(result) == len(found_man)
     for adl in result:
         assert found_man["https://www.reddit.com{}".format(adl.reddit_info["permalink"])] == adl.page_url
 

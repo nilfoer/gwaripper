@@ -2,7 +2,7 @@ import pytest
 import os
 import hashlib
 import sqlite3
-from gwaripper.gwaripper import AudioDownload
+from gwaripper.audio_dl import AudioDownload
 from gwaripper.utils import InfoExtractingError
 
 # mark module with dltest, all classes, funcs, methods get marked with that
@@ -83,17 +83,17 @@ def gen_audiodl_failed():
     os.rmdir(os.path.join(testdir, "miyu213"))
 
 
-@pytest.fixture
-def gen_audiodl_chirbit():
-    a = AudioDownload(urls[1][1], urls[1][0], r_infos[1])
+# @pytest.fixture
+# def gen_audiodl_chirbit():
+#     a = AudioDownload(urls[1][1], urls[1][0], r_infos[1])
 
-    yield a, testdir
+#     yield a, testdir
 
-    if a.filename_local:  # coming from download test not just info test
-        os.remove(os.path.join(testdir, a.name_usr, a.filename_local))
-        os.remove(os.path.join(testdir, a.name_usr, a.filename_local + ".txt"))
-        os.rmdir(os.path.join(testdir, a.name_usr))
-    del a
+#     if a.filename_local:  # coming from download test not just info test
+#         os.remove(os.path.join(testdir, a.name_usr, a.filename_local))
+#         os.remove(os.path.join(testdir, a.name_usr, a.filename_local + ".txt"))
+#         os.rmdir(os.path.join(testdir, a.name_usr))
+#     del a
 
 
 @pytest.fixture
@@ -171,50 +171,51 @@ def test_soundgasm(gen_audiodl_sgasm, create_db_download, create_new_test_con):
                                                                                a.reddit_info["selftext"])
 
 
-def test_chirbit_info(gen_audiodl_chirbit):
-    a, dir = gen_audiodl_chirbit
-    a.call_host_get_file_info()
-    # only compare till aws id other part of url changes every time
-    assert a.url_to_file.split("&",1)[0] == "http://audio.chirbit.com/Pip_1446845763.mp3?AWSAccessKeyId=AKIAIHJD7T6NGQMM2VCA"
-    assert a.file_type == ".mp3"
+# chirbit doesnt seem to be working anymore even in my browser
+# def test_chirbit_info(gen_audiodl_chirbit):
+#     a, dir = gen_audiodl_chirbit
+#     a.call_host_get_file_info()
+#     # only compare till aws id other part of url changes every time
+#     assert a.url_to_file.split("&",1)[0] == "http://audio.chirbit.com/Pip_1446845763.mp3?AWSAccessKeyId=AKIAIHJD7T6NGQMM2VCA"
+#     assert a.file_type == ".mp3"
 
 
-@pytest.mark.dltest
-def test_chirbit(gen_audiodl_chirbit, create_db_download, create_new_test_con):
-    con, c = create_db_download
-    fn = "[FF4M] It_s not what you think, brother_ [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with _u_alwaysslightlysleepy]"[0:110] + ".mp3"
-    a, dir = gen_audiodl_chirbit
-    a.call_host_get_file_info()
+# @pytest.mark.dltest
+# def test_chirbit(gen_audiodl_chirbit, create_db_download, create_new_test_con):
+#     con, c = create_db_download
+#     fn = "[FF4M] It_s not what you think, brother_ [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with _u_alwaysslightlysleepy]"[0:110] + ".mp3"
+#     a, dir = gen_audiodl_chirbit
+#     a.call_host_get_file_info()
 
-    a.download(con, 0, 0, dir)
-    assert a.filename_local == fn
-    assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
-    assert md5(os.path.join(dir, a.name_usr, fn)) == "e8ff0e482d1837cd8be723c64b3ae32f"
-    assert a.downloaded is True
+#     a.download(con, 0, 0, dir)
+#     assert a.filename_local == fn
+#     assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
+#     assert md5(os.path.join(dir, a.name_usr, fn)) == "e8ff0e482d1837cd8be723c64b3ae32f"
+#     assert a.downloaded is True
 
-    new_con, new_c = create_new_test_con  # testing if visible from other con
-    id = c.lastrowid
-    expected = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile',
-                 'https://hostdomain.com/sub/TESTURL/', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None,
-                 'TESTTEDDITUSER', 'TESTUSER', None), (
-                    2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0,
-                    None,
-                    'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
-                # not testing date time, using whatever the attributes are
-                (3, a.date, a.time, None, fn,
-                 "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
-                 a.url_to_file, urls[1][1],
-                 "created_utc_chirbit", "r_post_url_chirbit", "id_chirbit",
-                 "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
-                 "permalink_chirbit", 'test_user', 'test_user', "subreddit_chirbit")
-                ]
-    new_c.execute("SELECT * FROM Downloads")
-    assert new_c.fetchall() == expected
+#     new_con, new_c = create_new_test_con  # testing if visible from other con
+#     id = c.lastrowid
+#     expected = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile',
+#                  'https://hostdomain.com/sub/TESTURL/', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None,
+#                  'TESTTEDDITUSER', 'TESTUSER', None), (
+#                     2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0,
+#                     None,
+#                     'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
+#                 # not testing date time, using whatever the attributes are
+#                 (3, a.date, a.time, None, fn,
+#                  "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
+#                  a.url_to_file, urls[1][1],
+#                  "created_utc_chirbit", "r_post_url_chirbit", "id_chirbit",
+#                  "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
+#                  "permalink_chirbit", 'test_user', 'test_user', "subreddit_chirbit")
+#                 ]
+#     new_c.execute("SELECT * FROM Downloads")
+#     assert new_c.fetchall() == expected
 
-    with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
-        assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
-                                                                               a.reddit_info["permalink"],
-                                                                               a.reddit_info["selftext"])
+#     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
+#         assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
+#                                                                                a.reddit_info["permalink"],
+#                                                                                a.reddit_info["selftext"])
 
 
 def test_eraudica_info(gen_audiodl_eraudica):
