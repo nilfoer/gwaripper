@@ -7,7 +7,8 @@ import praw
 import bs4
 
 from .config import config, KEYWORDLIST, TAG1_BUT_NOT_TAG2, reload_config, ROOTDIR
-from .audio_dl import AudioDownload
+from .audio_dl import AudioDownload, DELETED_USR_FOLDER
+from .imgur import ImgurAlbum, ImgurFile
 
 logger = logging.getLogger(__name__)
 
@@ -165,9 +166,10 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
                             logger.info("{} link found in selftext of: {}".format(host, submission.title))
                             # matched supported host, search next href
                             break
-                    # TODO temporary till proper support is implemented
+                    # TODO i.redd.it only in sub.url not in selftext and always direct link
+                    # so i could just dl it
                     else:
-                        if "imgur.com/" in href or "i.redd.it/" in href:
+                        if "i.redd.it/" in href:
                             logger.info("Image link found in submission with id '%s': %s",
                                         submission.id, href)
 
@@ -196,7 +198,18 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
 
             # create AudioDownload from found_urls
             for host, url in found_urls:
-                dl_list.append(AudioDownload(url, host, reddit_info=reddit_info))
+                if "imgur" in host:
+                    title_sanitized = re.sub("[^\w\-_.,\[\] ]", "_", submission.title[0:100])
+                    user_dir = reddit_info['r_user'] or DELETED_USR_FOLDER
+                    user_dir = os.path.join(ROOTDIR, f"{user_dir}")
+                    # direclty download imgur links
+                    if host == "imgur":
+                        imgur = ImgurFile(None, url, user_dir, prefix=title_sanitized)
+                    else:
+                        imgur = ImgurAlbum(url, user_dir, name=title_sanitized)
+                    imgur.download()
+                else:
+                    dl_list.append(AudioDownload(url, host, reddit_info=reddit_info))
 
     return dl_list
 

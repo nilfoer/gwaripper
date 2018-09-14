@@ -50,7 +50,9 @@ except KeyError:
 SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
                 "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
                 "chirb.it": "chirb.it/",
-                "eraudica": "eraudica.com/"
+                "eraudica": "eraudica.com/",
+                "imgur": re.compile(r"(https?://)?i\.imgur\.com/(\w{5,7})(\.\w+)"),
+                "imgur album": re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(a/|gallery/)?(\w{5,7})")
             }
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)

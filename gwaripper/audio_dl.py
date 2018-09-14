@@ -14,6 +14,8 @@ from . import utils
 
 logger = logging.getLogger(__name__)
 
+DELETED_USR_FOLDER = "deleted_users"
+
 
 class AudioDownload:  # TODO docstr
     """
@@ -28,7 +30,7 @@ class AudioDownload:  # TODO docstr
         if host == "sgasm":
             self.name_usr = self.page_url.split("/u/", 1)[1].split("/", 1)[0]
         elif self.reddit_info["r_user"] is None:
-            self.name_usr = "deleted_users"
+            self.name_usr = DELETED_USR_FOLDER
         else:
             self.name_usr = self.reddit_info["r_user"]
         self.downloaded = False
