@@ -20,7 +20,7 @@ except FileNotFoundError:
     init_cfg = {
         "Reddit": {
             "user_agent": "gwaRipper",
-            "client_id": "***REMOVED***",
+            "client_id": "to get a client id visit: reddit.com/wiki/api",
         },
         "Settings": {
             "tag_filter": "[request], [script offer]",
