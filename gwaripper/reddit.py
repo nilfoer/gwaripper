@@ -165,6 +165,11 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
                             logger.info("{} link found in selftext of: {}".format(host, submission.title))
                             # matched supported host, search next href
                             break
+                    # TODO temporary till proper support is implemented
+                    else:
+                        if "imgur.com/" in href or "i.redd.it/" in href:
+                            logger.info("Image link found in submission with id '%s': %s",
+                                        submission.id, href)
 
             if not found_urls:
                 logger.info("No supported link in \"{}\"".format(submission.shortlink))

@@ -1,5 +1,6 @@
 - save tags in db
 - dl/print found img links (like imgur etc)
+
 - refactor to use classes but prob too much work
 
 

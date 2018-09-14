@@ -300,7 +300,7 @@ def main():
     if ROOTDIR:
         if args.test:
             # test code
-            llist = get_sub_from_reddit_urls(["https://www.reddit.com/r/BraesBoudoir/comments/9dim20/check_out_my_first_collab/"])
+            llist = get_sub_from_reddit_urls(["https://old.reddit.com/r/gonewildaudio/comments/8wqzen/f4m_overwatch_joip_come_for_her_stroke_that_cock/"])
             a = reddit_praw.submission(id="9dg1bk")
             adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
             rip_audio_dls(adl_list)
