@@ -42,19 +42,23 @@ class AudioDownload:  # TODO docstr
         self.date = None
         self.time = None
 
-    def call_host_get_file_info(self):
+    def call_host_get_file_info(self, force=False):
         """
-        Calls appropriate method to get file info for host type, throws InfoExtractingError if
-        the calle function fails to extract the needed info (site structure probably changed)
+        Calls appropriate method to get file info for host type if we didnt get file info yet,
+        throws InfoExtractingError if the calle function fails to extract the needed info
+        (site structure probably changed)
 
+        :param force: Force getting file info
         :return: None
         """
-        if self.host == "sgasm":
-            self._set_sgasm_info()
-        elif self.host == "chirb.it":
-            self._set_chirbit_url()
-        elif self.host == "eraudica":
-            self._set_eraudica_info()
+        # only get file info if we havent yet or we def want to force it
+        if (self.url_to_file is None) or force:
+            if self.host == "sgasm":
+                self._set_sgasm_info()
+            elif self.host == "chirb.it":
+                self._set_chirbit_url()
+            elif self.host == "eraudica":
+                self._set_eraudica_info()
 
     def _set_chirbit_url(self):
         """
@@ -194,33 +198,20 @@ class AudioDownload:  # TODO docstr
         mypath = os.path.join(dl_root, self.name_usr)
         # isfile works without checking if dir exists first
         if os.path.isfile(os.path.join(mypath, filename + ftype)):
-            if check_direct_url_for_dl(db_con, self.url_to_file):
-                # TORELEASE remove
-                # set filename since we need it to update in db
-                self.filename_local = filename + ftype
-                self.set_missing_values_db(db_con, url_type="file")
-                logger.warning("!!! File already exists and was found in direct url_file but not in urls! "
-                               "--> not renaming --> SKIPPING")
-                # No need to return filename since file was already downloaded
-                # mb refactor so we dont have to function exits, e.g. setting filename to None and at end of func
-                # return with if-else...
-                return None
-            else:
-                i = 0
+            i = 0
 
-                # You don't need to copy a Python string. They are immutable, so concatenating or slicing
-                # returns a new string
-                filename_old = filename
+            # You don't need to copy a Python string. They are immutable, so concatenating or
+            # slicing returns a new string
+            filename_old = filename
 
-                # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
-                # or the ending is different (since fname got cut off, so we dont exceed win path limit)
-                # count up i till file doesnt exist anymore
-                while os.path.isfile(os.path.join(mypath, filename + ftype)):
-                    i += 1
-                    # :02d -> pad number with 0 to a width of 2, d -> digit(int)
-                    filename = "{}_{:02d}".format(filename_old, i)
-                logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
-
+            # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
+            # or the ending is different (since fname got cut off, so we dont exceed win path limit)
+            # count up i till file doesnt exist anymore
+            while os.path.isfile(os.path.join(mypath, filename + ftype)):
+                i += 1
+                # :02d -> pad number with 0 to a width of 2, d -> digit(int)
+                filename = "{}_{:02d}".format(filename_old, i)
+            logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
         return filename + ftype
 
     def download(self, db_con, curfnr, maxfnr, dl_root):
@@ -282,7 +273,7 @@ class AudioDownload:  # TODO docstr
         Adds instance attributes and reddit_info values to the database using named SQL query
         parameters with a dictionary.
         DOESN'T COMMIT the transaction, since the context manager in self.download() needs to be
-        able to do a rollback if the dl fails, will be commited in
+        able to do a rollback if the dl fails
 
         :param db_con: Connection obj to sqlite db
         :return: None
@@ -327,16 +318,17 @@ class AudioDownload:  # TODO docstr
                        ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
                        ":sgasm_user, :subreddit_name)", val_dict)
 
-    def set_missing_values_db(self, db_con, url_type="page"):
+    def set_missing_reddit_db(self, db_con):
         """
-        Updates row of file entry in db with information from self like page_url, filename_local
-        and reddit_info dict, only sets values if previous entry was NULL/None
+        Updates row of file entry in db with reddit_info dict, only sets values if previous
+        entry was NULL/None
 
         :param db_con: Connection to sqlite db
         :param self: instance of AudioDownload whose entry should be updated
-        :param url_type: Use either "page" url or direct "file" url to find row
-        :return: Filename string in db-column local_filename
+        :return: Returns local filename of downloaded audio file
         """
+        if not self.reddit_info:
+            return
         # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
         db_con.row_factory = sqlite3.Row
         # we need to create new cursor after changing row_factory
@@ -347,61 +339,47 @@ class AudioDownload:  # TODO docstr
         # new_c will always fetch Row obj and cursor will fetch tuples
         db_con.row_factory = None
 
-        url_type_file = True if url_type == "file" else False
-        if url_type_file:
-            c.execute("SELECT * FROM Downloads WHERE url_file = ?", (self.url_to_file,))
-        else:
-            c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
-        # get row
+        c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
         row_cont = c.fetchone()
 
-        set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"), ("reddit_user", "r_user"),
-                      ("created_utc", "created_utc"), ("reddit_id", "id"), ("subreddit_name", "subreddit"),
+        set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"),
+                      ("reddit_user", "r_user"), ("created_utc", "created_utc"),
+                      ("reddit_id", "id"), ("subreddit_name", "subreddit"),
                       ("r_post_url", "r_post_url"))
 
         upd_cols = []
         upd_vals = []
-        # TORELEASE remove url_file stuff
-        if row_cont["url"] is None:
-            # add col = ? strings to list -> join them later to SQL query
-            upd_cols.append("url = ?")
-            upd_vals.append(self.page_url)
-        if row_cont["local_filename"] is None:
-            upd_cols.append("local_filename = ?")
-            upd_vals.append(self.filename_local)
-        if self.reddit_info:
-            for col, key in set_helper:
-                if row_cont[col] is None:
-                    upd_cols.append("{} = ?".format(col))
-                    upd_vals.append(self.reddit_info[key])
+        for col, key in set_helper:
+            if row_cont[col] is None:
+                upd_cols.append("{} = ?".format(col))
+                upd_vals.append(self.reddit_info[key])
 
         if upd_cols:
             logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
             # append url since upd_vals need to include all the param substitutions for ?
-            if url_type_file:
-                upd_vals.append(self.url_to_file)
-            else:
-                upd_vals.append(self.page_url)
-            # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would have to update as well
-            # so not a good idea
-            # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(",".join(upd_cols),
-            #                                                               ",".join("?"*len(upd_cols))))
+            upd_vals.append(self.page_url)
+            # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would
+            # have to update as well so not a good idea
+            # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(
+            #   ",".join(upd_cols), ",".join("?"*len(upd_cols))))
 
-            # Connection objects can be used as context managers that automatically commit or rollback transactions.
-            # In the event of an exception, the transaction is rolled back; otherwise, the transaction is committed
+            # Connection objects can be used as context managers that automatically commit or
+            # rollback transactions.
+            # In the event of an exception, the transaction is rolled back; otherwise, the 
+            # transaction is committed
             # Unlike with open() etc. connection WILL NOT GET CLOSED
             with db_con:
-                # join only inserts the string to join on in-between the elements of the iterable (none at the end)
-                # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ? WHERE url_file = ?
-                if url_type_file:
-                    c.execute("UPDATE Downloads SET {} WHERE url_file = ?".format(",".join(upd_cols)), upd_vals)
-                else:
-                    c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
+                # join only inserts the string to join on in-between the elements of the 
+                # iterable (none at the end)
+                # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ?
+                # WHERE url_file = ?
+                c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
         return row_cont["local_filename"]
 
     def write_selftext_file(self, dl_root):
         """
         Write selftext to a text file if not None, reddit_info must not be None!!
+        Doesnt overwrite already existing selftext file!
 
         :param dl_root: Path of root directory where all downloads are saved to (in username folders)
         :return: None

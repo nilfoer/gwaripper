@@ -3,6 +3,7 @@ import os
 import hashlib
 import sqlite3
 from gwaripper.audio_dl import AudioDownload
+from gwaripper.db import load_or_create_sql_db
 from gwaripper.utils import InfoExtractingError
 
 # mark module with dltest, all classes, funcs, methods get marked with that
@@ -304,13 +305,7 @@ def create_new_test_con():
 
 @pytest.fixture
 def create_db_download():
-    conn = sqlite3.connect(os.path.join(testdir, "testdb.sqlite"))
-    c = conn.cursor()
-    # create table if it doesnt exist
-    c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
-              "description TEXT, local_filename TEXT, title TEXT, url_file TEXT, url TEXT, created_utc REAL, "
-              "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
-              "sgasm_user TEXT, subreddit_name TEXT)")
+    conn, c = load_or_create_sql_db(os.path.join(testdir, "testdb.sqlite"))
 
     val_dict = {
         "date": "TESTDATE",
@@ -375,22 +370,16 @@ def create_db_download():
 
 @pytest.fixture
 def create_db_missing():
-    conn = sqlite3.connect(os.path.join(testdir, "testdb.sqlite"))
-    c = conn.cursor()
-    # create table if it doesnt exist
-    c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
-              "description TEXT, local_filename TEXT, title TEXT, url_file TEXT, url TEXT, created_utc REAL, "
-              "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
-              "sgasm_user TEXT, subreddit_name TEXT)")
+    conn, c = load_or_create_sql_db(os.path.join(testdir, "testdb.sqlite"))
 
     val_dict = {
         "date": "TESTDATE",
         "time": "TESTIME",
         "description": "TESTDESCR",
-        "local_filename": None,
+        "local_filename": "testfn",
         "title": "TESTTITLE",
         "url_file": "testfile",
-        "url": "https://soundsm.net/u/TESTNOTREPL",
+        "url": "https://soundsm.net/u/testu1/test1",
         "sgasm_user": "TESTUSER",
         "created_utc": None,
         "r_post_url": "TESTPOSTURL",
@@ -408,7 +397,7 @@ def create_db_missing():
         "local_filename": "TESTFILENAME",
         "title": "TESTTITLE",
         "url_file": "testfile2",
-        "url": None,
+        "url": "https://soundgasm.net/u/testu2/test2",
         "sgasm_user": "TESTUSER",
         "created_utc": 12345.0,
         "r_post_url": None,
@@ -504,38 +493,40 @@ def test_set_missing_vals(create_db_missing, create_adl_missing):
     con, c = create_db_missing
     adl, adl2, adl3 = create_adl_missing
 
-    start = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None, 'TESTTEDDITUSER', 'TESTUSER', None),
-             (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
+    start = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/testu1/test1', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None, 'TESTTEDDITUSER', 'TESTUSER', None),
+             (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
              (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
 
-    fill_one = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
-                (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
+    fill_one = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/testu1/test1', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
+                (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
                 (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
-    fill_two = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
+    fill_two = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/testu1/test1', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
                 (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
                 (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, None, 'test6a48d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')]
-    fill_three = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/TESTNOTREPL', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
+    fill_three = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/testu1/test1', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
                   (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
                   (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, "testpurl3", 'test6a48d', "testtitle3", 'TESTREDDITURL', "testruser3", 'TESTUSER', 'TESTSUBR')]
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == start
-    # test returned filename
-    assert adl.set_missing_values_db(con, url_type="file") is None
+    # handling of filling in local_filename and url used to be tested here
+    # only present in my db that was used with older versions
+    # removed to have cleaner code
+    adl.set_missing_reddit_db(con)
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_one
-    assert adl2.set_missing_values_db(con, url_type="file") == 'TESTFILENAME'
+    # test returned filename
+    assert adl2.set_missing_reddit_db(con) == 'TESTFILENAME'
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_two
-    assert adl3.set_missing_values_db(con) == 'TESTFILENAME'
+    adl3.set_missing_reddit_db(con)
     c.execute("SELECT * FROM Downloads")
     result = c.fetchall()
     assert result == fill_three
 
 @pytest.mark.parametrize("title, expected", [
-    ("file_dled_but_no_url", None),
     ("[same]_file-name:but\\new_dl", "[same]_file-name_but_new_dl_01.txt"),
     ("[F4M] This, gonna.be good!! Gimme $$", "[F4M] This, gonna.be good__ Gimme __.txt"),
     # TODO also replace äüö?
@@ -545,8 +536,6 @@ def test_gen_fn(title, expected, create_db_missing): # [^\w\-_.,\[\] ]
     adl = AudioDownload("https://soundgasm.net/u/testu1/blabla", "sgasm")
     adl.title = title
     adl.file_type = ".txt"
-    if title == "file_dled_but_no_url":
-        adl.url_to_file = "testfile"
     con, c = create_db_missing
 
     assert adl.gen_filename(con, testdir) == expected

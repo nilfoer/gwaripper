@@ -624,25 +624,22 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     # Return the intersection of two sets as a new set. (i.e. all elements that are in both sets.)
     duplicate = downloaded_urls.intersection(to_filter)
 
-    for dup in duplicate:
-        # when we got reddit info get sgasm info even if this file was already downloaded b4
-        # then write missing info to df and write selftext to file
-        if dl_dict[dup].reddit_info and config.getboolean("Settings", "set_missing_reddit") and ("soundgasm.net/" in dup):
-            logger.info("Filling in missing reddit info: TEMPORARY")
-            adl = dl_dict[dup]
-            rqd.delay_request()  # TORELEASE remove
-            try:
-                adl.call_host_get_file_info()  # TORELEASE remove
-            except urllib.request.HTTPError:
-                # page with file info doesnt exist
-                continue
-            # gen filename manually since calling gen_filename would rename it with _00i since file already exists
-            adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
-            # get filename from db to write selftext
-            adl.filename_local = adl.set_missing_values_db(db_con, url_type="file")  # TORELEASE remove url_type
-            if adl.filename_local is None:  # TORELEASE remove
-                adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
-            adl.write_selftext_file(ROOTDIR)
+    if config.getboolean("Settings", "set_missing_reddit"):
+        for dup in duplicate:
+            # when we got reddit info get sgasm info even if this file was already downloaded b4
+            # then write missing info to df and write selftext to file
+            if dl_dict[dup].reddit_info and ("soundgasm.net/" in dup):
+                logger.info("Filling in missing reddit info: You can disable this"
+                            "in the settings")
+                adl = dl_dict[dup]
+                # get filename from db to write selftext
+                adl.filename_local = adl.set_missing_reddit_db(db_con)
+                # TODO due to my db having been used with older versions there are a lot of
+                # rows where cols local_filename and url are empty -> gen a filename so we can
+                # write the selftext
+                if adl.filename_local is None:  # TORELEASE remove
+                    adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
+                adl.write_selftext_file(ROOTDIR)
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))
         logger.debug("Already downloaded urls:\n{}".format("\n".join(duplicate)))
