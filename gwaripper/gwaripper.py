@@ -351,9 +351,9 @@ def _cl_rip_users(args):
 def _cl_fromtxt(args):
     mypath = os.path.join(ROOTDIR, "_linkcol")
     if args.type == "sg":
-        rip_audio_dls(gen_audiodl_from_sglink(txt_to_list(mypath, args.filename)))
+        rip_audio_dls(gen_audiodl_from_sglink(utils.txt_to_list(mypath, args.filename)))
     else:
-        llist = get_sub_from_reddit_urls(txt_to_list(mypath, args.filename))
+        llist = get_sub_from_reddit_urls(utils.txt_to_list(mypath, args.filename))
         adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
         rip_audio_dls(adl_list)
 
