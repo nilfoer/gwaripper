@@ -8,7 +8,7 @@ import bs4
 
 from .config import config, KEYWORDLIST, TAG1_BUT_NOT_TAG2, reload_config, ROOTDIR
 from .audio_dl import AudioDownload, DELETED_USR_FOLDER
-from .imgur import ImgurAlbum, ImgurFile
+from .imgur import ImgurAlbum, ImgurFile, ImgurImage
 
 logger = logging.getLogger(__name__)
 
@@ -203,10 +203,12 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
                     user_dir = reddit_info['r_user'] or DELETED_USR_FOLDER
                     user_dir = os.path.join(ROOTDIR, f"{user_dir}")
                     # direclty download imgur links
-                    if host == "imgur":
+                    if host == "imgur file":
                         imgur = ImgurFile(None, url, user_dir, prefix=title_sanitized)
-                    else:
+                    elif host == "imgur album":
                         imgur = ImgurAlbum(url, user_dir, name=title_sanitized)
+                    else:
+                        imgur = ImgurImage(url, user_dir, prefix=title_sanitized)
                     imgur.download()
                 else:
                     dl_list.append(AudioDownload(url, host, reddit_info=reddit_info))

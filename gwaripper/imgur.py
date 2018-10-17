@@ -22,7 +22,9 @@ urllib.request.install_opener(opener)
 
 
 class ImgurFile:
-    IMAGE_URL_RE = re.compile(r"(https?://)?i\.imgur\.com/(\w{5,7})(\.\w+)")
+    IMAGE_FILE_URL_RE = re.compile(r"(https?://)?i\.imgur\.com/(\w{5,7})(\.\w+)")
+
+    IMAGE_FILE_URL_FORMAT = "https://i.imgur.com/{image_hash}.{extension}"
 
     def __init__(self, parent, url, dest_path, img_nr=None, prefix=None, postfix=None):
         self.parent = parent
@@ -52,8 +54,33 @@ class ImgurFile:
                 self.downloaded = True
 
 
+class ImgurImage:
+    """Only using this as proxy for ImgurFile when url isnt a direct link to the
+    image file but to the image page"""
+
+    IMAGE_URL_RE = re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(\w{5,7})")
+
+    def __init__(self, url, dest_path, prefix=None, postfix=None):
+        self.image_page = url
+        self.dest_path = dest_path
+        self.prefix = prefix
+        self.postfix = postfix
+        match = self.IMAGE_URL_RE.match(url)
+        self.image_hash = match.group(3)
+        self.api_response = api_req_imgur(f"https://api.imgur.com/3/image/{self.image_hash}")
+
+    def download(self):
+        if self.api_response:
+            url = self.api_response["data"]["link"]
+            f = ImgurFile(None, url, self.dest_path, prefix=self.prefix, postfix=self.postfix)
+            f.download()
+        else:
+            logger.warning("Couldn't download ImgurImage no data recieved!")
+            return
+
+
 class ImgurAlbum:
-    ALBUM_URL_RE = re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(a/|gallery/)?(\w{5,7})")
+    ALBUM_URL_RE = re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(a|gallery)/(\w{5,7})")
 
     def __init__(self, url, dest_path, mp4_always=True, name=None):
         self.album_url = url
@@ -78,7 +105,12 @@ class ImgurAlbum:
         return self.name
 
     def _get_single_images(self):
-        images = self.api_response["data"]["images"]
+        if self.api_response:
+            images = self.api_response["data"]["images"]
+        else:
+            logger.warning("No data recieved when getting images for ImgurAlbum %s",
+                           self.album_hash)
+            return
         img_nr = 1
         for img in images:
             furl = None
@@ -101,7 +133,10 @@ class ImgurAlbum:
 
     def download(self):
         self._get_single_images()
-        logger.info("Downloading imgur Album with %d images to %s", 
+        if not self.images:
+            logger.warning("No images to download!")
+            return
+        logger.info("Downloading imgur Album with %d images to %s",
                     len(self.images), self.dest_path)
         for img in self.images:
             img.download()
@@ -122,4 +157,4 @@ def api_req_imgur(url):
         site.close()
         logger.debug("Getting html done!")
 
-    return json.loads(content)
+    return json.loads(content) if content else None

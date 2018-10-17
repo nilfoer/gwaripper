@@ -629,7 +629,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
             # when we got reddit info get sgasm info even if this file was already downloaded b4
             # then write missing info to df and write selftext to file
             if dl_dict[dup].reddit_info and ("soundgasm.net/" in dup):
-                logger.info("Filling in missing reddit info: You can disable this"
+                logger.info("Filling in missing reddit info: You can disable this "
                             "in the settings")
                 adl = dl_dict[dup]
                 # get filename from db to write selftext

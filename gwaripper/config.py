@@ -3,6 +3,8 @@ import time
 import re
 import configparser
 
+from .imgur import ImgurFile, ImgurAlbum, ImgurImage
+
 MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 # init ConfigParser instance
@@ -51,8 +53,9 @@ SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
                 "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
                 "chirb.it": "chirb.it/",
                 "eraudica": "eraudica.com/",
-                "imgur": re.compile(r"(https?://)?i\.imgur\.com/(\w{5,7})(\.\w+)"),
-                "imgur album": re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(a/|gallery/)?(\w{5,7})")
+                "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
+                "imgur image": ImgurImage.IMAGE_URL_RE,
+                "imgur album": ImgurAlbum.ALBUM_URL_RE
             }
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
