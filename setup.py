@@ -21,7 +21,7 @@ setuptools.setup(
     classifiers=[],
     keywords="script rip gonewildaudio download scraping",
     packages=setuptools.find_packages(exclude=['gwaripper.pyperclip', '*pyperclip', 'tests*']),
-    install_requires=["pyperclip == 1.5.27, == 1.5.25", "praw >=4.5.0, <4.6.0", "bs4 == 4.5.3"],
+    install_requires=["1.5.25<=pyperclip<=1.7.0", "praw==6", "4.5.3<=bs4<=4.6.3"],
     package_data={
         'gwaripper': ['config.ini'],
     },
