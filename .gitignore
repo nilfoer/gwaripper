@@ -38,3 +38,4 @@ imgur_api_creds.txt
 todo.txt
 gwaripper/config*.ini
 dependencies/
+venv/
