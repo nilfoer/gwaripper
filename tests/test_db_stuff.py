@@ -9,7 +9,7 @@ from gwaripper.db import export_csv_from_sql, backup_db
 from gwaripper.config import config, write_config_module
 
 time_str = time.strftime("%Y-%m-%d")
-testdir = os.path.normpath("N:\\_archive\\test\\trans\soundgasmNET\\_dev\\_sgasm-repo\\tests\\test_res")
+testdir = os.path.normpath("tests\\test_res")
 
 @pytest.fixture
 def create_dl_dict():

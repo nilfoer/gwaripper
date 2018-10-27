@@ -39,3 +39,4 @@ todo.txt
 gwaripper/config*.ini
 dependencies/
 venv/
+test_files_bu*

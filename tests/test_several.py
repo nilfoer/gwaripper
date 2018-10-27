@@ -1,5 +1,6 @@
 import pytest
 from gwaripper.gwaripper import rip_usr_links
+from utils import build_test_dir_furl
 
 # urrlib can also get html code from disk with file:///
 # so we can test if all links are found, getting it frome the server could mean they were files added
@@ -34,7 +35,7 @@ expected_man = [
 
 
 def test_rip_usrlinks_off():
-    urls = rip_usr_links("file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_res/DDCherryB_ripuser_soundgasm.net.html")
+    urls = rip_usr_links(build_test_dir_furl("test_res/DDCherryB_ripuser_soundgasm.net.html"))
     # make sure list have same contents, wont change since from file
     assert expected_man == urls
 

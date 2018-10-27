@@ -5,6 +5,7 @@ import sqlite3
 from gwaripper.audio_dl import AudioDownload
 from gwaripper.db import load_or_create_sql_db
 from gwaripper.utils import InfoExtractingError
+from utils import build_test_dir_furl
 
 # mark module with dltest, all classes, funcs, methods get marked with that
 # usable on single classes/funcs.. with @pytest.mark.webtest
@@ -12,7 +13,7 @@ from gwaripper.utils import InfoExtractingError
 # $ pytest -v -m dltest
 # pytestmark = pytest.mark.dltest  MODULE contains more than dltest now use function marker
 
-testdir = os.path.normpath("N:\\_archive\\test\\trans\soundgasmNET\\_dev\\_sgasm-repo\\tests\\test_dl")
+testdir = os.path.normpath("tests\\test_dl")
 
 urls = [
         ("sgasm", "https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-Slut-Mother-RapeBlackmailFacefuckingSlap-my-face-with-that-thick-cockInnocent-to-sluttyRoughDirty-TalkFuck-Me-Into-The-MatressCreampieImpregMultiple-Real-Orgasms"),
@@ -526,6 +527,7 @@ def test_set_missing_vals(create_db_missing, create_adl_missing):
     result = c.fetchall()
     assert result == fill_three
 
+
 @pytest.mark.parametrize("title, expected", [
     ("[same]_file-name:but\\new_dl", "[same]_file-name_but_new_dl_01.txt"),
     ("[F4M] This, gonna.be good!! Gimme $$", "[F4M] This, gonna.be good__ Gimme __.txt"),
@@ -540,12 +542,13 @@ def test_gen_fn(title, expected, create_db_missing): # [^\w\-_.,\[\] ]
 
     assert adl.gen_filename(con, testdir) == expected
 
+
 @pytest.mark.parametrize("host, url, r_inf", [
-    ("sgasm", "file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_dl/u/exc_dl/soundgasm.net.html",
+    ("sgasm", build_test_dir_furl("test_dl/u/exc_dl/soundgasm.net.html"),
      {"r_user": None}),
-    ("chirb.it", "file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_dl/u/exc_dl/Chirbit.html",
+    ("chirb.it", build_test_dir_furl("test_dl/u/exc_dl/Chirbit.html"),
      {"r_user": None}),
-    ("eraudica", "file:///N:/_archive/test/trans/soundgasmNET/_dev/_sgasm-repo/tests/test_dl/u/exc_dl/Eraudica.html",
+    ("eraudica", build_test_dir_furl("test_dl/u/exc_dl/Eraudica.html"),
      {"r_user": None})
 ])
 def test_info_extract_exc(host, url, r_inf):
