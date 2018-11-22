@@ -1,6 +1,6 @@
 import pytest
 from gwaripper.reddit import parse_submissions_for_links, check_submission_banned_tags, get_sub_from_reddit_urls
-from gwaripper.config import SUPPORTED_HOSTS
+from gwaripper.gwaripper import SUPPORTED_HOSTS
 
 @pytest.mark.parametrize("title, keywordlist, tag1_but_not_2, expected", [
     ("[M4F] This should be banned", ["[m4", "[cuck"], None, True),

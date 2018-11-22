@@ -1,9 +1,6 @@
 import os.path
 import time
-import re
 import configparser
-
-from .imgur import ImgurFile, ImgurAlbum, ImgurImage
 
 MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -22,7 +19,10 @@ except FileNotFoundError:
     init_cfg = {
         "Reddit": {
             "user_agent": "gwaRipper",
-            "client_id": "to get a client id visit: reddit.com/wiki/api",
+            "client_id": "to get a client id visit: https://www.reddit.com/prefs/apps",
+        },
+        "Imgur": {
+            "client_id": "to get a client id visit: https://api.imgur.com/oauth2/addclient",
         },
         "Settings": {
             "tag_filter": "[request], [script offer]",
@@ -48,15 +48,6 @@ try:
     ROOTDIR = config["Settings"]["root_path"]
 except KeyError:
     pass
-
-SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
-                "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
-                "chirb.it": "chirb.it/",
-                "eraudica": "eraudica.com/",
-                "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
-                "imgur image": ImgurImage.IMAGE_URL_RE,
-                "imgur album": ImgurAlbum.ALBUM_URL_RE
-            }
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
 # load from config ini, split at comma, strip whitespaces, ensure that they are lowercase with .lower()

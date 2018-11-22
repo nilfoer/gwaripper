@@ -4,15 +4,16 @@ import logging
 import re
 import json
 
+from .config import config
 from .download import download
 
 MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 logger = logging.getLogger(__name__)
 
-client_id = None
-with open(os.path.join(MODULE_PATH, "imgur_cl_id.txt"), "r", encoding="UTF-8") as f:
-    client_id = f.read().strip()
+client_id = config["Imgur"]["client_id"]
+if client_id.startswith("to get a client id"):
+    client_id = None
 
 # set user agent to use with urrlib
 opener = urllib.request.build_opener()
@@ -61,6 +62,9 @@ class ImgurImage:
     IMAGE_URL_RE = re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(\w{5,7})")
 
     def __init__(self, url, dest_path, prefix=None, postfix=None):
+        if not client_id:
+            raise NoAuthenticationError("In order to download imgur images a Client ID "
+                                        "is needed!")
         self.image_page = url
         self.dest_path = dest_path
         self.prefix = prefix
@@ -83,12 +87,18 @@ class ImgurAlbum:
     ALBUM_URL_RE = re.compile(r"(https?://)?(www\.|m\.)?imgur\.com/(a|gallery)/(\w{5,7})")
 
     def __init__(self, url, dest_path, mp4_always=True, name=None):
+        if not client_id:
+            raise NoAuthenticationError("In order to download imgur images a Client ID "
+                                        "is needed!")
         self.album_url = url
         self.album_hash = re.search(self.ALBUM_URL_RE, url).group(4)
         self.dest_path = dest_path
         self.mp4_always = mp4_always
         self.images = []
-        self.api_response = api_req_imgur(f"https://api.imgur.com/3/album/{self.album_hash}")
+        self.api_url = f"https://api.imgur.com/3/album/{self.album_hash}"
+        self.api_response = api_req_imgur(self.api_url)
+        if not self.api_response:
+            raise NoAPIResponseError("No Response recieved", self.api_url)
         self.image_count = self.api_response["data"]["images_count"]
         self.name = None
         if name is None:
@@ -145,6 +155,8 @@ class ImgurAlbum:
 def api_req_imgur(url):
     content = None
     req = urllib.request.Request(url)
+    if not client_id:
+        return None
     # add Authorization header otherwise we just get denied
     req.add_header("Authorization", f"Client-ID {client_id}")
 
@@ -158,3 +170,14 @@ def api_req_imgur(url):
         logger.debug("Getting html done!")
 
     return json.loads(content) if content else None
+
+
+class NoAPIResponseError(Exception):
+    def __init__(self, m, api_url):
+        super().__init__(m)
+        self.api_url = api_url
+
+
+class NoAuthenticationError(Exception):
+    def __init__(self, m):
+        super().__init__(m)

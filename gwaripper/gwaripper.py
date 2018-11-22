@@ -22,11 +22,12 @@ import bs4
 # and does if __name__ == "__main__": main() and run that file as script
 from . import clipwatcher_single
 from . import utils
-from .config import config, write_config_module, SUPPORTED_HOSTS, ROOTDIR
+from .config import config, write_config_module, ROOTDIR
 from .audio_dl import AudioDownload
 from .db import load_or_create_sql_db, export_csv_from_sql, backup_db
 from .reddit import reddit_praw, parse_submissions_for_links, get_sub_from_reddit_urls, \
         parse_subreddit, search_subreddit
+from .imgur import ImgurFile, ImgurAlbum, ImgurImage        
 
 # by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
 # cmd                                               output
@@ -76,6 +77,15 @@ stdohandler.setLevel(logging.INFO)
 formatterstdo = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "%H:%M:%S")
 stdohandler.setFormatter(formatterstdo)
 logger.addHandler(stdohandler)
+
+SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
+                "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
+                "chirb.it": "chirb.it/",
+                "eraudica": "eraudica.com/",
+                "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
+                "imgur image": ImgurImage.IMAGE_URL_RE,
+                "imgur album": ImgurAlbum.ALBUM_URL_RE
+            }
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -238,6 +248,15 @@ def main():
     parser_cfg.add_argument("-smr", "--set-missing-reddit", type=int, choices=(0, 1),
                             help="Should gwaripper get the info of soundgasm.net-files when coming from reddit even "
                                  "thouth they already have been downloaded, so missing info can be fille into the DB")
+    parser_cfg.add_argument("-ci", "--client-id", metavar="client_id", type=str,
+                            help="Set client_id which is needed to use reddit functions")                                 
+    parser_cfg.add_argument("-cs", "--client-secret", metavar="client_secret", type=str,
+                            help=("Set client_secret which is needed to use reddit functions if you"
+                                  " registered for the app type 'script'. Use -cs \"\" to remove "
+                                  "client_secret"))  
+    parser_cfg.add_argument("-ici", "--imgur-client-id", metavar="imgur_client_id", type=str,
+                            help=("Set client_id for imgur which is needed to download imgur "
+                                  "images and albumus (but not direct imgur links)"))                                                                                            
     parser_cfg.set_defaults(func=_cl_config)
 
     # TOCONSIDER implement verbosity with: stdohandler.setLevel(logging.INFO)?
@@ -460,6 +479,33 @@ def _cl_config(args):
         changed = True
         print("Gwaripper will try to fill in missing reddit info of "
               "soundgasm.net files: {}".format(smr_bool))
+    if args.client_id:
+        try:
+            config["Reddit"]["client_id"] = str(args.client_id)
+        except KeyError:
+            config["Reddit"] = {"client_id": str(args.client_id)}
+        changed = True
+        print("Successfully set Client ID")
+    if args.client_secret is not None:
+        if args.client_secret:
+            try:
+                config["Reddit"]["client_secret"] = str(args.client_secret)
+            except KeyError:
+                config["Reddit"] = {"client_secret": str(args.client_secret)}
+        else:
+            try:
+                del config["Reddit"]["client_secret"]
+            except KeyError:
+                pass
+        changed = True
+        print("Successfully set Client Secret")    
+    if args.imgur_client_id:
+        try:
+            config["Imgur"]["client_id"] = str(args.imgur_client_id)
+        except KeyError:
+            config["Imgur"] = {"client_id": str(args.imgur_client_id)}
+        changed = True
+        print("Successfully set Imgur Client ID")          
     if not changed:
         # print current cfg
         for sec in config.sections():

@@ -8,7 +8,7 @@ import bs4
 
 from .config import config, KEYWORDLIST, TAG1_BUT_NOT_TAG2, reload_config, ROOTDIR
 from .audio_dl import AudioDownload, DELETED_USR_FOLDER
-from .imgur import ImgurAlbum, ImgurFile, ImgurImage
+from .imgur import ImgurAlbum, ImgurFile, ImgurImage, NoAPIResponseError, NoAuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,9 @@ logger = logging.getLogger(__name__)
 # installed app -> only client_id needed, but read-only access until we get a refresh_token
 # for this script read-only access is enough
 reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
-                          client_secret=None,
+                          client_secret=config["Reddit"].get("CLIENT_SECRET", None),
                           user_agent=config["Reddit"]["USER_AGENT"])
+reddit_praw.read_only = True                          
 
 
 def parse_subreddit(subreddit, sort, limit, time_filter=None):
@@ -205,10 +206,22 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
                     # direclty download imgur links
                     if host == "imgur file":
                         imgur = ImgurFile(None, url, user_dir, prefix=title_sanitized)
-                    elif host == "imgur album":
-                        imgur = ImgurAlbum(url, user_dir, name=title_sanitized)
                     else:
-                        imgur = ImgurImage(url, user_dir, prefix=title_sanitized)
+                        try:
+                            if host == "imgur album":
+                                imgur = ImgurAlbum(url, user_dir, name=title_sanitized)
+                            elif host == "imgur image":
+                                imgur = ImgurImage(url, user_dir, prefix=title_sanitized)                         
+                            else:
+                                logger.error("Unrecognized imgur type: %s", host)
+                                continue
+                        except NoAuthenticationError as e:
+                            # repr(e) gives you the exception(and the message string); str(e) only gives the message string
+                            logger.error(str(e))
+                            continue
+                        except NoAPIResponseError as e:
+                            logger.warning(str(e))
+                            continue                        
                     imgur.download()
                 else:
                     dl_list.append(AudioDownload(url, host, reddit_info=reddit_info))
