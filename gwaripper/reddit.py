@@ -15,7 +15,12 @@ logger = logging.getLogger(__name__)
 # init Reddit instance
 # installed app -> only client_id needed, but read-only access until we get a refresh_token
 # for this script read-only access is enough
-reddit_praw = praw.Reddit(client_id=config["Reddit"]["CLIENT_ID"],
+reddit_client_id = config["Reddit"]["CLIENT_ID"]
+reddit_client_id = reddit_client_id if not reddit_client_id.startswith("to get a client id") else None
+if reddit_client_id is None:
+    logger.warning("GWARipper needs a reddit client id to access reddit! Set it using"
+                   " gwaripper config -ci CLIENT_ID")
+reddit_praw = praw.Reddit(client_id=reddit_client_id,
                           client_secret=config["Reddit"].get("CLIENT_SECRET", None),
                           user_agent=config["Reddit"]["USER_AGENT"])
 reddit_praw.read_only = True                          

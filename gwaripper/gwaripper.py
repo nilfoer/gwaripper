@@ -6,7 +6,6 @@ import re
 import sys
 import time
 import urllib.request
-from logging.handlers import RotatingFileHandler
 
 import bs4
 
@@ -20,6 +19,7 @@ import bs4
 #           main()
 # and run package with python -m gwaripper or use helper file gwaripper-runner.py that just imports main
 # and does if __name__ == "__main__": main() and run that file as script
+from .logging_setup import configure_logging
 from . import clipwatcher_single
 from . import utils
 from .config import config, write_config_module, ROOTDIR
@@ -54,29 +54,7 @@ logger.setLevel(logging.DEBUG)
 
 # only log to file if ROOTDIR is set up so we dont clutter the cwd or the module dir
 if ROOTDIR:
-    # create a file handler
-    # handler = TimedRotatingFileHandler("gwaripper.log", "D", encoding="UTF-8", backupCount=10)
-    # max 1MB and keep 5 files
-    handler = RotatingFileHandler(os.path.join(ROOTDIR, "gwaripper.log"),
-                                  maxBytes=1048576, backupCount=5, encoding="UTF-8")
-    handler.setLevel(logging.DEBUG)
-
-    # create a logging format
-    formatter = logging.Formatter("%(asctime)-15s - %(name)-9s - %(levelname)-6s - %(message)s")
-    # '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    handler.setFormatter(formatter)
-
-    # add the handlers to the logger
-    logger.addHandler(handler)
-
-# create streamhandler
-stdohandler = logging.StreamHandler(sys.stdout)
-stdohandler.setLevel(logging.INFO)
-
-# create a logging format
-formatterstdo = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "%H:%M:%S")
-stdohandler.setFormatter(formatterstdo)
-logger.addHandler(stdohandler)
+    configure_logging(os.path.join(ROOTDIR, "gwaripper.log"))
 
 SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
                 "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
