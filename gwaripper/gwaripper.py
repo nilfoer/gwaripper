@@ -299,7 +299,7 @@ def main():
         if args.test:
             # test code
             llist = get_sub_from_reddit_urls(["https://old.reddit.com/r/gonewildaudio/comments/8wqzen/f4m_overwatch_joip_come_for_her_stroke_that_cock/"])
-            a = reddit_praw.submission(id="9dg1bk")
+            a = reddit_praw().submission(id="9dg1bk")
             adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
             rip_audio_dls(adl_list)
         else:
@@ -327,7 +327,7 @@ def _cl_redditor(args):
     limit = args.limit
     time_filter = args.timefilter
     for usr in args.names:
-        redditor = reddit_praw.redditor(usr)
+        redditor = reddit_praw().redditor(usr)
         if args.sort == "hot":
             sublist = redditor.submissions.hot(limit=limit)
         elif args.sort == "top":

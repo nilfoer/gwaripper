@@ -6,6 +6,7 @@ import json
 
 from .config import config
 from .download import download
+from .exceptions import NoAPIResponseError, NoAuthenticationError
 
 MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
 
@@ -170,14 +171,3 @@ def api_req_imgur(url):
         logger.debug("Getting html done!")
 
     return json.loads(content) if content else None
-
-
-class NoAPIResponseError(Exception):
-    def __init__(self, m, api_url):
-        super().__init__(m)
-        self.api_url = api_url
-
-
-class NoAuthenticationError(Exception):
-    def __init__(self, m):
-        super().__init__(m)

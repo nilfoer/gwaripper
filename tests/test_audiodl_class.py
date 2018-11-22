@@ -4,7 +4,7 @@ import hashlib
 import sqlite3
 from gwaripper.audio_dl import AudioDownload
 from gwaripper.db import load_or_create_sql_db
-from gwaripper.utils import InfoExtractingError
+from gwaripper.exceptions import InfoExtractingError
 from utils import build_test_dir_furl
 
 # mark module with dltest, all classes, funcs, methods get marked with that

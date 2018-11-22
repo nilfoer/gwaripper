@@ -8,22 +8,26 @@ import bs4
 
 from .config import config, KEYWORDLIST, TAG1_BUT_NOT_TAG2, reload_config, ROOTDIR
 from .audio_dl import AudioDownload, DELETED_USR_FOLDER
-from .imgur import ImgurAlbum, ImgurFile, ImgurImage, NoAPIResponseError, NoAuthenticationError
+from .imgur import ImgurAlbum, ImgurFile, ImgurImage
+from .exceptions import NoAPIResponseError, NoAuthenticationError
 
 logger = logging.getLogger(__name__)
 
-# init Reddit instance
 # installed app -> only client_id needed, but read-only access until we get a refresh_token
 # for this script read-only access is enough
 reddit_client_id = config["Reddit"]["CLIENT_ID"]
-reddit_client_id = reddit_client_id if not reddit_client_id.startswith("to get a client id") else None
-if reddit_client_id is None:
-    logger.warning("GWARipper needs a reddit client id to access reddit! Set it using"
-                   " gwaripper config -ci CLIENT_ID")
-reddit_praw = praw.Reddit(client_id=reddit_client_id,
-                          client_secret=config["Reddit"].get("CLIENT_SECRET", None),
-                          user_agent=config["Reddit"]["USER_AGENT"])
-reddit_praw.read_only = True                          
+reddit_client_id = reddit_client_id if reddit_client_id and not reddit_client_id.startswith("to get a client id") else None
+
+  
+def reddit_praw():    
+    if reddit_client_id is None:
+        raise NoAuthenticationError("Client ID is required to access reddit: https://www.reddit.com/prefs/apps/")
+               
+    reddit = praw.Reddit(client_id=reddit_client_id,
+                         client_secret=config["Reddit"].get("CLIENT_SECRET", None),
+                         user_agent=config["Reddit"]["USER_AGENT"])
+    reddit.read_only = True
+    return reddit                      
 
 
 def parse_subreddit(subreddit, sort, limit, time_filter=None):
@@ -36,7 +40,7 @@ def parse_subreddit(subreddit, sort, limit, time_filter=None):
     :param time_filter: Time period to use, can be all, day, hour, month, week, year
     :return: praw.ListingGenerator
     """
-    sub = reddit_praw.subreddit(subreddit)
+    sub = reddit_praw().subreddit(subreddit)
     if sort == "hot":
         return redirect_crossposts(sub.hot(limit=limit))
     elif sort == "top":
@@ -60,7 +64,7 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     # sort: relevance, hot, top, new, comments (default: relevance).
     # syntax: cloudsearch, lucene, plain (default: lucene) in praw4 cloud
     # time_filter – Can be one of: all, day, hour, month, week, year (default: all)
-    subreddit = reddit_praw.subreddit(subname)
+    subreddit = reddit_praw().subreddit(subname)
 
     found_sub_list = []
     # Returns a generator for submissions that match the search query
@@ -296,7 +300,7 @@ def get_sub_from_reddit_urls(urllist):
     urls_unique = set(urllist)
     sublist = []
     for url in urls_unique:
-        sub = reddit_praw.submission(url=url)
+        sub = reddit_praw().submission(url=url)
         sublist.append(sub)
     sublist = redirect_crossposts(sublist)
     return sublist
@@ -317,7 +321,7 @@ def redirect_crossposts(subs):
             logger.info("Reddit submission with id %s is a crosspost, using the redirected "
                         "submission with id %s instead!", sub.id, sub.crosspost_parent)
             assert len(sub.crosspost_parent_list) == 1
-            sub_redirect = reddit_praw.submission(id=sub.crosspost_parent.split("_")[1])
+            sub_redirect = reddit_praw().submission(id=sub.crosspost_parent.split("_")[1])
             result.append(sub_redirect)
         else:
             result.append(sub)

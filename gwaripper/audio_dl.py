@@ -10,7 +10,7 @@ from urllib.parse import quote as url_quote
 
 import bs4
 
-from . import utils
+from .exceptions import InfoExtractingError
 
 logger = logging.getLogger(__name__)
 
@@ -93,9 +93,9 @@ class AudioDownload:  # TODO docstr
                 self.file_type = self.url_to_file.split("?")[0][-4:]
                 self.title = self.reddit_info["title"]
             except (AttributeError, IndexError, TypeError):
-                raise utils.InfoExtractingError("Error occured while extracting chirbit info - site structure "
-                                                "probably changed! See if there are updates available!",
-                                                self.page_url, html)
+                raise InfoExtractingError("Error occured while extracting chirbit info - site structure "
+                                           "probably changed! See if there are updates available!",
+                                          self.page_url, html)
 
     def _set_eraudica_info(self):
         # strip("/gwa") doesnt strip the exact string "/gwa" from the end but instead it strips all the
@@ -137,9 +137,9 @@ class AudioDownload:  # TODO docstr
                 self.title = self.reddit_info["title"]
                 self.file_type = fname[-4:]
             except (IndexError, AttributeError):
-                raise utils.InfoExtractingError("Error occured while extracting eraudica info - site structure "
-                                                "probably changed! See if there are updates available!",
-                                                self.page_url, html)  # from None -> get rid of Exceptions b4 this one
+                raise InfoExtractingError("Error occured while extracting eraudica info - site structure "
+                                          "probably changed! See if there are updates available!",
+                                          self.page_url, html)  # from None -> get rid of Exceptions b4 this one
 
     def _set_sgasm_info(self):
         logger.info("Getting soundgasm info of: %s" % self.page_url)
@@ -163,9 +163,9 @@ class AudioDownload:  # TODO docstr
                 self.title = title
                 self.descr = soup.select_one("div.jp-description > p").text
             except AttributeError:
-                raise utils.InfoExtractingError("Error occured while extracting sgasm info - site structure "
-                                                "probably changed! See if there are updates available!",
-                                                self.page_url, html)
+                raise InfoExtractingError("Error occured while extracting sgasm info - site structure "
+                                          "probably changed! See if there are updates available!",
+                                          self.page_url, html)
 
     # From Hitchhiker's Guide to Python:
     # When a function grows in complexity it is not uncommon to use multiple return statements inside the function’s
