@@ -65,7 +65,8 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     found_sub_list = []
     # Returns a generator for submissions that match the search query
     matching_sub_gen = subreddit.search(searchstring, sort=sort, limit=limit,
-                                        syntax="lucene", **kwargs)
+                                        syntax="lucene", params={'include_over_18': 'on'},
+                                        **kwargs)
     # iterate over generator and append found submissions to list
     for sub in matching_sub_gen:
         found_sub_list.append(sub)
@@ -134,7 +135,7 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
         # get new lastdltime from cfg
         reload_config()
         lastdltime = config.getfloat("Time", "last_dl_time", fallback=0.0)
-    elif type(time_check) is float:
+    elif isinstance(time_check, (int, float)):
         lastdltime = time_check
     else:
         lastdltime = None
@@ -205,7 +206,7 @@ def parse_submissions_for_links(sublist, supported_hosts, time_check=False):
             # create AudioDownload from found_urls
             for host, url in found_urls:
                 if "imgur" in host:
-                    title_sanitized = re.sub("[^\w\-_.,\[\] ]", "_", submission.title[0:100])
+                    title_sanitized = re.sub(r"[^\w\-_.,\[\] ]", "_", submission.title[0:100])
                     user_dir = reddit_info['r_user'] or DELETED_USR_FOLDER
                     user_dir = os.path.join(ROOTDIR, f"{user_dir}")
                     # direclty download imgur links

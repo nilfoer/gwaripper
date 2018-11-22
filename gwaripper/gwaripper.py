@@ -183,7 +183,7 @@ def main():
     # optional arguments -> option string is present but not followed by a command-line argument -> value from const
     parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=False, type=float,
                             help="Only download submission if creation time is newer than provided utc"
-                                 "timestamp or last_dl_time from config if none provided (default: False)")
+                                 "timestamp or last_dl_time from config if none provided (default: None)")
     parser_sub.set_defaults(func=_cl_sub)
 
     parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
@@ -201,11 +201,12 @@ def main():
     # always of the same kind
     # metavar=['SUBREDDIT', 'SEARCHSTRING'])
     parser_se.add_argument("subname", help="Name of subreddit")
-    parser_se.add_argument("sstr", help="'searchstring' in QUOTES: https://www.reddit.com/wiki/search",
+    parser_se.add_argument("sstr", help=("Searchstring in lucene syntax (see: "
+                                         "https://www.reddit.com/wiki/search)"),
                            metavar="searchstring")
     parser_se.add_argument("limit", type=int, help="How many posts to download")
-    parser_se.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method (default: top)",
-                           default="top")
+    parser_se.add_argument("-s", "--sort", choices=("relevance", "hot", "top", "new", "comments"),
+                           help="Reddit post sorting method (default: relevance)", default="relevance")
     parser_se.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
                            choices=("all", "day", "hour", "month", "week", "year"))
     parser_se.set_defaults(func=_cl_search)
@@ -333,11 +334,16 @@ def _cl_redditor(args):
             sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
         else:  # just get new posts if input doesnt match hot or top
             sublist = redditor.submissions.new(limit=limit)
+        # to get actual subs sinc praw uses lazy loading
+        sublist = list(sublist)
+        if not sublist:
+            logger.info("No subs recieved from user %s with time_filter %s", usr, args.timefilter)
+            return
         adl_list = parse_submissions_for_links(sublist, SUPPORTED_HOSTS)
         if adl_list:
             rip_audio_dls(adl_list)
         else:
-            logger.warning("No subs recieved from user {} with time_filter {}".format(usr, args.timefilter))
+            logger.info("No audios found for user %s with time_filter %s", usr, args.timefilter)
 
 
 def _cl_rip_users(args):
@@ -375,10 +381,12 @@ def _cl_sub(args):
     time_filter = args.timefilter
     if sort == "top":
         adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter),
-                                               SUPPORTED_HOSTS)
+                                               SUPPORTED_HOSTS, time_check=args.only_newer)
     else:
+        # new and hot dont use time_filter
         adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), SUPPORTED_HOSTS,
                                                time_check=args.only_newer)
+    if args.only_newer:
         write_last_dltime()
     rip_audio_dls(adl_list)
 
