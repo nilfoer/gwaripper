@@ -32,11 +32,9 @@ tests/test_dl/
 tests/test_res/
 .*/
 *.swp
-gwaripper/config.ini
-gwaripper/imgur_cl_id.txt
-imgur_api_creds.txt
+gwaripper/gwaripper_config*.ini
 todo.txt
-gwaripper/config*.ini
 dependencies/
 venv/
 test_files_bu*
+secrets/

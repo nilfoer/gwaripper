@@ -8,8 +8,6 @@ from .config import config
 from .download import download
 from .exceptions import NoAPIResponseError, NoAuthenticationError
 
-MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
-
 logger = logging.getLogger(__name__)
 
 client_id = config["Imgur"]["client_id"]

@@ -2,7 +2,7 @@
 exclude .gitignore
 include README.txt
 include setup.cfg
-include gwaripper/config.ini
+exclude gwaripper/config*.ini
 prune .git
 prune build
 prune dist

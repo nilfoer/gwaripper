@@ -29,16 +29,6 @@ from .reddit import reddit_praw, parse_submissions_for_links, get_sub_from_reddi
         parse_subreddit, search_subreddit
 from .imgur import ImgurFile, ImgurAlbum, ImgurImage        
 
-# by neuro: http://stackoverflow.com/questions/4934806/how-can-i-find-scripts-directory-with-python
-# cmd                                               output
-# os.getcwd()                       N:\_archive\...\_sgasm-repo\dist (where my cmd was, cwd)
-# os.path.dirname(os.path.realpath(sys.argv[0]))    C:\python3.5\Scripts (loc of gwaripper.exe) -> script path
-# os.path.dirname(os.path.realpath(__file__))       c:\python3.5\lib\site-packages\gwaripper (loc of module)
-# but __file__ is not always defined
-MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
-
-DLTXT_ENTRY_END = "\t" + ("___" * 30) + "\n\n\n"
-
 rqd = utils.RequestDelayer(0.25, 0.75)
 
 # configure logging

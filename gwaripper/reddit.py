@@ -21,8 +21,7 @@ reddit_client_id = reddit_client_id if reddit_client_id and not reddit_client_id
   
 def reddit_praw():    
     if reddit_client_id is None:
-        raise NoAuthenticationError("Client ID is required to access reddit: https://www.reddit.com/prefs/apps/")
-               
+        raise NoAuthenticationError("Client ID is required to access reddit: https://www.reddit.com/prefs/apps/")          
     reddit = praw.Reddit(client_id=reddit_client_id,
                          client_secret=config["Reddit"].get("CLIENT_SECRET", None),
                          user_agent=config["Reddit"]["USER_AGENT"])

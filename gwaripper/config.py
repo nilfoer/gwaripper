@@ -12,10 +12,12 @@ config = configparser.ConfigParser()
 # configparser.read() takes a list of paths if one fails it will be ignored
 # An application which requires initial values to be loaded from a file should load the required file or files
 # using read_file() before calling read() for any optional files
-try:
-    with open(os.path.join(MODULE_PATH, "config.ini"), "r") as cfg:
-        config.read_file(cfg)
-except FileNotFoundError:
+config.read([
+    "gwaripper_config.ini", os.path.expanduser("~/.gwaripper_config.ini"),
+    os.path.join(MODULE_PATH, "gwaripper_config.ini")
+], encoding="UTF-8")
+# no sections -> empty config
+if not config.sections():
     init_cfg = {
         "Reddit": {
             "user_agent": "gwaRipper",
@@ -37,9 +39,6 @@ except FileNotFoundError:
     }
     # read initial config from dict (sections are keys with dicts as values with options as keys..)
     config.read_dict(init_cfg)
-    # write cfg file
-    with open(os.path.join(MODULE_PATH, "config.ini"), "w") as cfg:
-        config.write(cfg)
 
 
 # path to dir where the soundfiles will be stored in subfolders
@@ -76,6 +75,7 @@ def write_config_module():
 
     :return: None
     """
-    with open(os.path.join(MODULE_PATH, "config.ini"), "w") as config_file:
+    os.makedirs(MODULE_PATH, exist_ok=True)
+    with open(os.path.join(MODULE_PATH, "gwaripper_config.ini"), "w", encoding="UTF-8") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)

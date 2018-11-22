@@ -1,33 +1,34 @@
 import setuptools
 
-long_descr = """Script to rip audio files mainly from soundgasm.net but it also supports chirb.it and free
-eraudica.com audios. Able to download single links or entire users. Links can also be obtained by scanning subs in
-the subreddits gonewilaudio and pillowtalkaudio. Going through reddit is preferred since more post information can
-be saved, if a selftext is present it will be saved alongside the audio file. Searching reddit and downloading
-submissions by redditors is also supported. Saves the info of downloaded files as sqlite database but
-also exports it to csv to be human-readable.
+with open("README.md", "r", encoding="UTF-8") as fh:
+    long_description = fh.read()
 
-Call script with -h to show info of available commands!"""
 
 setuptools.setup(
     name="GWARipper",
-    version="0.1.0a1",
+    version="0.2",
     description="A script that rips and downloads audio files from the gonewildaudio subreddit.",
-    long_description=long_descr,
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url="",
     author="nilfoer",
     author_email="",
-    license="",
-    classifiers=[],
-    keywords="script rip gonewildaudio download scraping",
-    packages=setuptools.find_packages(exclude=['gwaripper.pyperclip', '*pyperclip', 'tests*']),
-    install_requires=["1.5.25<=pyperclip<=1.7.0", "praw==6", "4.5.3<=bs4<=4.6.3"],
-    package_data={
-        'gwaripper': ['config.ini'],
-    },
+    license="MIT",
+    keywords="script reddit gonewildaudio download scraping",
+    packages=setuptools.find_packages(exclude=['tests*']),
+    python_requires='>=3.6',
+    install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw==6", "beautifulsoup4>=4.5.3,<=4.6.3"],
+    tests_require=['pytest'],
+    # non-python data that should be included in the pkg
+    # mapping from package name to a list of relative path names that should be copied into the package
+    package_data={},
     entry_points={
         'console_scripts': [
             # linking the executable gwaripper here to running the python function main in the gwaripper module
             'gwaripper=gwaripper.gwaripper:main',
-        ]}
+        ]},
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Operating System :: OS Independent",
+    ],
 )
