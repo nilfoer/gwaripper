@@ -299,8 +299,8 @@ def main():
     elif not ROOTDIR and args.subcmd == "config":
         _cl_config(args)
     else:
-        print("root_path not set in config.ini, use command config -p 'C:\\absolute\\path' to specify where the"
-              "files will be downloaded to")
+        print("root_path not set in gwaripper_config.ini, use command config -p 'C:\\absolute\\path'"
+              " to specify where the files will be downloaded to")
 
 
 def _cl_link(args):
@@ -660,7 +660,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
                 # rows where cols local_filename and url are empty -> gen a filename so we can
                 # write the selftext
                 if adl.filename_local is None:  # TORELEASE remove
-                    adl.filename_local = re.sub("[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
+                    adl.filename_local = re.sub(r"[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
                 adl.write_selftext_file(ROOTDIR)
     if duplicate:
         logger.info("{} files were already downloaded!".format(len(duplicate)))

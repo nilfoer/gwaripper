@@ -49,5 +49,5 @@ def configure_logging(log_path):
         
     logging.config.dictConfig(logging_conf)
 
-# log to dir of package but set actual logging loc to working dir when called as script (done in main)
+# only log to console when no root dir set yet
 configure_logging(None)

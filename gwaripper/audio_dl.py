@@ -119,7 +119,10 @@ class AudioDownload:  # TODO docstr
             try:
                 # selects script tags beneath div with id main and div class post
                 # returns list of bs4.element.Tag -> access text with .text
-                scripts = soup.select("div#main div.post script")[1].text
+                # get script on eraudica that contains ALL dl information (fn etc. theres also
+                # one with just the file url
+                scripts = [s.text for s in soup.select("div#main div.post script")
+                           if "playerServerURLAuthorityIncludingScheme" in s.text][0]
                 # vars that are needed to gen dl link are included in script tag
                 # access group of RE (part in '()') with .group(index)
                 # Group 0 is always present; it’s the whole RE

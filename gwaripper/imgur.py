@@ -22,7 +22,7 @@ urllib.request.install_opener(opener)
 
 
 class ImgurFile:
-    IMAGE_FILE_URL_RE = re.compile(r"(https?://)?i\.imgur\.com/(\w{5,7})(\.\w+)")
+    IMAGE_FILE_URL_RE = re.compile(r"(https?://)?i\.imgur\.com/(\w{5,7})\.(\w+)")
 
     IMAGE_FILE_URL_FORMAT = "https://i.imgur.com/{image_hash}.{extension}"
 
@@ -30,7 +30,7 @@ class ImgurFile:
         self.parent = parent
         self.dest_path = dest_path
         self.file_url = url
-        self.orig_fn, self.ext = url.rsplit("/", 1)[1].rsplit(".", 1)
+        _, self.orig_fn, self.ext = self.IMAGE_FILE_URL_RE.match(url).groups()
         self.img_nr = img_nr
         self.filename = self._build_name(prefix, postfix)
         self.downloaded = False
