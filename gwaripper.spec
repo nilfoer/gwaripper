@@ -3,7 +3,9 @@
 block_cipher = None
 
 a = Analysis(['gwaripper-runner.py'],
-             pathex=['N:\\coding\\_sgasm-repo'],
+             # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows   
+             pathex=['N:\\coding\\_sgasm-repo',
+                     '..\\UniversalCRTDLLs\\x86', '..\\UniversalCRTDLLs\\x64'],
              binaries=[],
              # praw needs praw.ini (which it looks for in 3 places appdata etc. including cwd)
              # -> include praw.ini in root folder

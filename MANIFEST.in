@@ -1,7 +1,6 @@
 # MANIFEST.in
 exclude .gitignore
-include README.txt
-include setup.cfg
+include README.md
 exclude gwaripper/config*.ini
 prune .git
 prune build
