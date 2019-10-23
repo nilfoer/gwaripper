@@ -43,12 +43,12 @@ logger = logging.getLogger("gwaripper")
 logger.setLevel(logging.DEBUG)
 
 # only log to file if ROOTDIR is set up so we dont clutter the cwd or the module dir
-if ROOTDIR:
+if ROOTDIR and os.path.isdir(ROOTDIR):
     configure_logging(os.path.join(ROOTDIR, "gwaripper.log"))
 
 SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
                 "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
-                "chirb.it": "chirb.it/",
+                # doesnt rly host files anymore "chirb.it": "chirb.it/",
                 "eraudica": "eraudica.com/",
                 "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
                 "imgur image": ImgurImage.IMAGE_URL_RE,
@@ -538,7 +538,10 @@ def rip_audio_dls(dl_list):
     # create dict that has page urls as keys and AudioDownload instances as values
     # dict comrehension: d = {key: value for (key, value) in iterable}
     # duplicate keys -> last key value pair is in dict, values of the same key that came before arent
-    dl_dict = {audio.page_url: audio for audio in dl_list}
+    # @Hack removing /gwa appendix since we only add the url without /gwa to the db
+    # so we might have duplicate downloads otherwise
+    dl_dict = {audio.page_url[:-4] if audio.page_url.endswith("/gwa") else audio.page_url:
+               audio for audio in dl_list}
 
     # returns list of new downloads, dl_dict still holds all of them
     new_dls = filter_alrdy_downloaded(urls_dled, dl_dict, conn)

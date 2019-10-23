@@ -4,6 +4,12 @@ import os
 
 TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 
+# hacky way to setup root_path in config so we have a valid place to log to
+from gwaripper.config import config, ROOTDIR
+from gwaripper.logging_setup import configure_logging
+config["Settings"]["root_path"] = TESTS_DIR
+configure_logging(os.path.join(TESTS_DIR, "gwaripper.log"))
+
 
 def build_test_dir_furl(rel_path):
     conv_slashes = TESTS_DIR.replace("\\", "/")

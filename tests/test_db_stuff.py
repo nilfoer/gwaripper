@@ -3,6 +3,7 @@ import sqlite3
 import os
 import csv
 import time
+import utils  # needed for valid logging dir hack
 from gwaripper.audio_dl import AudioDownload, check_direct_url_for_dl
 from gwaripper.gwaripper import filter_alrdy_downloaded
 from gwaripper.db import export_csv_from_sql, backup_db

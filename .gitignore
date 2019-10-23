@@ -30,6 +30,7 @@ build/
 .cache/
 tests/test_dl/
 tests/test_res/
+tests/_linkcol
 .*/
 *.swp
 gwaripper/gwaripper_config*.ini

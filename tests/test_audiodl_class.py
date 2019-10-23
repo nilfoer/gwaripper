@@ -17,7 +17,6 @@ testdir = os.path.normpath("tests\\test_dl")
 
 urls = [
         ("sgasm", "https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-Slut-Mother-RapeBlackmailFacefuckingSlap-my-face-with-that-thick-cockInnocent-to-sluttyRoughDirty-TalkFuck-Me-Into-The-MatressCreampieImpregMultiple-Real-Orgasms"),
-        ("chirb.it", "http://chirb.it/s80vbt"),
         ("eraudica", "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp"),
     ]
 
@@ -30,16 +29,6 @@ r_infos = [{
         "id": "id_sgasm",
         "permalink": "permalink_sgasm",
         "subreddit": "subreddit_sgasm"
-    },
-    {
-        "r_user": "test_user",
-        "title": "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
-        "selftext": "Testing selftext",
-        "created_utc": "created_utc_chirbit",
-        "r_post_url": "r_post_url_chirbit",
-        "id": "id_chirbit",
-        "permalink": "permalink_chirbit",
-        "subreddit": "subreddit_chirbit"
     },
     {
         "r_user": "test_user",
@@ -85,22 +74,9 @@ def gen_audiodl_failed():
     os.rmdir(os.path.join(testdir, "miyu213"))
 
 
-# @pytest.fixture
-# def gen_audiodl_chirbit():
-#     a = AudioDownload(urls[1][1], urls[1][0], r_infos[1])
-
-#     yield a, testdir
-
-#     if a.filename_local:  # coming from download test not just info test
-#         os.remove(os.path.join(testdir, a.name_usr, a.filename_local))
-#         os.remove(os.path.join(testdir, a.name_usr, a.filename_local + ".txt"))
-#         os.rmdir(os.path.join(testdir, a.name_usr))
-#     del a
-
-
 @pytest.fixture
 def gen_audiodl_eraudica(tmpdir):
-    a = AudioDownload(urls[2][1], urls[2][0], r_infos[2])
+    a = AudioDownload(urls[1][1], urls[1][0], r_infos[1])
 
     yield a, testdir
 
@@ -173,53 +149,6 @@ def test_soundgasm(gen_audiodl_sgasm, create_db_download, create_new_test_con):
                                                                                a.reddit_info["selftext"])
 
 
-# chirbit doesnt seem to be working anymore even in my browser
-# def test_chirbit_info(gen_audiodl_chirbit):
-#     a, dir = gen_audiodl_chirbit
-#     a.call_host_get_file_info()
-#     # only compare till aws id other part of url changes every time
-#     assert a.url_to_file.split("&",1)[0] == "http://audio.chirbit.com/Pip_1446845763.mp3?AWSAccessKeyId=AKIAIHJD7T6NGQMM2VCA"
-#     assert a.file_type == ".mp3"
-
-
-# @pytest.mark.dltest
-# def test_chirbit(gen_audiodl_chirbit, create_db_download, create_new_test_con):
-#     con, c = create_db_download
-#     fn = "[FF4M] It_s not what you think, brother_ [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with _u_alwaysslightlysleepy]"[0:110] + ".mp3"
-#     a, dir = gen_audiodl_chirbit
-#     a.call_host_get_file_info()
-
-#     a.download(con, 0, 0, dir)
-#     assert a.filename_local == fn
-#     assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
-#     assert md5(os.path.join(dir, a.name_usr, fn)) == "e8ff0e482d1837cd8be723c64b3ae32f"
-#     assert a.downloaded is True
-
-#     new_con, new_c = create_new_test_con  # testing if visible from other con
-#     id = c.lastrowid
-#     expected = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile',
-#                  'https://hostdomain.com/sub/TESTURL/', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None,
-#                  'TESTTEDDITUSER', 'TESTUSER', None), (
-#                     2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', None, 12345.0,
-#                     None,
-#                     'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
-#                 # not testing date time, using whatever the attributes are
-#                 (3, a.date, a.time, None, fn,
-#                  "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
-#                  a.url_to_file, urls[1][1],
-#                  "created_utc_chirbit", "r_post_url_chirbit", "id_chirbit",
-#                  "[FF4M] It's not what you think, brother! [Age] [rape] [incest] [virginity] [impregnation] [vibrator] [reluctance] [lesbian sisters] [together with /u/alwaysslightlysleepy]",
-#                  "permalink_chirbit", 'test_user', 'test_user', "subreddit_chirbit")
-#                 ]
-#     new_c.execute("SELECT * FROM Downloads")
-#     assert new_c.fetchall() == expected
-
-#     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
-#         assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
-#                                                                                a.reddit_info["permalink"],
-#                                                                                a.reddit_info["selftext"])
-
-
 def test_eraudica_info(gen_audiodl_eraudica):
     a, dir = gen_audiodl_eraudica
     a.call_host_get_file_info()
@@ -253,7 +182,7 @@ def test_eraudica(gen_audiodl_eraudica, create_db_download, create_new_test_con)
                 # not testing date time, using whatever the attributes are
                 (3, a.date, a.time, None, fn,
                  "[F4M] Nurse Eve and Dr. Eve Double Team TLC! [twins][binaural][medical][sucking and licking and fucking and cumming!][face sitting][riding your cock] [repost]",
-                 "https://data1.eraudica.com/fd/71c71873-7356-4cee-bdfa-de1d0a652c3c_/Twins%20-%20Nurse%20Eve%20and%20Dr.%20Eve.mp3", urls[2][1],
+                 "https://data1.eraudica.com/fd/71c71873-7356-4cee-bdfa-de1d0a652c3c_/Twins%20-%20Nurse%20Eve%20and%20Dr.%20Eve.mp3", urls[1][1],
                  "created_utc_eraudica", "r_post_url_eraudica", "id_eraudica",
                  "[F4M] Nurse Eve and Dr. Eve Double Team TLC! [twins][binaural][medical][sucking and licking and fucking and cumming!][face sitting][riding your cock] [repost]",
                  "permalink_eraudica", 'test_user', 'test_user', "subreddit_eraudica")
@@ -289,7 +218,6 @@ def test_download_failed(gen_audiodl_failed, create_db_download, create_new_test
     assert new_c.fetchall() == expected
 
     assert not os.path.isfile(os.path.join(dir, a.name_usr, fn + ".txt"))
-
 
 
 @pytest.fixture
@@ -546,10 +474,8 @@ def test_gen_fn(title, expected, create_db_missing): # [^\w\-_.,\[\] ]
 @pytest.mark.parametrize("host, url, r_inf", [
     ("sgasm", build_test_dir_furl("test_dl/u/exc_dl/soundgasm.net.html"),
      {"r_user": None}),
-    ("chirb.it", build_test_dir_furl("test_dl/u/exc_dl/Chirbit.html"),
-     {"r_user": None}),
     ("eraudica", build_test_dir_furl("test_dl/u/exc_dl/Eraudica.html"),
-     {"r_user": None})
+     {"r_user": None, "title": "Twin TLC...Dr. Eve and Nurse Eve"})
 ])
 def test_info_extract_exc(host, url, r_inf):
     a = AudioDownload(url, host, r_inf)
