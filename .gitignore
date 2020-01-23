@@ -39,3 +39,4 @@ dependencies/
 venv/
 test_files_bu*
 secrets/
+gwaripper_test.ipynb
