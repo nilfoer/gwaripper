@@ -1,0 +1,125 @@
+<!doctype html>
+{% if book %}
+<title>{{ book.title if book.title else 'New Book' + ' - GWARipper' }}</title>
+{% else %}
+<title>GWARipper</title>
+{% endif %}
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='fontawesome-all.min.css') }}">
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='bootstrap.min.css') }}">
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
+<script type="text/javascript" src="{{ url_for('static', filename='jquery-3.3.1.min.js') }}"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script type="text/javascript">
+    // configure jquery ajax requests to send csrf_token as X-CSRF-Token header on POST request
+    // taken from flask-wtf
+
+    // The settings specified here will affect all calls to $.ajax or Ajax-based derivatives
+    // such as $.get(). This can cause undesirable behavior since other callers (for example,
+    // plugins) may be expecting the normal default settings. For that reason we strongly
+    // recommend against using this API. Instead, set the options explicitly in the call
+    // or define a simple plugin to do so.
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                xhr.setRequestHeader("X-CSRFToken", $('meta[name="csrf-token"]').attr('content'));
+            }
+        }
+    });
+</script>
+<nav class="navbar navbar-expand mdb-nav dark-color">
+    <a class="mdb-navbar-brand" href="/">GWARipper</a>
+
+    <form id="searchForm" action="{{ url_for('main.search_entries') }}" method=get class="search-form">
+        <i class="fa fa-search" id="search-icon"></i>
+        <input type="text" id="searchBar" class="searchbar" name ="q" placeholder="Search" value="{{ search_field }}"/>
+        <input type="hidden" value="{{ order_col if order_col else 'id' }}" name="sort_col" />
+        <input type="hidden" value="{{ asc_desc if asc_desc else 'DESC' }}" name="order" />
+    </form>
+    <ul class="navbar-nav mr-auto" id="search-options">
+        <li class="nav-item" style="position:relative"> {# relative so dropdown is at correct loc #}
+        <a class="nav-link" href="#" role="button" id="sortDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><i class="fas fa-sort"></i></a>
+        
+        <div class="dropdown-menu" id="sortColOptions" aria-labelledby="sortDropdown">
+            <a class="dropdown-item {{ 'active' if order_col == 'id' else '' }}" data-value="id" href="#">Id</a>
+            <a class="dropdown-item {{ 'active' if order_col == 'rating' else '' }}" data-value="rating" href="#">Rating</a>
+      </div>
+      </li>
+      <li class="nav-item">
+          <a class="nav-link" href="#" id="orderLnk" data-value="{{ asc_desc if asc_desc else 'DESC' }}"><i class="fas fa-sort-amount-{{ 'down' if asc_desc == 'DESC' else 'up' }}"></i></a>
+      </li>
+      <li class="nav-item">
+          <a class="nav-link" href="#" id="refreshSearch"><i class="fas fa-sync-alt"></i></a>
+      </li>
+    </ul>
+    <div class="mdb-nav-right">
+        {% if "authenticated" in session %}
+        <a href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i></a>
+        {% else %}
+        <a href="{{ url_for('auth.login') }}"><i class="fas fa-sign-in-alt"></i></a>
+        {% endif %}
+    </div>
+    <script>
+    $(document).ready(function() {
+        function setSortCol(e) {
+            let new_sort_col = $(e.currentTarget).data("value");
+            $("input[name=sort_col]").val(new_sort_col);
+
+            $("#sortColOptions .dropdown-item.active").removeClass("active");
+            $(e.currentTarget).addClass("active");
+            
+            e.preventDefault();
+            return
+        }
+    
+        $("#sortColOptions .dropdown-item").click(setSortCol);
+
+        function changeOrder(e) {
+            let order_div = $(e.currentTarget);
+            let current_order = order_div.data("value");
+            console.log(order_div, current_order);
+            let new_order = "";
+            if (current_order === "DESC") {
+                new_order = "ASC";
+                order_div.html('<i class="fas fa-sort-amount-up"></i>');
+            } else {
+                new_order = "DESC";
+                order_div.html('<i class="fas fa-sort-amount-down"></i>');
+            }
+            $("input[name=order]").val(new_order);
+            // data-value update isnt shown in chrome debugger but it works correctly
+            console.log("after:", new_order, order_div);
+            order_div.data("value", new_order);
+
+            e.preventDefault();
+            return
+        }
+
+        $("#orderLnk").click(changeOrder);
+        /* An arrow function expression has a shorter syntax compared to
+        function expressions and lexically binds the this value (does not bind
+        its own this, arguments, super, or new.target). Arrow functions are
+        always anonymous. */
+        $("#refreshSearch").click((e) => {
+            e.preventDefault();
+            $("#searchForm").submit()
+            return
+        });
+    });
+    </script>
+</nav>
+<div class=page>
+	{% with messages = get_flashed_messages(with_categories=true) %}
+		{% if messages %}
+		    <div class="flash dark-color">
+			<ul class="flash-messages">
+			{% for category, message in messages %}
+			<li class="{{ category }}">{{ message }}</li>
+			{% endfor %}
+			</ul>
+		    </div>
+		{% endif %}
+	{% endwith %}
+{% block body %}{% endblock %}
+</div>

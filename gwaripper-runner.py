@@ -3,7 +3,18 @@
 """Convenience wrapper for running gwaripper directly from source tree.
     from: https://gehrcke.de/2014/02/distributing-a-python-command-line-application/"""
 
+import sys
+
 from gwaripper.gwaripper import main
+from webGUI import create_app
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 1 and sys.argv[1].lower() == "webgui":
+        # use terminal environment vars to set debug etc.
+        # windows: set FLASK_ENV=development -> enables debug or set FLASK_DEBUG=1
+        app = create_app()
+        # use threaded=False so we can leverage MangaDB's id_map
+        # also makes sense since we only want to support one user (at least with write access)
+        app.run(threaded=False, port=7568)
+    else:
+        main()

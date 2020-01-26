@@ -1,0 +1,128 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row">
+<div class="col-md-12">
+<div id="searchResult">
+{% if entries %}
+    {% for entry in entries %}
+    <div class="entry-container{# ' odd' if loop.index0 % 2 != 0 else '' #}">
+        <div class="entry-container-top">
+            <div class="entry-container-title">
+                {{ entry.reddit_title or entry.title }}
+            </div>
+            <div class="entry-container-artist">
+                {{ entry.reddit_user or entry.sgasm_user }}
+            </div>
+            <div class="entry-container-date">
+                {{ entry.date }}
+            </div>
+        </div>
+        <div class="entry-expand" style="display:none;">
+            <div class="entry-expand-inner">
+                <div class="description">
+                    Audio page title: {{ entry.title }}<br/>
+                    Local filename: {{ entry.local_filename if entry.local_filename else 'Missing!' }}<br/><br/>
+                    {% if entry.description %}
+                        Description:<br/>
+                        {% for ln in entry.description.splitlines() %}
+                            {{ ln }}<br/>
+                        {% endfor %}
+                    {% else %}
+                        Description: Missing!<br/>
+                    {% endif %}
+                </div>
+                <div class="entry-expand-actions">
+                    Source:<br/>
+                    <div class="entry-expand-icons">
+                        {% set r_url = entry.r_post_url if entry.r_post_url and ('reddit' in entry.r_post_url) else entry.reddit_url %}
+                        <a href={{ r_url if r_url else '#' }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
+                        <a href={{ entry.url if entry.url else '#' }} title="Visit audio source page!"><i class="fas fa-globe-americas"></i></a>
+                    </div>
+                    <br/>
+                    Embed:<br/>
+                    <div class="entry-expand-icons">
+                        <a href="#" class="load-audio-embed" title="Embed audio file!"><i class="fas fa-file-audio"></i></a>
+                        <a href="#" class="load-selftxt-embed" title="Embed local selftext file!"><i class="fas fa-file-alt"></i></a>
+                    </div>
+                </div>
+                <div class="entry-expand-actions">
+                    Artist:<br/>
+                    <div class="entry-expand-icons">
+                        <a href={{ 'https://reddit.com/user/' + entry.reddit_user if entry.reddit_user else '#' }} class="artist" title="Visit reddit user!"><i class="fab fa-reddit-square"></i></a>
+                    </div>
+                </div>
+                <br/>
+                <div class="embeds-container">
+                    {# we don't have local_filename for older entries, so check for it's presence #}
+                    <span class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename) if entry.local_filename else '' }} data-online-src={{ entry.url_file }}>
+                    </span>
+                    <span class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div> {# entry-container #}
+    {% endfor %}
+{% else %}
+    <em>Unbelievable. No entries here so far</em>
+{% endif %}
+    <script>
+        // emebd local audio file or online src
+		$(document).ready(function() {
+			$('.entry-container-top').click(function(event) {
+                $(event.currentTarget).parent().find(".entry-expand").toggle();
+            });
+			$('.load-audio-embed').click(function(event) {
+                let embed_container = $(event.currentTarget).parents(".entry-expand").find(".audio-embed");
+                let embed_url = embed_container.data("localSrc");
+                $.get(embed_url)
+                    .done(function() { 
+                        // exists code 
+                        embed_container.html("<audio controls src='" + embed_url + "'></audio>");
+                    }).fail(function() { 
+                        // not exists code
+                        embed_container.html("Local file couldn&#39;t be found, online source was embedded instead:<br/><audio controls src='" + embed_container.data("onlineSrc") + "'></audio>");
+                    })
+                event.preventDefault();
+			});
+			$('.load-selftxt-embed').click(function(event) {
+                let embed_container = $(event.currentTarget).parents(".entry-expand").find(".selftxt-embed");
+                let embed_url = embed_container.data("localSrc");
+                $.get(embed_url)
+                    .done(function() { 
+                        // exists code 
+                        embed_container.html("<iframe id='txtEmbed' width=100% height=300px src='" + embed_url + "' scrolling='yes' frameborder='0'></iframe>");
+                        // need to split </scr ipt> tag otherwise browser parses it as end of script
+                    }).fail(function() { 
+                        // not exists code
+                        // add HTMLString to end of element
+                        embed_container.html("<br/>Error: Local selftext file couldn&#39;t be found!<br/>");
+                    })
+                event.preventDefault();
+			});
+		});
+    </script>
+</div>
+</div>
+</div>
+
+{% if last %}
+{% if search_field %}
+	{% if more.next %}
+    <a href="{{ url_for('main.search_entries', after=last, q=search_field,
+	sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-next">›</div></a>
+	{% endif %}
+	{% if more.prev %}
+    <a href="{{ url_for('main.search_entries', before=first, q=search_field,
+	sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-prev">‹</div></a>
+	{% endif %}
+{% else %}
+	{% if more.next %}
+    <a href="{{ url_for('main.show_entries', after=last, sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-next">›</div></a>
+	{% endif %}
+	{% if more.prev %}
+    <a href="{{ url_for('main.show_entries', before=first, sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-prev">‹</div></a>
+	{% endif %}
+{% endif %}
+{% endif %}
+{% endblock %}

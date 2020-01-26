@@ -40,3 +40,6 @@ venv/
 test_files_bu*
 secrets/
 gwaripper_test.ipynb
+webGUI/static/webfonts
+webGUI/static/*
+!webGUI/static/style.css

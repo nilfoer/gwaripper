@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+{% block body %}
+<script type="text/javascript" src="{{ url_for('static', filename='selectize.min.js') }}"></script>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='selectize.bootstrap3.css') }}" />
+<form id=register_user action="{{ url_for('auth.register') }}" method=post>
+    {{ csrf_token_field() }}
+    <h3>Register</h3>
+    <label>Username: <input type=text class="selectize-input" name=username /></label><br/>
+    <label>Password: <input type=password class="selectize-input" name=password /></label>
+    <div class=row-no-margin><button type=submit class="button green-color
+    button-leftmost">Submit</button></div>
+</form>
+{% endblock %}

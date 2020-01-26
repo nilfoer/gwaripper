@@ -1,0 +1,523 @@
+/* open-sans-regular - latin */
+@font-face {
+  font-family: 'Open Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: local('Open Sans Regular'), local('OpenSans-Regular'),
+       url('../static/webfonts/open-sans-v15-latin-regular.woff2') format('woff2'), /* Chrome 26+, Opera 23+, Firefox 39+ */
+       url('..static/webfonts/open-sans-v15-latin-regular.woff') format('woff'); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+}
+body {
+    background-color: #191919;
+    font-family: 'Open Sans',sans-serif!important;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    text-align: left;
+}
+a, h1, h2       { color: #fff; underline: none }
+a               { text-decoration: none; }
+a:hover, a:visited, a:focus {
+    text-decoration: none;
+    color: #fff;
+}
+h1, h2          { font-family: 'Open Sans',sans-serif; margin: 0; }
+h1              { border-bottom: 2px solid #eee; margin-bottom: 1em;}
+h2              { font-size: 1.2em; }
+h3              { color: #22a7f0; }
+hr { 
+    display: block;
+    margin-top: .5rem;
+    margin-bottom: .5rem;
+    margin-left: auto;
+    margin-right: auto;
+    border-style: inset;
+    border-width: 1px;
+    border-color: #fff;
+}
+.purple-color{background-color: #a233a5 !important} /* #a72aaa */
+.pink-color{background-color: #ff2871!important; /* #ff1a73!important; */ /* #ff468e !important */ }
+.blue-color { background-color: #1498ff!important; /* #44a6f2!important; */ }
+.dark-color { background-color: #2d2d2d!important; }
+.red-color { background-color: #e42323!important; /* #f34c4c!important; */ }
+.green-color { background-color: #31c131!important; }
+.purple-fcolor{ color: #a233a5 !important; }
+.pink-fcolor{color: #ff2871!important; /* #ff1a73!important; */ /* #ff468e !important */ }
+.dgrey-fcolor { color: #2d2d2d!important; }
+.blue-fcolor { color: #1498ff!important; /* #44a6f2!important; */ }
+.red-fcolor { color: #e42323!important; /* #f34c4c!important; */ }
+.green-fcolor { color: #31c131!important; }
+.img-responsive {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+.mdb-navbar-brand {
+    font-size: 1.75rem;
+    font-weight: bold;
+}
+.mdb-nav {
+    display: flex;
+    flex-flow: row nowrap;
+    align-items: center;
+    z-index: 999; /* so pos fixed next/prev dont overlap */
+}
+.mdb-nav-right {
+    display: flex;
+    flex-flow: row nowrap;
+    flex-grow: 1;
+    justify-content: flex-end;
+}
+.page           { margin: 1rem auto 2rem auto; width: 100%;
+                  padding: 0.8em}
+@media only screen and (min-width: 1200px) {
+    /* use full screen width on smaller devices but center on 3/4 for desktop */
+    .page {
+        width: 75%;
+    }
+}
+.page-nav {
+    position: fixed;
+    top: 0%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 0.3em;
+    font-size: 4em;
+    font-weight: bold;
+}
+.page-nav:hover {
+    color: #f34c4c;
+    background-color: #7575750f;
+}
+#page-next {
+    right: 0;
+}
+#page-prev {
+    left: 0;
+}
+.button-leftmost {
+    margin-left: 0;
+}
+.list-tag {
+	position: relative;
+	padding-right: 17px!important;
+}
+.list-tag-border {
+	border: #22a7f0 1px solid;
+}
+.list-tag a {
+	text-decoration: none!important;
+	color: #fff!important;
+}
+input[type="checkbox"].mdb-checkboxes {
+	/* input[type=checkbox], input[type=radio] { */
+	vertical-align: middle;
+	position: relative;
+	bottom: 1px;
+	margin: 0 3px 0 0;
+}
+ul.flash-messages li label {
+	font-weight: normal;
+	margin-bottom: 0px;
+}
+.mdb-list-remove {
+    display: inline-block;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    vertical-align: middle;
+    right: 0;
+    text-align: center;
+    padding: 3px;
+    padding-top: 4px;
+    font-size: 0.8em;
+    border-left: 1px solid #22a7f0;
+}
+/* Dropdown Button */
+.mdb-drop-btn {
+    	cursor: pointer;
+}
+
+/* Dropdown button on hover & focus */
+.mdb-drop-btn:hover, .mdb-drop-btn:focus {
+    background-color: #4c4c4c;
+}
+
+/* The container <div> - needed to position the dropdown content */
+.mdb-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* Dropdown Content (Hidden by Default) */
+.mdb-dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: #333;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+    /* limit height and add scrollbar with overflow auto */
+    overflow: auto;
+    max-height: 250px;
+}
+
+/* Links inside the dropdown */
+.mdb-dropdown-content a {
+    color: #fff;
+    padding: 3px 12px;
+    text-decoration: none;
+    display: block;
+}
+
+/* Change color of dropdown links on hover */
+.mdb-dropdown-content a:hover {background-color: #4c4c4c}
+/* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
+.mdb-show {display:block;}
+
+.kw-headline hr {
+    display: block;
+    margin-top: 0;
+    margin-bottom: .5rem;
+    margin-left: auto;
+    margin-right: auto;
+    border-style: inset;
+    border-width: 1px;
+    border-color: #fff;
+}
+.kw-headline span {
+    margin-left: .25rem;
+    font-size: 1.25rem;
+    letter-spacing: 1.5px;
+}
+.entry-container-top {
+    display: grid;
+    grid-template-columns: auto 120px 100px;
+    justify-items: stretch; /* Aligns grid items along the inline (row) axis */
+    align-items: stretch; /* Aligns grid items along the block (column) axis */
+    justify-content: stretch; /* align the whole grid inside the container */
+    align-content: start; /* vertically align the whole grid inside the container */
+    /* padding: .5em .5em; */
+    width: 100%;
+}
+.entry-container {
+    background-color: #1f1f1f;
+    border: 1px solid #fff;
+    margin: .5em 0;
+}
+.entry-container-title {
+    margin: .5em .5em .5em .5em;
+}
+.entry-container-artist {
+    margin: .5em 0 .5em .5em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    justify-self: start; /* horizontal */
+    align-self: center; /* vert */
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    background-color: #44a6f2;
+    padding: 3px 6px;
+    max-width: 100%;
+}
+.entry-container-date {
+    margin: .5em;
+    justify-self: end; /* horizontal */
+    align-self: center; /* vert */
+}
+.entry-container.odd {
+    background-color: #3c3c3c;
+}
+.entry-expand {
+    border-top: 1px solid #fff;
+}
+.entry-expand .description {
+    padding: .5em;
+}
+.entry-expand-inner {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 110px 110px;
+}
+.entry-expand-actions {
+    padding: .5em .5em;
+    grid-row: 1 / span 2;
+}
+.entry-expand-icons {
+    font-size: 1.5em;
+}
+.entry-expand .embeds-container {
+    padding: .5em;
+    grid-column: 1 / span 1;
+    grid-row: 2 / span 1;
+}
+.artist {
+    color: #44a6f2;
+}
+.audio-embed audio {
+    margin: .5em 0;
+}
+ul.flash-messages {
+   list-style: none;
+   margin-left: 0;
+   padding-left: 1em;
+}
+li.info {
+    font-size: 1em;
+    font-family: 'Open Sans',sans-serif;
+    color: #fff;
+}
+li.title {
+    font-size: 18px;
+    font-family: 'Open Sans',sans-serif;
+    color: #fff;
+    margin-bottom: 0.5em 0;
+}
+li.warning {
+	font-size: 20px;
+	color: #f67764; /* #f67764 */
+}
+ul.flash-messages a.underline {
+    text-decoration: underline;
+}
+
+.star-inactive {
+    color: #fff !important;
+}
+.star-active {
+    color: #22a7f0 !important;
+}
+#MyRating i:hover {
+    color: #c00 !important;
+}
+
+    
+/* change placeholder for inputs */
+::placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
+    color: #bdbdbd;
+    opacity: 1; /* Firefox */
+}
+
+:-ms-input-placeholder { /* Internet Explorer 10-11 */
+    color: #bdbdbd;
+}
+
+::-ms-input-placeholder { /* Microsoft Edge */
+    color: #bdbdbd;
+}
+/* Change autocomplete styles in WebKit */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+    /* either set color to same color as our input or use transition delay so it never gets set
+     * unless the user spends 9999s on the page
+    -webkit-transition-delay: 9999s;
+    transition-delay: 9999s; */
+    -webkit-text-fill-color: #fff;
+    -webkit-box-shadow: 0 0 0px 30px #1a1a1a inset;
+}
+.search-container {
+    width: 50%;
+}
+.search-form {
+    display: flex;
+    margin-left: .5rem;
+    flex-grow: 3;
+}
+#search-icon { /* set to inline-block and same (line)height as input field to align icon and input */
+    display: inline-block !important;
+    min-width: 15px;
+    min-height: 15px;
+    line-height: 32px;
+    position: relative;
+    left: 25px;
+}
+.searchbar {
+    background-color: #191919;
+    border: none;
+    width: 100%;
+    padding-left: 30px;
+    color: #fff;
+}
+#refreshSearch {
+    /* since sync-alt icon is bigger on same font-size scale it down */
+    font-size: 14px;
+    padding-top: .6rem;
+}
+#search-options {
+    margin-left: .4rem;
+    flex-grow: 2;
+}
+.mdb-nav .navbar-nav .nav-link {
+    padding-right: .5rem;
+    padding-left: 0;
+}
+/* re-style bootstrap dropdown */
+.dropdown-item.active, .dropdown-item:active {
+    color: #fff;
+    text-decoration: none;
+    background-color: #4c4c4c;
+}
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: .25rem 1.5rem;
+    clear: both;
+    font-weight: 400;
+    color: #fff;
+    text-align: inherit;
+    white-space: nowrap;
+    background-color: transparent;
+    border: 0;
+}
+.dropdown-item:focus, .dropdown-item:hover {
+    color: #fff;
+    text-decoration: none;
+    background-color: #4c4c4c;
+}
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    display: none;
+    float: left;
+    min-width: 10rem;
+    padding: .5rem 0;
+    margin: .125rem 0 0;
+    font-size: 1rem;
+    color: #fff;
+    text-align: left;
+    list-style: none;
+    background-color: #2d2d2d;
+    background-clip: padding-box;
+    border: 1px solid rgba(0,0,0,.15);
+    border-radius: .25rem;
+}
+
+/* to make all book-grid-items the same size i could either specify a fixed size(min/width/height)
+ * in px or % for the items -> no resizing not rly responsive or i could use bootstraps cols and add
+ * col-md-2 col-sm-4 col-xs-6 no-padding to book-grid-item's div classes
+ * or i could use grid and alter the nr of cols it hast based on viewport size
+ * with grid-template-columns: auto auto .. nr_of_cols*auto (auto for auto size) */
+#searchResult {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    /* display: grid; */
+    /* /1* grid-template-columns: repeat(2, auto); *1/ */
+    /* grid-template-rows: auto; */
+    /* justify-items: stretch; /1* Aligns grid items along the inline (row) axis *1/ */
+    /* align-items: stretch; /1* Aligns grid items along the block (column) axis *1/ */
+    /* justify-content: center; /1* align the whole grid inside the container *1/ */
+    /* align-content: start; /1* vertically align the whole grid inside the container *1/ */
+}
+.no-padding {
+    padding-left: 0!important;
+    padding-right: 0!important;
+}
+.no-margin {
+    margin-left: 0!important;
+    margin-right: 0!important;
+}
+/* src: https://www.cssportal.com/css-ribbon-generator/ */
+.ribbon.fav {
+  position: absolute;
+  right: -5px; top: -5px;
+  z-index: 1;
+  overflow: hidden;
+  width: 75px; height: 75px;
+  text-align: right;
+}
+.ribbon.fav span {
+  font-size: 10px;
+  font-weight: bold;
+  color: #FFF;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 20px;
+  transform: rotate(45deg);
+  -webkit-transform: rotate(45deg);
+  width: 100px;
+  display: block;
+  background: #79A70A;
+  background: linear-gradient(#FF468E 0%, #BA3368 100%);
+  box-shadow: 0 3px 10px -5px rgba(0, 0, 0, 1);
+  position: absolute;
+  top: 19px; right: -21px;
+}
+.ribbon.fav span::before {
+  content: "";
+  position: absolute; left: 0px; top: 100%;
+  z-index: -1;
+  border-left: 3px solid #BA3368;
+  border-right: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  border-top: 3px solid #BA3368;
+}
+.ribbon.fav span::after {
+  content: "";
+  position: absolute; right: 0px; top: 100%;
+  z-index: -1;
+  border-left: 3px solid transparent;
+  border-right: 3px solid #BA3368;
+  border-bottom: 3px solid transparent;
+  border-top: 3px solid #BA3368;
+}
+.button {
+    background-color: #2d2d2d;
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff!important;
+    text-decoration: none!important;
+    padding: 15px;
+    cursor: pointer;
+    border: none;
+}
+.button-stack {
+    margin: 2px;
+    display: inline-block;
+}
+.inline-block {
+    display: inline-block;
+}
+input[type=submit] {
+    border: none;
+    color: #fff;
+    /* 1rem == 16px */
+    font-size: .9rem;
+    background-color: #2d2d2d;
+}
+.tag {
+    margin-right: 2px;
+    display: inline-block;
+    background-color: #2d2d2d;
+    color: #fff !important;
+    font-family: 'Open Sans',sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 10px;
+    text-decoration: none !important;
+    padding: 5px;
+    height: 20px;
+    margin-bottom: 5px;
+}
+.entries img    { width: 100% }
+.entries li h2  { margin-left: -1em; }
+.metanav        { text-align: right; font-size: 0.8em; padding: 0.3em;
+                  margin-bottom: 1em; background: #1a1a1a; }
+.flash          { background: #22a7f0; padding: 0.5em;
+                  margin: 0.5em 0 2em  auto; 
+                  color: #fff !important;
+                  font-family: 'Open Sans',sans-serif;
+                  font-size: 14px; }
+.error          { background: #f0d6d6; padding: 0.5em; }
