@@ -36,6 +36,34 @@ Successfully set Imgur Client ID
 ```
 Now you're ready to use GWARipper!
 
+### WebGUI
+For using the WebGUI run the script like so:
+```
+gwaripper-runner.py webgui
+```
+Then you can access the WebGUI by going to `localhost:7568` in your web browser. The first time you access the WebGUI you have to create a user by clicking on **Register**. Then just type in the username and password combination you chose and press **Login**.
+
+#### Searching
+The search bar matches the input string against the entries reddit post title and the title on the host page by default (so it if there's a string without a preceeding keyword the title is searched).
+
+Additionally you can search the following fields:
+
+| Field                                 | search keyword |
+| -------------------------------------:| --------------:|
+| (Title)                               | title          |
+| Host page (e.g. soundgasm) user       | sgasm\_user    |
+| Reddit user name                      | reddit\_user   |
+| Reddit id                             | reddit\_id     |
+| Reddit url                            | reddit\_url    |
+| Host page URL                         | url            |
+
+All of these fields can be combined in one search. When the search string for a specific keyword contains spaces, it needs to be escaped with quotes. To search for multiple items that have to be present, separate them with semicolons. Everything but the title requires exact (case-sensitive as well) matches!
+
+E.g. this string searches for audios by sassmastah77 with [GFE] in the title
+```
+sgasm_user:sassmastah77 [GFE]
+```
+
 ### Examples
 #### Example: Watch for copied reddit urls and parse them from downloadable files
 Run script from command line like so:
