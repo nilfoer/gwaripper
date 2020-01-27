@@ -28,9 +28,11 @@ def load_or_create_sql_db(filename):
     c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
               "description TEXT, local_filename TEXT, title TEXT, url_file TEXT, url TEXT, created_utc REAL, "
               "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
-              "sgasm_user TEXT, subreddit_name TEXT)")
+              "sgasm_user TEXT, subreddit_name TEXT, rating REAL, favorite INTEGER)")
     # commit changes
     conn.commit()
+    
+    conn.row_factory = sqlite3.Row
 
     return conn, c
 
@@ -155,6 +157,36 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=None):
         logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
                     "in {: .2f} Tagen!".format(config.getfloat("Settings", "db_bu_freq",
                                                                fallback=5), next_bu / 24 / 60 / 60))
+
+
+def set_favorite_entry(db_con, _id, fav_intbool):
+    with db_con:
+        db_con.execute("UPDATE Downloads SET favorite = ? WHERE id = ?", (fav_intbool, _id))
+
+
+def remove_entry(db_con, _id, root_dir):
+    c = db_con.execute("SELECT * FROM Downloads WHERE id = ?", (_id,))
+    row = RowData(c.fetchone())
+    local_filename = row.local_filename
+    if not local_filename:
+        logger.error("Couldn't remove entry due to a missing local_filename entry! Title: %s",
+                     row.title)
+        return False
+    try:
+        os.remove(os.path.join(root_dir, row.sgasm_user, local_filename))
+    except FileNotFoundError:
+        logger.warning("Didn't find audio file: %s",
+                       os.path.join(root_dir, row.sgasm_user, local_filename))
+    try:
+        os.remove(os.path.join(root_dir, row.sgasm_user, local_filename + ".txt"))
+    except FileNotFoundError:
+        logger.warning("Didn't find selftext file: %s",
+                       os.path.join(root_dir, row.sgasm_user, local_filename + ".txt"))
+
+    with db_con:
+        c.execute("DELETE FROM Downloads WHERE id = ?", (_id,))
+
+    return True
 
 
 # helper class to turn attribute-based acces into dict-like acces on sqlite3.Row

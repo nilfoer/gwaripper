@@ -176,6 +176,10 @@ ul.flash-messages li label {
 .mdb-dropdown-content a:hover {background-color: #4c4c4c}
 /* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
 .mdb-show {display:block;}
+.mdb-none {display:none;}
+
+.mdb-hidden {visibility:hidden;}
+.mdb-visible {visibility:visible;}
 
 .kw-headline hr {
     display: block;
@@ -194,13 +198,14 @@ ul.flash-messages li label {
 }
 .entry-container-top {
     display: grid;
-    grid-template-columns: auto 120px 100px;
+    grid-template-columns: auto 150px 120px 100px;
     justify-items: stretch; /* Aligns grid items along the inline (row) axis */
     align-items: stretch; /* Aligns grid items along the block (column) axis */
     justify-content: stretch; /* align the whole grid inside the container */
     align-content: start; /* vertically align the whole grid inside the container */
     /* padding: .5em .5em; */
     width: 100%;
+    position: relative; /* for ribbon absolute positioning */
 }
 .entry-container {
     background-color: #1f1f1f;
@@ -209,6 +214,11 @@ ul.flash-messages li label {
 }
 .entry-container-title {
     margin: .5em .5em .5em .5em;
+}
+.entry-container-rating {
+    margin: .5em .5em .5em .5em;
+    justify-self: center;
+    align-self: center;
 }
 .entry-container-artist {
     margin: .5em 0 .5em .5em;
@@ -221,7 +231,7 @@ ul.flash-messages li label {
     font-weight: 600;
     background-color: #44a6f2;
     padding: 3px 6px;
-    max-width: 100%;
+    max-width: 95%; /* need space for ellipsis? */
 }
 .entry-container-date {
     margin: .5em;
@@ -260,6 +270,48 @@ ul.flash-messages li label {
 .audio-embed audio {
     margin: .5em 0;
 }
+
+/* half-star rating start */
+/* adapted from https://codepen.io/redlabor/pen/wyiAH */
+/* Ratings widget */
+.rate {
+    display: inline-block;
+    border: 0;
+}
+/* Order correctly by floating highest to the right */
+.rate > a {
+    float: right;
+}
+/* The star of the show */
+.rate > a:before {
+    display: inline-block;
+    font-size: 1.1rem;
+    padding: .3rem .1rem;
+    margin: 0;
+    cursor: pointer;
+    font-family:"Font Awesome 5 Free";
+    content: "\f005 "; /* full star */
+}
+/* Half star trick */
+/* drops half star directly on the full start by using absolute positioning */
+.rate .half:before {
+    content: "\f089 "; /* half star no outline */
+    position: absolute;
+    padding-right: 0;
+}
+/* Click + hover color */
+/* p1 ~ p2 -> sibling selector, selects all p2 following(after p1) children of the same parent
+ * p1 + p2 -> adjacent selector, selects siblind that directly follows p1 */
+.rate a.active ~ a, /* color current and previous stars on checked */
+.rate a:hover, .rate a:hover ~ a { color: #73B100;  } /* color previous stars on hover */
+
+/* Hover highlights */
+input:checked + label:hover, input:checked ~ label:hover, /* highlight current and previous stars */
+input:checked ~ label:hover ~ label, /* highlight previous selected stars for new rating */
+label:hover ~ input:checked ~ label /* highlight previous selected stars */ { color: #A6E72D;  } 
+
+/* half-star rating end */
+
 ul.flash-messages {
    list-style: none;
    margin-left: 0;
@@ -430,32 +482,35 @@ select:-webkit-autofill:focus {
     margin-right: 0!important;
 }
 /* src: https://www.cssportal.com/css-ribbon-generator/ */
-.ribbon.fav {
-  position: absolute;
-  right: -5px; top: -5px;
-  z-index: 1;
-  overflow: hidden;
-  width: 75px; height: 75px;
-  text-align: right;
+.ribbon {
+    position: absolute;
+    right: -5px;
+    top: -5px;
+    z-index: 1;
+    overflow: hidden;
+    width: 55px;
+    height: 65px;
+    text-align: right;
 }
-.ribbon.fav span {
-  font-size: 10px;
-  font-weight: bold;
-  color: #FFF;
-  text-transform: uppercase;
-  text-align: center;
-  line-height: 20px;
-  transform: rotate(45deg);
-  -webkit-transform: rotate(45deg);
-  width: 100px;
-  display: block;
-  background: #79A70A;
-  background: linear-gradient(#FF468E 0%, #BA3368 100%);
-  box-shadow: 0 3px 10px -5px rgba(0, 0, 0, 1);
-  position: absolute;
-  top: 19px; right: -21px;
+.ribbon span {
+    font-size: 10px;
+    font-weight: bold;
+    color: #FFF;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 15px;
+    transform: rotate(45deg);
+    -webkit-transform: rotate(45deg);
+    width: 65px;
+    display: block;
+    background: #79A70A;
+    background: linear-gradient(#FF468E 0%, #BA3368 100%);
+    box-shadow: 0 3px 10px -5px rgba(0, 0, 0, 1);
+    position: absolute;
+    top: 10px;
+    right: -15px;
 }
-.ribbon.fav span::before {
+.ribbon span::before {
   content: "";
   position: absolute; left: 0px; top: 100%;
   z-index: -1;
@@ -464,7 +519,7 @@ select:-webkit-autofill:focus {
   border-bottom: 3px solid transparent;
   border-top: 3px solid #BA3368;
 }
-.ribbon.fav span::after {
+.ribbon span::after {
   content: "";
   position: absolute; right: 0px; top: 100%;
   z-index: -1;

@@ -11,7 +11,10 @@ from flask import (
         jsonify, send_file, session, g
 )
 
-from gwaripper.db import get_x_entries, validate_order_by_str, search
+from gwaripper.db import (
+        get_x_entries, validate_order_by_str, search,
+        remove_entry as gwa_remove_entry, set_favorite_entry
+)
 
 from .gwaripper_db import get_db
 
@@ -181,11 +184,14 @@ def search_entries():
 #             })
 
 
-# @main_bp.route("/book/<int:book_id>/set/fav/<int:fav_intbool>")
-# def set_favorite(book_id, fav_intbool):
-#     Book.set_favorite_id(get_mdb(), book_id, fav_intbool)
-#     return redirect(
-#         url_for("main.show_info", book_id=book_id))
+@main_bp.route("/entry/set-favorite", methods=("POST",))
+def set_favorite():
+    entry_id = request.form.get("entryId", None, type=int)
+    fav_intbool = request.form.get("favIntbool", None, type=int)
+    if entry_id is None or fav_intbool is None:
+        return jsonify({"error": "Missing entry id or fav value from data!"})
+    set_favorite_entry(get_db(), entry_id, fav_intbool)
+    return jsonify({})
 
 
 # @main_bp.route("/book/<int:book_id>/rate/<float:rating>")
@@ -195,9 +201,10 @@ def search_entries():
 #         url_for("main.show_info", book_id=book_id))
 
 
-# @main_bp.route('/book/<int:book_id>/remove', methods=("POST",))
-# def remove_book(book_id):
-#     book = get_mdb().get_book(book_id)
-#     book.remove()
-#     flash(f"Book '{book.title}' was removed from MangaDB!")
-#     return redirect(url_for('main.show_entries'))
+@main_bp.route('/entry/remove', methods=("POST",))
+def remove_entry():
+    entry_id = request.form.get("entryId", None, type=int)
+    if entry_id is None:
+        return jsonify({"error": "Missing entry id from data!"})
+    success = gwa_remove_entry(get_db(), entry_id, current_app.instance_path)
+    return jsonify({"removed": success})
