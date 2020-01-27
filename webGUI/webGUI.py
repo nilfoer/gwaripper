@@ -13,12 +13,13 @@ from flask import (
 
 from gwaripper.db import (
         get_x_entries, validate_order_by_str, search,
-        remove_entry as gwa_remove_entry, set_favorite_entry
+        remove_entry as gwa_remove_entry, set_favorite_entry,
+        set_rating
 )
 
 from .gwaripper_db import get_db
 
-ENTRIES_PER_PAGE = 60
+ENTRIES_PER_PAGE = 30
 
 # no url prefix
 main_bp = Blueprint("main", __name__)
@@ -194,11 +195,14 @@ def set_favorite():
     return jsonify({})
 
 
-# @main_bp.route("/book/<int:book_id>/rate/<float:rating>")
-# def rate_book(book_id, rating):
-#     Book.rate_book_id(get_mdb(), book_id, rating)
-#     return redirect(
-#         url_for("main.show_info", book_id=book_id))
+@main_bp.route("/entry/rate", methods=("POST",))
+def rate_entry():
+    entry_id = request.form.get("entryId", None, type=int)
+    rating = request.form.get("rating", None, type=float)
+    if entry_id is None or rating is None:
+        return jsonify({"error": "Missing entry id or rating from data!"})
+    set_rating(get_db(), entry_id, rating)
+    return jsonify({})
 
 
 @main_bp.route('/entry/remove', methods=("POST",))

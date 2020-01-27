@@ -164,6 +164,11 @@ def set_favorite_entry(db_con, _id, fav_intbool):
         db_con.execute("UPDATE Downloads SET favorite = ? WHERE id = ?", (fav_intbool, _id))
 
 
+def set_rating(db_con, _id, rating):
+    with db_con:
+        db_con.execute("UPDATE Downloads SET rating = ? WHERE id = ?", (rating, _id))
+
+
 def remove_entry(db_con, _id, root_dir):
     c = db_con.execute("SELECT * FROM Downloads WHERE id = ?", (_id,))
     row = RowData(c.fetchone())

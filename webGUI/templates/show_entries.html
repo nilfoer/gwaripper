@@ -14,9 +14,9 @@
             <div class="entry-container-rating">
                 {# adapted from https://codepen.io/redlabor/pen/wyiAH which is a fork of https://codepen.io/jamesbarnett/pen/vlpkh #}
                 <div class="rate" data-entry-id={{ entry.id }}>
-                    {% set rating = entry.rating * 2 if entry.rating is not none else 20 %}
+                    {% set rating = entry.rating * 2 if entry.rating is not none else 0 %}
                     {% for i in range(10, 0, -1) %}
-                    <a href="#" class="rate-star{{ ' half' if i % 2 == 1 else '' }}{{' active' if i >= rating else '' }}" data-value={{ i }} title="{{ (i/2)|string }} stars"></a>
+                    <a href="#" class="rate-star fas{{ ' half' if i % 2 == 1 else '' }}{{' star-active' if i <= rating else '' }}" data-value={{ i }} title="{{ (i/2)|string }} stars"></a>
                     {% endfor %}
                 </div>
             </div>
@@ -180,6 +180,36 @@
 					// (data in func below)
 					dataType: "json"
 				});
+            });
+			$('.rate-star').click(function(event) {
+                let rate_container = $(event.currentTarget).parents(".rate");
+                let star_elements = rate_container.find(".rate-star");
+                let rating2 = $(event.currentTarget).data("value");
+                let rating = rating2 / 2.0;
+                let entry_id = rate_container.data("entryId");
+                event.preventDefault();
+
+                $.ajax({
+					data : {
+                        "entryId": entry_id,
+                        "rating": rating
+                    },
+					type : 'POST',
+					url : "{{ url_for('main.rate_entry') }}",
+					// let jquery know that flask is returning json data
+					// (data in func below)
+					dataType: "json"
+				})
+				.done(function(data) { // when prev function is done
+                    star_elements.each(function() {
+                        let this_rating = $(this).data("value");
+                        if (this_rating <= rating2) {
+                            $(this).addClass("star-active");
+                        } else {
+                            $(this).removeClass("star-active");
+                        }
+                    });
+                });
             });
 		});
     </script>

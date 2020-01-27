@@ -277,21 +277,24 @@ ul.flash-messages li label {
 .rate {
     display: inline-block;
     border: 0;
+    position: relative;
 }
 /* Order correctly by floating highest to the right */
 .rate > a {
     float: right;
+    position: relative;
 }
 /* The star of the show */
 .rate > a:before {
     display: inline-block;
-    font-size: 1.1rem;
+    font-size: 1rem;
     padding: .3rem .1rem;
     margin: 0;
     cursor: pointer;
     font-family:"Font Awesome 5 Free";
     content: "\f005 "; /* full star */
 }
+/* BUG: hover on full star only registers once it's on the far right edge of the star */
 /* Half star trick */
 /* drops half star directly on the full start by using absolute positioning */
 .rate .half:before {
@@ -302,13 +305,15 @@ ul.flash-messages li label {
 /* Click + hover color */
 /* p1 ~ p2 -> sibling selector, selects all p2 following(after p1) children of the same parent
  * p1 + p2 -> adjacent selector, selects siblind that directly follows p1 */
-.rate a.active ~ a, /* color current and previous stars on checked */
-.rate a:hover, .rate a:hover ~ a { color: #73B100;  } /* color previous stars on hover */
+.rate a.star-active,
+.rate a.star-active ~ a, /* color current and previous stars on checked */
+.rate a:hover, .rate a:hover ~ a { color: #e42323;  } /* color previous stars on hover */
 
 /* Hover highlights */
-input:checked + label:hover, input:checked ~ label:hover, /* highlight current and previous stars */
-input:checked ~ label:hover ~ label, /* highlight previous selected stars for new rating */
-label:hover ~ input:checked ~ label /* highlight previous selected stars */ { color: #A6E72D;  } 
+.rate a.star-active + a:hover, .rate a.star-active ~ a:hover, /* highlight current and previous stars */
+.rate a.star-active ~ a:hover ~ a, /* highlight previous selected stars for new rating */
+.rate a:hover ~ a.star-active ~ a /* highlight previous selected stars */ { color: #e42323;  } 
+/* BUG: sometimes color stops changing at a certain star using same color for now */
 
 /* half-star rating end */
 
@@ -336,15 +341,15 @@ ul.flash-messages a.underline {
     text-decoration: underline;
 }
 
-.star-inactive {
-    color: #fff !important;
-}
-.star-active {
-    color: #22a7f0 !important;
-}
-#MyRating i:hover {
-    color: #c00 !important;
-}
+/* .star-inactive { */
+/*     color: #fff !important; */
+/* } */
+/* .star-active { */
+/*     color: #22a7f0 !important; */
+/* } */
+/* #MyRating i:hover { */
+/*     color: #c00 !important; */
+/* } */
 
     
 /* change placeholder for inputs */
