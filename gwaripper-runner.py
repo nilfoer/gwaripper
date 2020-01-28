@@ -15,6 +15,10 @@ if __name__ == '__main__':
         app = create_app()
         # use threaded=False so we can leverage MangaDB's id_map
         # also makes sense since we only want to support one user (at least with write access)
-        app.run(threaded=False, port=7568)
+        # use host='0.0.0.0' or ip to run on machine's ip address and be accessible over lan
+        if len(sys.argv) > 2 and sys.argv[2] == "open":
+            app.run(threaded=False, host='0.0.0.0', port=7568)
+        else:
+            app.run(threaded=False, port=7568)
     else:
         main()

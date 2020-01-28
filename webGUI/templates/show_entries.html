@@ -1,30 +1,34 @@
 {% extends "layout.html" %}
 {% block body %}
 <div class="row">
-<div class="col-md-12">
+<div class="col-md-10" style="margin:auto;">
 <div id="searchResult">
 {% if entries %}
     {% for entry in entries %}
     <div class="entry-container{# ' odd' if loop.index0 % 2 != 0 else '' #}">
         <div class="entry-container-top">
             <div class="ribbon {{ 'mdb-visible' if entry.favorite else 'mdb-hidden' }}"><span><i class="fas fa-heart"></i></span></div>
-            <div class="entry-container-title">
-                {{ entry.reddit_title or entry.title }}
-            </div>
-            <div class="entry-container-rating">
-                {# adapted from https://codepen.io/redlabor/pen/wyiAH which is a fork of https://codepen.io/jamesbarnett/pen/vlpkh #}
-                <div class="rate" data-entry-id={{ entry.id }}>
-                    {% set rating = entry.rating * 2 if entry.rating is not none else 0 %}
-                    {% for i in range(10, 0, -1) %}
-                    <a href="#" class="rate-star fas{{ ' half' if i % 2 == 1 else '' }}{{' star-active' if i <= rating else '' }}" data-value={{ i }} title="{{ (i/2)|string }} stars"></a>
-                    {% endfor %}
+            <div class="row no-margin">
+                <div class="entry-container-title">
+                    {{ entry.reddit_title or entry.title }}
                 </div>
             </div>
-            <div class="entry-container-artist">
-                <a href={{ url_for('main.search_entries', q='sgasm_user:"' + entry.sgasm_user + '"') }} title={{ entry.reddit_user or entry.sgasm_user }}>{{ entry.reddit_user or entry.sgasm_user }}</a>
-            </div>
-            <div class="entry-container-date">
-                {{ entry.date }}
+            <div class="row no-margin">
+                <div class="entry-container-rating">
+                    {# adapted from https://codepen.io/redlabor/pen/wyiAH which is a fork of https://codepen.io/jamesbarnett/pen/vlpkh #}
+                    <div class="rate" data-entry-id={{ entry.id }}>
+                        {% set rating = entry.rating * 2 if entry.rating is not none else 0 %}
+                        {% for i in range(10, 0, -1) %}
+                        <a href="#" class="rate-star fas{{ ' half' if i % 2 == 1 else '' }}{{' star-active' if i <= rating else '' }}" data-value={{ i }} title="{{ (i/2)|string }} stars"></a>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="entry-container-date">
+                    {{ entry.date }}
+                </div>
+                <div class="entry-container-artist">
+                    <a href={{ url_for('main.search_entries', q='sgasm_user:"' + entry.sgasm_user + '"') }} title={{ entry.reddit_user or entry.sgasm_user }}>{{ entry.reddit_user or entry.sgasm_user }}</a>
+                </div>
             </div>
         </div>
         <div class="entry-expand" style="display:none;">
@@ -41,42 +45,44 @@
                         Description: Missing!<br/>
                     {% endif %}
                 </div>
-                <div class="entry-expand-actions">
-                    Source:<br/>
-                    <div class="entry-expand-icons">
-                        {% set r_url = entry.r_post_url if entry.r_post_url and ('reddit' in entry.r_post_url) else entry.reddit_url %}
-                        <a href={{ r_url if r_url else '#' }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
-                        <a href={{ entry.url if entry.url else '#' }} title="Visit audio source page!"><i class="fas fa-globe-americas"></i></a>
+                <div class="entry-expand-actions-wrap">
+                    <div class="entry-expand-actions">
+                        Source:<br/>
+                        <div class="entry-expand-icons">
+                            {% set r_url = entry.r_post_url if entry.r_post_url and ('reddit' in entry.r_post_url) else entry.reddit_url %}
+                            <a href={{ r_url if r_url else '#' }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
+                            <a href={{ entry.url if entry.url else '#' }} title="Visit audio source page!"><i class="fas fa-globe-americas"></i></a>
+                        </div>
+                        <br/>
+                        Embed:<br/>
+                        <div class="entry-expand-icons">
+                            <a href="#" class="load-audio-embed" title="Embed audio file!"><i class="fas fa-file-audio"></i></a>
+                            <a href="#" class="load-selftxt-embed" title="Embed local selftext file!"><i class="fas fa-file-alt"></i></a>
+                        </div>
                     </div>
-                    <br/>
-                    Embed:<br/>
-                    <div class="entry-expand-icons">
-                        <a href="#" class="load-audio-embed" title="Embed audio file!"><i class="fas fa-file-audio"></i></a>
-                        <a href="#" class="load-selftxt-embed" title="Embed local selftext file!"><i class="fas fa-file-alt"></i></a>
+                    <div class="entry-expand-actions">
+                        Artist:<br/>
+                        <div class="entry-expand-icons">
+                            <a href={{ 'https://reddit.com/user/' + entry.reddit_user if entry.reddit_user else '#' }} class="artist" title="Visit reddit user!"><i class="fab fa-reddit-square"></i></a>
+                        </div>
+                        <br/>
+                        Actions:<br/>
+                        <div class="entry-expand-icons">
+                            {# set favIntbool to opposite of what it is 0 or 1 with 1-val #}
+                            <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - entry.favorite }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
+                            <a href="#" class="remove-entry-btn" data-entry-id={{ entry.id }} title="Remove audio!"><i class="fas fa-trash-alt red-fcolor"></i></a>
+                        </div>
                     </div>
-                </div>
-                <div class="entry-expand-actions">
-                    Artist:<br/>
-                    <div class="entry-expand-icons">
-                        <a href={{ 'https://reddit.com/user/' + entry.reddit_user if entry.reddit_user else '#' }} class="artist" title="Visit reddit user!"><i class="fab fa-reddit-square"></i></a>
-                    </div>
-                    <br/>
-                    Actions:<br/>
-                    <div class="entry-expand-icons">
-                        {# set favIntbool to opposite of what it is 0 or 1 with 1-val #}
-                        <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - entry.favorite }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
-                        <a href="#" class="remove-entry-btn" data-entry-id={{ entry.id }} title="Remove audio!"><i class="fas fa-trash-alt red-fcolor"></i></a>
-                    </div>
-                </div>
+                </div> {# entry-expand-actions-wrap #}
                 <br/>
-                <div class="embeds-container">
-                    {# we don't have local_filename for older entries, so check for it's presence #}
-                    <span class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename) if entry.local_filename else '' }} data-online-src={{ entry.url_file }}>
-                    </span>
-                    <span class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
-                    </span>
-                </div>
             </div> {# entry-expand-inner #}
+            <div class="embeds-container row no-margin">
+                {# we don't have local_filename for older entries, so check for it's presence #}
+                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename) if entry.local_filename else '' }} data-online-src={{ entry.url_file }}>
+                </div>
+                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
+                </div>
+            </div>
         </div> {# entry-expand #}
     </div> {# entry-container #}
     {% endfor %}

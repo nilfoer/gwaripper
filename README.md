@@ -43,6 +43,8 @@ gwaripper-runner.py webgui
 ```
 Then you can access the WebGUI by going to `localhost:7568` in your web browser. The first time you access the WebGUI you have to create a user by clicking on **Register**. Then just type in the username and password combination you chose and press **Login**.
 
+To be able to access the site with e.g. your phone in your LAN use `gwaripper-runner.py webgui open` and then browse to http://INSERT.YOUR.IP.HERE:7568/
+
 #### Searching
 The search bar matches the input string against the entries reddit post title and the title on the host page by default (so it if there's a string without a preceeding keyword the title is searched).
 

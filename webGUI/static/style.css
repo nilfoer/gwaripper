@@ -197,8 +197,9 @@ ul.flash-messages li label {
     letter-spacing: 1.5px;
 }
 .entry-container-top {
-    display: grid;
-    grid-template-columns: auto 150px 120px 100px;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
     justify-items: stretch; /* Aligns grid items along the inline (row) axis */
     align-items: stretch; /* Aligns grid items along the block (column) axis */
     justify-content: stretch; /* align the whole grid inside the container */
@@ -213,10 +214,10 @@ ul.flash-messages li label {
     margin: .5em 0;
 }
 .entry-container-title {
-    margin: .5em .5em .5em .5em;
+    margin: .5em .5em 0 .5em;
 }
 .entry-container-rating {
-    margin: .5em .5em .5em .5em;
+    margin: .5em .5em .2em .5em;
     justify-self: center;
     align-self: center;
 }
@@ -237,6 +238,7 @@ ul.flash-messages li label {
     margin: .5em;
     justify-self: end; /* horizontal */
     align-self: center; /* vert */
+    font-size: 14px;
 }
 .entry-container.odd {
     background-color: #3c3c3c;
@@ -246,23 +248,39 @@ ul.flash-messages li label {
 }
 .entry-expand .description {
     padding: .5em;
+    flex-shrink: 1;
+    flex-grow: 1;
 }
 .entry-expand-inner {
     width: 100%;
-    display: grid;
-    grid-template-columns: auto 110px 110px;
+    display: flex;
+    flex-wrap: wrap-reverse; /* so controls that follow the description and are normally placed on the right
+                              * end up on top of the description instead of at the bottom */
+    justify-content: space-between;
+}
+.entry-expand-actions-wrap {
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
 }
 .entry-expand-actions {
-    padding: .5em .5em;
-    grid-row: 1 / span 2;
+    padding: .5em;
 }
 .entry-expand-icons {
     font-size: 1.5em;
 }
 .entry-expand .embeds-container {
     padding: .5em;
-    grid-column: 1 / span 1;
-    grid-row: 2 / span 1;
+    width: 100%;
+}
+.entry-expand .embeds-container .selftxt-embed {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    overflow-wrap: break-word; /* break lines that are too long even mid-word */
+}
+.entry-expand .embeds-container .audio-embed {
+    width: 100%;
 }
 .artist {
     color: #44a6f2;
