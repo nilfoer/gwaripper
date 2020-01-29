@@ -16,22 +16,59 @@ logger = logging.getLogger(__name__)
 
 def load_or_create_sql_db(filename):
     """
-    Creates connection to sqlite3 db and a cursor object. Creates the table if it doesnt exist yet since,
-    the connect function creates the file if it doesnt exist but it doesnt contain any tables then.
+    Creates connection to sqlite3 db and a cursor object.
+    Creates file and tables if it doesn't exist!
 
     :param filename: Filename string/path to file
     :return: connection to sqlite3 db and cursor instance
     """
     conn = sqlite3.connect(filename)
-    c = conn.cursor()
-    # create table if it doesnt exist
-    c.execute("CREATE TABLE IF NOT EXISTS Downloads (id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT, "
-              "description TEXT, local_filename TEXT, title TEXT, url_file TEXT, url TEXT, created_utc REAL, "
-              "r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,reddit_url TEXT, reddit_user TEXT, "
-              "sgasm_user TEXT, subreddit_name TEXT, rating REAL, favorite INTEGER)")
-    # commit changes
-    conn.commit()
-    
+
+    # context mangaer auto-commits changes or does rollback on exception
+    with conn:
+        c = conn.executescript("""
+            PRAGMA foreign_keys=off;
+
+            CREATE TABLE IF NOT EXISTS Downloads(
+                id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT,
+                description TEXT, local_filename TEXT, title TEXT,
+                url_file TEXT, url TEXT, created_utc REAL,
+                r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,
+                reddit_url TEXT, reddit_user TEXT,
+                sgasm_user TEXT, subreddit_name TEXT, rating REAL,
+                favorite INTEGER);
+
+            -- full text-search virtual table
+            -- only stores the idx due to using parameter content='..'
+            -- -> external content table
+            -- but then we have to keep the content table and the idx up-to-date ourselves
+            CREATE VIRTUAL TABLE IF NOT EXISTS Downloads_fts_idx USING fts5(
+              title, reddit_title, content='Downloads', content_rowid='id');
+
+            -- even as external content table creating the table is not  enough
+            -- it needs to be manually populated from the content/original table
+            INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+                SELECT id, title, reddit_title FROM Downloads;
+
+            -- Triggers to keep the FTS index up to date.
+            CREATE TRIGGER IF NOT EXISTS Downloads_ai AFTER INSERT ON Downloads BEGIN
+              INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+              VALUES (new.id, new.title, new.reddit_title);
+            END;
+            CREATE TRIGGER IF NOT EXISTS Downloads_ad AFTER DELETE ON Downloads BEGIN
+              INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
+              VALUES('delete', old.id, old.title, old.reddit_title);
+            END;
+            CREATE TRIGGER IF NOT EXISTS Downloads_au AFTER UPDATE ON Downloads BEGIN
+              INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
+              VALUES('delete', old.id, old.title, old.reddit_title);
+              INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+              VALUES (new.id, new.title, new.reddit_title);
+            END;
+
+            PRAGMA foreign_keys=on;
+        """)
+
     conn.row_factory = sqlite3.Row
 
     return conn, c
@@ -265,7 +302,6 @@ def search_sytnax_parser(search_str,
     normal_col_values = {}
     assoc_col_values_incl = {}
     assoc_col_values_excl = {}
-    # TODO turn language_id into language and so on
     # Return all non-overlapping matches of pattern in string, as a list of strings.
     # The string is scanned left-to-right, and matches are returned in the order found.
     # If one or more groups are present in the pattern, return a list of groups; this will
@@ -403,13 +439,12 @@ def search_normal_mult_assoc(
 
     # normal col conditions
     for col, val in normal_col_values.items():
-        # use pattern match for title
+        # use full-text-search for titles
         if "title" in col:
-            title_wildcarded = f"%{val}%"
             cond_statements.append(
-                    f"{'AND' if cond_statements else 'WHERE'} (Downloads.title LIKE ? "
-                    "OR Downloads.reddit_title LIKE ?)")
-            vals_in_order.extend([title_wildcarded]*2)
+                    f"{'AND' if cond_statements else 'WHERE'} Downloads.id IN "
+                     "(SELECT rowid FROM Downloads_fts_idx WHERE Downloads_fts_idx MATCH ?)")
+            vals_in_order.append(val)
         else:
             cond_statements.append(f"{'AND' if cond_statements else 'WHERE'} Downloads.{col} = ?")
             vals_in_order.append(val)

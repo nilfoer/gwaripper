@@ -61,9 +61,27 @@ Additionally you can search the following fields:
 
 All of these fields can be combined in one search. When the search string for a specific keyword contains spaces, it needs to be escaped with quotes. To search for multiple items that have to be present, separate them with semicolons. Everything but the title requires exact (case-sensitive as well) matches!
 
+Searching the title uses SQLite full-text-search:
+- "monster girl" searches for 'monster' and 'girl' keywords being in the row
+- "monster + girl" searches for 'monster girl' phrase being in the row
+- You can use an asterisk(\*) to match any keyword that starts with that phrase (keyword can't start with an asterisk). E.g.: hypno\* matches Hypno, Hypnotic, Hypnosis, etc.
+- You can use the Boolean operators NOT, OR, or AND (operators **must** be in uppercase) to combine queries:
+    - q1 AND q2: matches if both q1 and q2 queries match.
+    - q1 OR q2: matches if either query q1 or q2 matches.
+    - q1 NOT q2: matches if query q1 matches and q2 doesn’t match.
+        - NOT is the same as using a dash(**-**)
+        - so a query for 'monster-girl' wouldn't work as expected
+- To change the operator precedence, you use parenthesis to group expressions.
+- For more information see: [SQLite.org: Full-text Query Syntax](https://www.sqlite.org/fts5.html#full_text_query_syntax)
+
 E.g. this string searches for audios by sassmastah77 with [GFE] in the title
 ```
 sgasm_user:sassmastah77 [GFE]
+```
+
+Search for 'monster girl' or 'demon girl' being in the title:
+```
+(monster + girl) OR (demon + girl)
 ```
 
 ### Examples
