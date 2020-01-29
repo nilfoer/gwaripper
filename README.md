@@ -3,7 +3,7 @@ Script to download audio files either by parsing reddit submissions for supporte
 be saved, if a selftext is present it will be saved alongside the audio file. Searching reddit and downloading submissions by redditors is also supported. Saves the info of downloaded files in a SQLite database but also exports it to csv.
 
 ## Download
-You can either download the [source]() and install it using:
+You can either download the [source](https://github.com/nilfoer/gwaripper/archive/master.zip) and install it using:
 ```
 > python -m pip install .
 ```

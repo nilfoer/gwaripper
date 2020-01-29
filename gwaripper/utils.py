@@ -67,7 +67,7 @@ class RequestDelayer:
             self.last_request = now
 
 
-def txt_to_list(path, txtfilename):
+def txt_to_list(txtfilename):
     """
     Reads in file, splits at newline and returns that list
 
@@ -75,7 +75,7 @@ def txt_to_list(path, txtfilename):
     :param txtfilename: Filename
     :return: List with lines of read text file as elements
     """
-    with open(os.path.join(path, txtfilename), "r", encoding="UTF-8") as f:
+    with open(txtfilename, "r", encoding="UTF-8") as f:
         llist = f.read().split()
         return llist
 

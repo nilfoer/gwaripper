@@ -139,7 +139,7 @@ def test_soundgasm(gen_audiodl_sgasm, create_db_download, create_new_test_con):
               "[F4M] I'm your Pornstar Cumdumpster Slut Mother [Rape][Blackmail][incest][Facefucking][Slap my face with that thick cock][Innocent to slutty][Rough][Denial][Toys][Mast][Dirty Talk][Fuck Me Into The Matress][Creampie][Impreg][Multiple Real Orgasms]",
               "permalink_sgasm", 'test_user', 'miyu213', "subreddit_sgasm")
              ]
-    new_c.execute("SELECT * FROM Downloads")
+    new_c.execute("SELECT id, date, time, description, local_filename, title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title,reddit_url, reddit_user, sgasm_user, subreddit_name FROM Downloads")
     assert new_c.fetchall() == expected
 
     # selftext written correctly
@@ -187,7 +187,7 @@ def test_eraudica(gen_audiodl_eraudica, create_db_download, create_new_test_con)
                  "[F4M] Nurse Eve and Dr. Eve Double Team TLC! [twins][binaural][medical][sucking and licking and fucking and cumming!][face sitting][riding your cock] [repost]",
                  "permalink_eraudica", 'test_user', 'test_user', "subreddit_eraudica")
                 ]
-    new_c.execute("SELECT * FROM Downloads")
+    new_c.execute("SELECT id, date, time, description, local_filename, title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title,reddit_url, reddit_user, sgasm_user, subreddit_name FROM Downloads")
     assert new_c.fetchall() == expected
 
     with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
@@ -214,7 +214,7 @@ def test_download_failed(gen_audiodl_failed, create_db_download, create_new_test
                     None,
                     'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR')
                 ]
-    new_c.execute("SELECT * FROM Downloads")
+    new_c.execute("SELECT id, date, time, description, local_filename, title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title,reddit_url, reddit_user, sgasm_user, subreddit_name FROM Downloads")
     assert new_c.fetchall() == expected
 
     assert not os.path.isfile(os.path.join(dir, a.name_usr, fn + ".txt"))
@@ -435,23 +435,24 @@ def test_set_missing_vals(create_db_missing, create_adl_missing):
     fill_three = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', "testfn", 'TESTTITLE', 'testfile', 'https://soundsm.net/u/testu1/test1', 12345.0, 'TESTPOSTURL', "test123", 'TESTREDDITTITLE', "testperm", 'TESTTEDDITUSER', 'TESTUSER', "testsub"),
                   (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2', "https://soundgasm.net/u/testu2/test2", 12345.0, "testpurl2", 'test6f78d', "testtitle2", 'TESTREDDITURL', "testruser2", 'TESTUSER', 'TESTSUBR'),
                   (3, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile3', 'https://soundsm.net/u/testu3/testfile3', 12345.0, "testpurl3", 'test6a48d', "testtitle3", 'TESTREDDITURL', "testruser3", 'TESTUSER', 'TESTSUBR')]
-    c.execute("SELECT * FROM Downloads")
+    query = "SELECT id, date, time, description, local_filename, title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title,reddit_url, reddit_user, sgasm_user, subreddit_name FROM Downloads"
+    c.execute(query)
     result = c.fetchall()
     assert result == start
     # handling of filling in local_filename and url used to be tested here
     # only present in my db that was used with older versions
     # removed to have cleaner code
     adl.set_missing_reddit_db(con)
-    c.execute("SELECT * FROM Downloads")
+    c.execute(query)
     result = c.fetchall()
     assert result == fill_one
     # test returned filename
     assert adl2.set_missing_reddit_db(con) == 'TESTFILENAME'
-    c.execute("SELECT * FROM Downloads")
+    c.execute(query)
     result = c.fetchall()
     assert result == fill_two
     adl3.set_missing_reddit_db(con)
-    c.execute("SELECT * FROM Downloads")
+    c.execute(query)
     result = c.fetchall()
     assert result == fill_three
 

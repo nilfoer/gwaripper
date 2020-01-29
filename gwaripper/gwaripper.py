@@ -148,9 +148,9 @@ def main():
     # to the add_subparsers(): parser.add_subparsers(dest='subparser_name')
     # Namespace(subparser_name='ripuser', ...)
 
-    parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file located in _linkcol')
+    parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file')
     parser_txt.add_argument("type", help="Reddit(r) or sgasm(sg) link/s in txt", choices=("r", "sg"))
-    parser_txt.add_argument("filename", help="Filename of txt file in _linkcol folder")
+    parser_txt.add_argument("filename", help="Filename of txt file")
     parser_txt.set_defaults(func=_cl_fromtxt)
 
     parser_clip = subparsers.add_parser('watch', help='Watch clipboard for sgasm/reddit links and save them to txt;'
@@ -342,11 +342,14 @@ def _cl_rip_users(args):
 
 
 def _cl_fromtxt(args):
-    mypath = os.path.join(ROOTDIR, "_linkcol")
+    if not os.path.isfile(args.filename):
+        logger.error("Couldn't find file %s", args.filename)
+        return
+
     if args.type == "sg":
-        rip_audio_dls(gen_audiodl_from_sglink(utils.txt_to_list(mypath, args.filename)))
+        rip_audio_dls(gen_audiodl_from_sglink(utils.txt_to_list(args.filename)))
     else:
-        llist = get_sub_from_reddit_urls(utils.txt_to_list(mypath, args.filename))
+        llist = get_sub_from_reddit_urls(utils.txt_to_list(args.filename))
         adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
         rip_audio_dls(adl_list)
 
@@ -560,26 +563,8 @@ def rip_audio_dls(dl_list):
             # nothing was added to db yet so we can just skip ahead
             filestodl -= 1
             continue
-        # try:
-        #     # get appropriate func for host to get direct url, sgasm title etc.
-        #     audio_dl.call_host_get_file_info()
-        # except utils.InfoExtractingError as err:
-        #     # dont crash whole script just log exception with traceback and original error msg
-        #     if audio_dl.reddit_info:
-        #         # level: ERROR, Exception info is added, should only be called from an exception handler
-        #         # .exception() Exception info is added to msg with lvl ERROR
-        #         # should only be called from an exception handler
-        #         logger.exception("Error occured while trying to extract file information at {} from submission {}"
-        #                          " -> SKIPPING".format(audio_dl.page_url, audio_dl.reddit_info["permalink"]))
-        #     else:
-        #         logger.exception("Error occured while trying to extract file information at {}"
-        #                          " -> SKIPPING".format(audio_dl.page_url))
-        #
-        #     logger.debug("Recieved HTML at '{}':\n{}".format(err.url, err.html))
-        #
-        #     continue
 
-        # sleep between requests so we dont stress the server to much or get banned
+        # sleep between requests so we dont stress the server too much or get banned
         # using helper class -> only sleep .25s when last request time was less than .5s ago
         rqd.delay_request()
         dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
@@ -677,7 +662,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     return result
 
 
-def watch_clip(domain):
+def watch_clip(site_name):
     """
     Watches clipboard for links of domain
 
@@ -687,9 +672,11 @@ def watch_clip(domain):
     :param domain: keyword that points to function is_domain_url in clipwatcher_single module
     :return: List of found links, None if there None
     """
-    # function is_domain_url will be predicate
-    # eval: string -> python code
-    dm = eval("clipwatcher_single.is_" + domain + "_url")
+    try:
+        dm = clipwatcher_single.site_keyword_func[site_name]
+    except KeyError:
+        logger.error("Invalid site_name %s", site_name)
+
     watcher = clipwatcher_single.ClipboardWatcher(dm, clipwatcher_single.print_write_to_txtf,
                                                   os.path.join(ROOTDIR, "_linkcol"), 0.1)
     try:

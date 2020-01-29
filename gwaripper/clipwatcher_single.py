@@ -1,24 +1,40 @@
 import time
 import os
 import logging
+import re
 
 import pyperclip
 
 logger = logging.getLogger(__name__)
 
+# grp1: subreddit, grp2: reddit id, grp3: title
+REDDIT_URL_RE = re.compile(
+        r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/r/(\w+)/comments/([A-Za-z0-9]+)/(\w+)?/?")
+# grp1: sgasm username, grp2: title
+SGASM_URL_RE = re.compile(
+        r"(?:https?://)?(?:www\.)?soundgasm\.net/(?:u|user)/([-a-zA-Z0-9_]+)/([-a-zA-Z0-9_]+)/?")
+
 
 def is_sgasm_url(url):
-    if url.startswith("htt") and "soundgasm" in url:
+    if re.match(SGASM_URL_RE, url) is None:
+        return False
+        logger.debug("NO SGASM URL: " + url)
+    else:
         return True
-    logger.debug("NO SGASM URL: " + url)
-    return False
 
 
 def is_reddit_url(url):
-    if url.startswith("htt") and "reddit" in url:
+    if re.match(REDDIT_URL_RE, url) is None:
+        return False
+        logger.debug("NO REDDIT URL: " + url)
+    else:
         return True
-    logger.debug("NO REDDIT URL: " + url)
-    return False
+
+
+site_keyword_func = {
+    "sgasm": is_sgasm_url,
+    "reddit": is_reddit_url,
+}
 
 
 def print_to_stdout(clipboard_content):
