@@ -76,6 +76,7 @@ def show_entries():
     entries, order_by_col, asc_desc, first, last, more = get_entries()
     return render_template(
         'show_entries.html',
+        display_search_err_msg=True if entries is None else False,
         entries=entries,
         more=more,
         first=first,
@@ -144,6 +145,7 @@ def search_entries():
 
     return render_template(
         'show_entries.html',
+        display_search_err_msg=True if entries is None else False,
         entries=entries,
         more=more,
         first=first,

@@ -373,7 +373,10 @@ def search(db_con, query, order_by="Downloads.id DESC", **kwargs):
                 db_con, normal_col_values,
                 assoc_col_values_incl, assoc_col_values_excl,
                 order_by=order_by, **kwargs)
-        return [RowData(row) for row in rows]
+        if rows is None:
+            return None
+        else:
+            return [RowData(row) for row in rows]
     else:
         return get_x_entries(kwargs.pop("limit", 60), order_by=order_by, **kwargs)
 
@@ -465,7 +468,24 @@ def search_normal_mult_assoc(
             query, vals_in_order, after=after, before=before,
             order_by=order_by, first_cond=not bool(cond_statements)
             )
-    c = db_con.execute(query, (*vals_in_order, limit))
+    try:
+        c = db_con.execute(query, (*vals_in_order, limit))
+    except sqlite3.OperationalError as e:
+        # str(exception) gives exception msg string
+        # while repr(exception) gives exception type and msg
+        # only allowed special chars in fts string are:
+        # asterisk*, parentheses() and plus+
+        # dash- gets parsed as part of a column filter although you normally
+        # separate the col filter with a colon: from the rest of the query
+        # means not to look at the col
+        # https://www.sqlite.org/fts5.html#fts5_column_filters allows more special chars
+        # double-quotes" would normally be allowed but due to the way search_sytnax_parser
+        # does the parsing they're not with our implementation
+        if "fts5: syntax error" in str(e):
+            return None
+        else:
+            raise
+
     rows = c.fetchall()
 
     return rows

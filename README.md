@@ -69,14 +69,14 @@ Searching the title uses SQLite full-text-search:
     - q1 AND q2: matches if both q1 and q2 queries match.
     - q1 OR q2: matches if either query q1 or q2 matches.
     - q1 NOT q2: matches if query q1 matches and q2 doesn’t match.
-        - NOT is the same as using a dash(**-**)
-        - so a query for 'monster-girl' wouldn't work as expected
-- To change the operator precedence, you use parenthesis to group expressions.
+- To change the operator precedence, you use parentheses to group expressions.
+- Special characters mentioned here are the only ones allowed in the title search query!
+- Normally double-quotes(**"**) would be allowed but due to the way we're currently parsing the search query they're not!
 - For more information see: [SQLite.org: Full-text Query Syntax](https://www.sqlite.org/fts5.html#full_text_query_syntax)
 
-E.g. this string searches for audios by sassmastah77 with [GFE] in the title
+E.g. this string searches for audios by sassmastah77 with GFE in the title
 ```
-sgasm_user:sassmastah77 [GFE]
+sgasm_user:sassmastah77 GFE
 ```
 
 Search for 'monster girl' or 'demon girl' being in the title:

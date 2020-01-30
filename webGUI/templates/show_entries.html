@@ -87,7 +87,29 @@
     </div> {# entry-container #}
     {% endfor %}
 {% else %}
-    <em>Unbelievable. No entries here so far</em>
+    {% if display_search_err_msg %}
+        <h2>Error in (title) search query!</h2>
+        <p class="search-err-msg">
+            Only alphanumerical characters and the following special characters are allowed in the
+            title search query (uses 
+            <a href="https://www.sqlite.org/fts5.html#full_text_query_syntax">SQLite FTS Query Syntax</a>):<br/>
+        </p>
+        <p class="search-err-msg">
+            asterisk(*):<br/>
+            Allowed as wild-chard-character, matches zero or more arbitrary characters. Can't
+            be the first character!
+        </p>
+        <p class="search-err-msg">
+            plus(+):<br/>
+            To concatenate phrases.
+        </p>
+        <p class="search-err-msg">
+            parentheses():<br/>
+            To change operator presedence in multi-phrase statements!
+        </p>
+    {% else %}
+        <em>Unbelievable. No entries here so far</em>
+    {% endif %}
 {% endif %}
     <script>
         // emebd local audio file or online src
