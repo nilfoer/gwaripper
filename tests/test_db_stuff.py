@@ -148,11 +148,17 @@ def test_check_dir_file_url(url, expected, create_db):
     assert check_direct_url_for_dl(con, url) is expected
 
 
-def test_filter_dl(create_dl_dict):
-    dled = {"https://soundsm.net/u/testu1/test1",
-            "https://soundsm.net/u/testu3/test3old", "https://soundsm.net/u/testu4/test4old"}
+def test_filter_dl(create_dl_dict, monkeypatch):
     dl_dict = create_dl_dict
-    filtered = filter_alrdy_downloaded(dled, dl_dict, 0)
+    con = sqlite3.connect(":memory:")
+    con.executescript("""
+        CREATE TABLE Downloads(url);
+        INSERT INTO Downloads(url) VALUES
+            ('https://soundsm.net/u/testu1/test1'),
+            ("https://soundsm.net/u/testu3/test3old"),
+            ("https://soundsm.net/u/testu4/test4old");""")
+
+    filtered = filter_alrdy_downloaded(dl_dict, con)
     assert filtered == {"https://soundsm.net/u/testu2/test2"}
 
 

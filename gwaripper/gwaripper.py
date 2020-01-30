@@ -47,7 +47,7 @@ if ROOTDIR and os.path.isdir(ROOTDIR):
     configure_logging(os.path.join(ROOTDIR, "gwaripper.log"))
 
 SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
-                "sgasm": re.compile("soundgasm.net/u/.+/.+", re.IGNORECASE),
+                "sgasm": re.compile("soundgasm.net/(?:u|user)/.+/.+", re.IGNORECASE),
                 # doesnt rly host files anymore "chirb.it": "chirb.it/",
                 "eraudica": "eraudica.com/",
                 "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
@@ -524,19 +524,10 @@ def rip_audio_dls(dl_list):
     # when assigning instance Attributes of classes like self.url
     # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
     # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
-    # could just work with dicts instead since theres no perf loss, but using classes may be easier to
-    # implement new features
-
-    # load dataframe
-    # df = pd.read_json("../sgasm_rip_db.json", orient="columns")
 
     # also possible to use .execute() methods on connection, which then create a cursor object and calls the
     # corresponding mehtod with given params and returns the cursor
     conn, c = load_or_create_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
-
-    # load already downloaded urls -> list -> to set since searching in set is A LOT faster
-    c.execute("SELECT url FROM Downloads")
-    urls_dled = set([tupe[0] for tupe in c.fetchall()])
 
     # create dict that has page urls as keys and AudioDownload instances as values
     # dict comrehension: d = {key: value for (key, value) in iterable}
@@ -547,7 +538,7 @@ def rip_audio_dls(dl_list):
                audio for audio in dl_list}
 
     # returns list of new downloads, dl_dict still holds all of them
-    new_dls = filter_alrdy_downloaded(urls_dled, dl_dict, conn)
+    new_dls = filter_alrdy_downloaded(dl_dict, conn)
 
     filestodl = len(new_dls)
     dlcounter = 0
@@ -617,22 +608,19 @@ def rip_usr_links(sgasm_usr_url):
     return user_files
 
 
-def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
+def filter_alrdy_downloaded(dl_dict, db_con):
     """
     Filters out already downloaded urls and returns a set of new urls
-    Intersects downloaded_urls with dict keys -> elements that are in both sets (duplicates)
-    Then build the symmetric_difference between dict keys and duplicates -> set with elements that
-    are in either of the sets but not both -> duplicates get filtered out
     Logs duplicate downloads
 
-    :param downloaded_urls: set of downloaded urls
     :param dl_dict: dict with urls as keys and the corresponding AudioDownload obj as values
     :param db_con: connection to sqlite3 db
     :return: set of new urls
     """
-    to_filter = dl_dict.keys()
-    # Return the intersection of two sets as a new set. (i.e. all elements that are in both sets.)
-    duplicate = downloaded_urls.intersection(to_filter)
+    c = db_con.execute("SELECT url FROM Downloads WHERE url IN "
+                       f"({', '.join(['?']*len(dl_dict.keys()))})",
+                       (*dl_dict.keys(),))
+    duplicate = {r[0] for r in c.fetchall()}
 
     if config.getboolean("Settings", "set_missing_reddit"):
         for dup in duplicate:
@@ -657,7 +645,7 @@ def filter_alrdy_downloaded(downloaded_urls, dl_dict, db_con):
     # set.symmetric_difference()
     # Return a new set with elements in either the set or other but not both.
     # -> duplicates will get removed from unique_urls
-    result = duplicate.symmetric_difference(to_filter)
+    result = duplicate.symmetric_difference(dl_dict.keys())
 
     return result
 
