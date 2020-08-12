@@ -70,7 +70,7 @@ hr {
     justify-content: flex-end;
 }
 .page           { margin: 1rem auto 2rem auto; width: 100%;
-                  padding: 0.8em}
+                  padding: 0.8em; }
 @media only screen and (min-width: 1200px) {
     /* use full screen width on smaller devices but center on 3/4 for desktop */
     .page {
@@ -99,102 +99,6 @@ hr {
 }
 .button-leftmost {
     margin-left: 0;
-}
-.list-tag {
-	position: relative;
-	padding-right: 17px!important;
-}
-.list-tag-border {
-	border: #22a7f0 1px solid;
-}
-.list-tag a {
-	text-decoration: none!important;
-	color: #fff!important;
-}
-input[type="checkbox"].mdb-checkboxes {
-	/* input[type=checkbox], input[type=radio] { */
-	vertical-align: middle;
-	position: relative;
-	bottom: 1px;
-	margin: 0 3px 0 0;
-}
-ul.flash-messages li label {
-	font-weight: normal;
-	margin-bottom: 0px;
-}
-.mdb-list-remove {
-    display: inline-block;
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    vertical-align: middle;
-    right: 0;
-    text-align: center;
-    padding: 3px;
-    padding-top: 4px;
-    font-size: 0.8em;
-    border-left: 1px solid #22a7f0;
-}
-/* Dropdown Button */
-.mdb-drop-btn {
-    	cursor: pointer;
-}
-
-/* Dropdown button on hover & focus */
-.mdb-drop-btn:hover, .mdb-drop-btn:focus {
-    background-color: #4c4c4c;
-}
-
-/* The container <div> - needed to position the dropdown content */
-.mdb-dropdown {
-    position: relative;
-    display: inline-block;
-}
-
-/* Dropdown Content (Hidden by Default) */
-.mdb-dropdown-content {
-    display: none;
-    position: absolute;
-    background-color: #333;
-    min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-    z-index: 1;
-    /* limit height and add scrollbar with overflow auto */
-    overflow: auto;
-    max-height: 250px;
-}
-
-/* Links inside the dropdown */
-.mdb-dropdown-content a {
-    color: #fff;
-    padding: 3px 12px;
-    text-decoration: none;
-    display: block;
-}
-
-/* Change color of dropdown links on hover */
-.mdb-dropdown-content a:hover {background-color: #4c4c4c}
-/* Show the dropdown menu (use JS to add this class to the .dropdown-content container when the user clicks on the dropdown button) */
-.mdb-show {display:block;}
-.mdb-none {display:none;}
-
-.mdb-hidden {visibility:hidden;}
-.mdb-visible {visibility:visible;}
-
-.kw-headline hr {
-    display: block;
-    margin-top: 0;
-    margin-bottom: .5rem;
-    margin-left: auto;
-    margin-right: auto;
-    border-style: inset;
-    border-width: 1px;
-    border-color: #fff;
-}
-.kw-headline span {
-    margin-left: .25rem;
-    font-size: 1.25rem;
-    letter-spacing: 1.5px;
 }
 .entry-container-top {
     display: flex;
@@ -240,7 +144,7 @@ ul.flash-messages li label {
     align-self: center; /* vert */
     font-size: 14px;
 }
-.entry-container.odd {
+.entry-container .odd {
     background-color: #3c3c3c;
 }
 .entry-expand {
@@ -254,9 +158,16 @@ ul.flash-messages li label {
 .entry-expand-inner {
     width: 100%;
     display: flex;
-    flex-wrap: wrap-reverse; /* so controls that follow the description and are normally placed on the right
-                              * end up on top of the description instead of at the bottom */
+    flex-wrap: nowrap;
     justify-content: space-between;
+}
+/* has to follow rule for .entry-expand-inner since selectors have the same spefificty otherwise
+ * rule wouldn't be overwritten */
+@media only screen and (max-width: 600px) {
+    .entry-expand-inner {
+        flex-wrap: wrap-reverse; /* so controls that follow the description and are normally placed on the right
+                                  * end up on top of the description instead of at the bottom */
+    }
 }
 .entry-expand-actions-wrap {
     padding: 0;
@@ -359,17 +270,6 @@ ul.flash-messages a.underline {
     text-decoration: underline;
 }
 
-/* .star-inactive { */
-/*     color: #fff !important; */
-/* } */
-/* .star-active { */
-/*     color: #22a7f0 !important; */
-/* } */
-/* #MyRating i:hover { */
-/*     color: #c00 !important; */
-/* } */
-
-    
 /* change placeholder for inputs */
 ::placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
     color: #bdbdbd;
@@ -574,20 +474,6 @@ input[type=submit] {
     /* 1rem == 16px */
     font-size: .9rem;
     background-color: #2d2d2d;
-}
-.tag {
-    margin-right: 2px;
-    display: inline-block;
-    background-color: #2d2d2d;
-    color: #fff !important;
-    font-family: 'Open Sans',sans-serif;
-    font-size: 12px;
-    font-weight: 400;
-    line-height: 10px;
-    text-decoration: none !important;
-    padding: 5px;
-    height: 20px;
-    margin-bottom: 5px;
 }
 .entries img    { width: 100% }
 .entries li h2  { margin-left: -1em; }

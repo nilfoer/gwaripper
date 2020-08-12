@@ -27,7 +27,8 @@ if not config.sections():
             "client_id": "to get a client id visit: https://api.imgur.com/oauth2/addclient",
         },
         "Settings": {
-            "tag_filter": "[request], [script offer]",
+            "tag_filter": "[request]",
+            "tag1_in_but_not_tag2": "[script offer];[script fill]",
             "db_bu_freq": "5",
             "max_db_bu": "5",
             "set_missing_reddit": "True"
@@ -52,7 +53,7 @@ except KeyError:
 # load from config ini, split at comma, strip whitespaces, ensure that they are lowercase with .lower()
 KEYWORDLIST = [x.strip().lower() for x in config["Settings"]["tag_filter"].split(",")]
 
-# tag1 is only banned if tag2 isnt there, in cfg file: tag1 &! tag2; tag3 &! tag4;...
+# tag1 is only banned if tag2 isnt there, in cfg file: tag1;tag2;, tag3;tag4;, ...
 TAG1_BUT_NOT_TAG2 = []
 if config.has_option("Settings", "tag1_in_but_not_tag2"):
     for tag_comb in config["Settings"]["tag1_in_but_not_tag2"].split(";,"):

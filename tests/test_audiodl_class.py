@@ -18,6 +18,7 @@ testdir = os.path.normpath("tests\\test_dl")
 urls = [
         ("sgasm", "https://soundgasm.net/u/miyu213/F4M-Im-your-Pornstar-Cumdumpster-Slut-Mother-RapeBlackmailFacefuckingSlap-my-face-with-that-thick-cockInnocent-to-sluttyRoughDirty-TalkFuck-Me-Into-The-MatressCreampieImpregMultiple-Real-Orgasms"),
         ("eraudica", "https://www.eraudica.com/e/eve/2015/Twin-TLC-Dr-Eve-and-Nurse-Eve-a-Sucking-Fucking-Hospital-Romp"),
+        ("chirb.it", "https://chirb.it/F4wx2q"),
     ]
 
 r_infos = [{
@@ -39,7 +40,18 @@ r_infos = [{
         "id": "id_eraudica",
         "permalink": "permalink_eraudica",
         "subreddit": "subreddit_eraudica"
-    }]
+    },
+    {
+        "r_user": "test_user",
+        "title": "[Script Fill] Monster University: Hailey the Hyena girl has been *starving,* and she needs to squeeze every drop of cum from your cock! [Hyena girl] [Monster girl] [Giggles] [Licking your cock] [Giggly Blowjob] [I need more. MORE.] [Deepthroat] [Cum-starved] [Cum eating] [Sweet and Salty]",
+        "selftext": "Testing selftext",
+        "created_utc": "created_utc_chirbit",
+        "r_post_url": "r_post_url_chirbit",
+        "id": "id_chirbit",
+        "permalink": "permalink_chirbit",
+        "subreddit": "subreddit_chirbit"
+    },
+    ]
 
 # we could either use a predefined fixture by pytest to get a unique tmpdir with def gen_audiodl_sgasm(tmpdir)
 # and then use tmpdir.strpath as path or we use a test dir thats always the same, and make sure to clean up after
@@ -77,6 +89,19 @@ def gen_audiodl_failed():
 @pytest.fixture
 def gen_audiodl_eraudica(tmpdir):
     a = AudioDownload(urls[1][1], urls[1][0], r_infos[1])
+
+    yield a, testdir
+
+    if a.filename_local:  # coming from download test not just info test
+        os.remove(os.path.join(testdir, a.name_usr, a.filename_local))
+        os.remove(os.path.join(testdir, a.name_usr, a.filename_local + ".txt"))
+        os.rmdir(os.path.join(testdir, a.name_usr))
+    del a
+
+
+@pytest.fixture
+def gen_audiodl_chirbit():
+    a = AudioDownload(urls[2][1], urls[2][0], r_infos[2])
 
     yield a, testdir
 
@@ -194,6 +219,52 @@ def test_eraudica(gen_audiodl_eraudica, create_db_download, create_new_test_con)
         assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
                                                                                a.reddit_info["permalink"],
                                                                                a.reddit_info["selftext"])
+
+
+def test_chirbit_info(gen_audiodl_chirbit):
+    a, dir = gen_audiodl_chirbit
+    a.call_host_get_file_info()
+    # only compare till aws id other part of url changes every time
+    assert a.url_to_file.startswith("https://s3.amazonaws.com/audio.chirbit.com/EsoraLuvey_1593569863.mp3")
+    assert "X-Amz-Credential=AKIAIHJD7T6NGQMM2VCA" in a.url_to_file
+    assert a.file_type == ".mp3"
+
+
+@pytest.mark.dltest
+def test_chirbit(gen_audiodl_chirbit, create_db_download, create_new_test_con):
+    con, c = create_db_download
+    fn = "[Script Fill] Monster University_ Hailey the Hyena girl has been _starving,_ and she needs to squeeze every drop of cum from your cock_ [Hyena girl] [Monster girl] [Giggles] [Licking your cock] [Giggly Blowjob] [I need more_ MORE_] [Deepthroat] [Cum-starved] [Cum eating] [Sweet and Salty]"[0:110] + ".mp3"
+    a, dir = gen_audiodl_chirbit
+    a.call_host_get_file_info()
+
+    a.download(con, 0, 0, dir)
+    assert a.filename_local == fn
+    assert os.path.isfile(os.path.join(dir, a.name_usr, fn))
+    assert md5(os.path.join(dir, a.name_usr, fn)) == "66f67f76b599421295e3864d5ae42113"
+    assert a.downloaded is True
+
+    new_con, new_c = create_new_test_con  # testing if visible from other con
+    id = c.lastrowid
+    expected = [(1, 'TESTDATE', 'TESTIME', 'TESTDESCR', None, 'TESTTITLE', 'testfile',
+                 'https://hostdomain.com/sub/TESTURL/', None, 'TESTPOSTURL', None, 'TESTREDDITTITLE', None,
+                 'TESTTEDDITUSER', 'TESTUSER', None),
+                 (2, 'TESTDATE', 'TESTIME', 'TESTDESCR', 'TESTFILENAME', 'TESTTITLE', 'testfile2',
+                  None, 12345.0, None, 'test6f78d', None, 'TESTREDDITURL', None, 'TESTUSER', 'TESTSUBR'),
+                # not testing date time, using whatever the attributes are
+                (3, a.date, a.time, None, fn,
+                 "[Script Fill] Monster University: Hailey the Hyena girl has been *starving,* and she needs to squeeze every drop of cum from your cock! [Hyena girl] [Monster girl] [Giggles] [Licking your cock] [Giggly Blowjob] [I need more. MORE.] [Deepthroat] [Cum-starved] [Cum eating] [Sweet and Salty]",
+                 a.url_to_file, urls[2][1],
+                 "created_utc_chirbit", "r_post_url_chirbit", "id_chirbit",
+                 "[Script Fill] Monster University: Hailey the Hyena girl has been *starving,* and she needs to squeeze every drop of cum from your cock! [Hyena girl] [Monster girl] [Giggles] [Licking your cock] [Giggly Blowjob] [I need more. MORE.] [Deepthroat] [Cum-starved] [Cum eating] [Sweet and Salty]",
+                 "permalink_chirbit", 'test_user', 'test_user', "subreddit_chirbit")
+                ]
+    new_c.execute("SELECT id, date, time, description, local_filename, title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title,reddit_url, reddit_user, sgasm_user, subreddit_name FROM Downloads")
+    assert new_c.fetchall() == expected
+
+    with open(os.path.join(dir, a.name_usr, fn + ".txt"), "r") as f:
+        assert f.read() == "Title: {}\nPermalink: {}\nSelftext:\n\n{}".format(a.reddit_info["title"],
+                                                                              a.reddit_info["permalink"],
+                                                                              a.reddit_info["selftext"])
 
 
 def test_download_failed(gen_audiodl_failed, create_db_download, create_new_test_con):

@@ -48,7 +48,7 @@ if ROOTDIR and os.path.isdir(ROOTDIR):
 
 SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
                 "sgasm": re.compile("soundgasm.net/(?:u|user)/.+/.+", re.IGNORECASE),
-                # doesnt rly host files anymore "chirb.it": "chirb.it/",
+                "chirb.it": "chirb.it/",
                 "eraudica": "eraudica.com/",
                 "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
                 "imgur image": ImgurImage.IMAGE_URL_RE,
