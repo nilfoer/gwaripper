@@ -7,34 +7,11 @@ import pyperclip
 
 logger = logging.getLogger(__name__)
 
-# grp1: subreddit, grp2: reddit id, grp3: title
-REDDIT_URL_RE = re.compile(
-        r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/r/(\w+)/comments/([A-Za-z0-9]+)/(\w+)?/?")
-# grp1: sgasm username, grp2: title
-SGASM_URL_RE = re.compile(
-        r"(?:https?://)?(?:www\.)?soundgasm\.net/(?:u|user)/([-a-zA-Z0-9_]+)/([-a-zA-Z0-9_]+)/?")
+URL_RE = re.compile(r"^(?:https?://)?(?:\w\.)*?[-A-Za-z0-9]{2,61}\.{a-z}{2,61}/.+")
 
 
-def is_sgasm_url(url):
-    if re.match(SGASM_URL_RE, url) is None:
-        return False
-        logger.debug("NO SGASM URL: " + url)
-    else:
-        return True
-
-
-def is_reddit_url(url):
-    if re.match(REDDIT_URL_RE, url) is None:
-        return False
-        logger.debug("NO REDDIT URL: " + url)
-    else:
-        return True
-
-
-site_keyword_func = {
-    "sgasm": is_sgasm_url,
-    "reddit": is_reddit_url,
-}
+def is_url(s):
+    return URL_RE.match(s)
 
 
 def print_to_stdout(clipboard_content):
@@ -87,7 +64,7 @@ class ClipboardWatcher:
 
 
 def main():
-    watcher = ClipboardWatcher(is_sgasm_url,
+    watcher = ClipboardWatcher(is_url,
                                print_write_to_txtf, os.getcwd(),
                                0.1)
 

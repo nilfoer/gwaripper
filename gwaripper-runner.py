@@ -5,7 +5,7 @@
 
 import sys
 
-from gwaripper.gwaripper import main
+from gwaripper.cli import main
 from webGUI import create_app
 
 if __name__ == '__main__':

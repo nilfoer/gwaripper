@@ -2,6 +2,8 @@ import os
 import urllib.request
 import logging
 
+from enum import Enum
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,3 +74,49 @@ def get_url_file_size(url):
     with urllib.request.urlopen(url) as response:
         reported_file_size = int(response.info()["Content-Length"])
     return reported_file_size
+
+
+def prog_bar_dl(blocknum, blocksize, totalsize):
+    """
+    Displays a progress bar to sys.stdout
+
+    blocknum * blocksize == bytes read so far
+    Only display MB read when total size is -1
+    Calc percentage of file download, number of blocks to display is bar length * percent/100
+    String to display is Downloading: xx.x% [#*block_nr + "-"*(bar_len-block_nr)] xx.xx MB
+
+    http://stackoverflow.com/questions/13881092/download-progressbar-for-python-3
+    by J.F. Sebastian
+    combined with:
+    http://stackoverflow.com/questions/3160699/python-progress-bar
+    by Brian Khuu
+    and modified
+
+    :param blocknum: Count of blocks transferred so far
+    :param blocksize: Block size in bytes
+    :param totalsize: Total size of the file in bytes
+    :return: None
+    """
+    bar_len = 25  # Modify this to change the length of the progress bar
+    # blocknum is current block, blocksize the size of each block in bytes
+    readsofar = blocknum * blocksize
+    if totalsize > 0:
+        percent = readsofar * 1e2 / totalsize  # 1e2 == 100.0
+        # nr of blocks
+        block_nr = int(round(bar_len*readsofar/totalsize))
+        # %5.1f: pad to 5 chars and display one decimal, type float, %% -> escaped %sign
+        # %*d -> Parametrized, width -> len(str(totalsize)), value -> readsofar
+        # s = "\rDownloading: %5.1f%% %*d / %d" % (percent, len(str(totalsize)), readsofar, totalsize)
+        sn = "\rDownloading: {:4.1f}% [{}] {:4.2f} / {:.2f} MB".format(percent, "#"*block_nr + "-"*(bar_len-block_nr),
+                                                                       readsofar / 1024**2, totalsize / 1024**2)
+        sys.stdout.write(sn)
+        if readsofar >= totalsize:  # near the end
+            sys.stdout.write("\n")
+    else:  # total size is unknown
+        sys.stdout.write("\rDownloading: %.2f MB" % (readsofar / 1024**2,))
+    # Python's standard out is buffered (meaning that it collects some of the data "written" to standard out before
+    # it writes it to the terminal). flush() forces it to "flush" the buffer, meaning that it will write everything
+    # in the buffer to the terminal, even if normally it would wait before doing so.
+    sys.stdout.flush()
+
+

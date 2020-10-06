@@ -1,33 +1,24 @@
 #! python3
-import argparse
 import logging
 import os
-import re
-import sys
 import time
+import re
 import urllib.request
+import sqlite3
 
 import bs4
 
-# since gwaripper contains __init__.py -> considered a package, so this becomes a intra-package reference
-# we could use an absolute reference with: import gwaripper.clipwatcher_single
-# or relative: from . import clipwatcher_single (.. -> would be for par dir and so on)
-# for more info see: https://docs.python.org/3/tutorial/modules.html#intra-package-references
-# and: http://stackoverflow.com/questions/4142151/how-to-import-the-class-within-the-same-directory-or-sub-directory
-# relative imports dont work when i try to run this module as a script!!!! either use __main__.py in package dir
-# contents: from .bootstrap import main
-#           main()
-# and run package with python -m gwaripper or use helper file gwaripper-runner.py that just imports main
-# and does if __name__ == "__main__": main() and run that file as script
+from typing import List, Union
+
 from .logging_setup import configure_logging
 from . import clipwatcher_single
 from . import utils
 from .config import config, write_config_module, ROOTDIR
+from .extractors import find_extractor
+from .info import FileInfo, FileCollection, RedditInfo
 from .audio_dl import AudioDownload
 from .db import load_or_create_sql_db, export_csv_from_sql, backup_db
-from .reddit import reddit_praw, parse_submissions_for_links, get_sub_from_reddit_urls, \
-        parse_subreddit, search_subreddit
-from .imgur import ImgurFile, ImgurAlbum, ImgurImage        
+from .exceptions import InfoExtractingError
 
 rqd = utils.RequestDelayer(0.25, 0.75)
 
@@ -46,458 +37,230 @@ logger.setLevel(logging.DEBUG)
 if ROOTDIR and os.path.isdir(ROOTDIR):
     configure_logging(os.path.join(ROOTDIR, "gwaripper.log"))
 
-SUPPORTED_HOSTS = {  # host type keyword: string/regex pattern to search for
-                "sgasm": re.compile("soundgasm.net/(?:u|user)/.+/.+", re.IGNORECASE),
-                "chirb.it": "chirb.it/",
-                "eraudica": "eraudica.com/",
-                "imgur file": ImgurFile.IMAGE_FILE_URL_RE,
-                "imgur image": ImgurImage.IMAGE_URL_RE,
-                "imgur album": ImgurAlbum.ALBUM_URL_RE
-            }
+
+DELETED_USR_FOLDER = "deleted_users"
 
 
-def handle_exception(exc_type, exc_value, exc_traceback):
-    if issubclass(exc_type, KeyboardInterrupt):
-        sys.__excepthook__(exc_type, exc_value, exc_traceback)
-        return
+class GWARipper:
+    def __init__(self, root_dir):
+        self.root_dir = root_dir
+        self.db_con, _ = load_or_create_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
+        self.downloads = []
 
-    logger.critical("Uncaught exception: ", exc_info=(exc_type, exc_value, exc_traceback))
+    def parse_links(self, links: List[str]) -> None:
+        for url in links:
+            extractor = find_extractor(url)
+            try:
+                info = extractor(url).extract()
+            except InfoExtractingError:
+                logger.error("Extraction failed! Skipping URL: %s", url)
+                continue
+            self.downloads.append(info)
 
-    if exc_traceback is not None:
-        # printing locals by frame from: Python Cookbook p. 343/343 von Alex Martelli,Anna Ravenscroft,David Ascher
-        tb = exc_traceback
-        # get innermost traceback
-        while tb.tb_next:
-            tb = tb.tb_next
+    def generate_filename(self, info: dict) -> str:
+        """
+        Generates filename to save file locally by replacing chars in the title that are not:
+        \\w(regex) - , . _ [ ] or a whitespace(" ")
+        with an underscore and limiting its length. If file exists it adds a number padded
+        to a width of 2 starting at one till there is no file with that name
 
-        stack = []
-        frame = tb.tb_frame
-        # walk backwards to outermost frame -> innermost first in list
-        while frame:
-            stack.append(frame)
-            frame = frame.f_back
-        stack.reverse()  # remove if you want innermost frame first
+        :return: String with filename and added extension
+        """
+        # [^\w\-_\.,\[\] ] -> match not(^) any of \w \- _  and whitepsace etc.,
+        # replace any that isnt in the  [] with _
+        filename = re.sub(r"[^\w\-_.,\[\] ]", "_", self.title[0:110])
+        ftype = self.file_type
 
-        # we could filter ouput by filename (frame.f_code.co_filename) so that we only print locals
-        # when we've reached the first frame of that file (could use part of __name__ (here: gwaripper.gwaripper))
+        mypath = os.path.join(self.root_dir, self.name_usr)
+        # isfile works without checking if dir exists first
+        if os.path.isfile(os.path.join(mypath, filename + ftype)):
+            i = 0
 
-        # build debug string by creating list of lines and join them on \n instead of concatenation
-        # since adding strings together means creating a new string (and potentially destroying the old ones)
-        # for each addition
-        # add first string in list literal instead of appending it in the next line -> would be bad practice
-        debug_strings = ["Locals by frame, innermost last"]
+            # You don't need to copy a Python string. They are immutable, so concatenating or
+            # slicing returns a new string
+            filename_old = filename
 
-        for frame in stack:
-            debug_strings.append("Frame {} in {} at line {}\n{}\n".format(frame.f_code.co_name,
-                                                                          frame.f_code.co_filename,
-                                                                          frame.f_lineno, "-"*100))
-            for key, val in frame.f_locals.items():
+            # file alrdy exists but it wasnt in the url database -> prob same titles only one tag
+            # or the ending is different (since fname got cut off, so we dont exceed win path limit)
+            # count up i till file doesnt exist anymore
+            while os.path.isfile(os.path.join(mypath, filename + ftype)):
+                i += 1
+                # :02d -> pad number with 0 to a width of 2, d -> digit(int)
+                filename = "{}_{:02d}".format(filename_old, i)
+            logger.info("FILE ALREADY EXISTS - ADDED: _{:02d}".format(i))
+        return filename + ftype
+
+    def download_all(self) -> None:
+        for fi in self.downloads:
+            self.download(fi)
+
+    def download(self, info: Union[FileInfo, FileCollection]) -> None:
+        if isinstance(info, FileInfo):
+            self._download_file(info)
+        else:
+            self._download_collection(info)
+
+    def _download_file(self):
+        """
+        Will download the file to dl_root in a subfolder named self.name_usr
+        Calls self.gen_filename to get a valid filename and sets date and time of the download.
+        Also calls method to add dl to db commits when download is successful, does a rollback
+        when not (exception raised). Calls self.write_selftext_file if reddit_info is not None
+
+        :param db_con: Connection to sqlite db
+        :param curfnr: Current file number
+        :param maxfnr: Max files to download
+        :param dl_root: Root dir of script/where dls will be saved in subdirs
+        :return: Current file nr(int)
+        """
+        if self.url_to_file is not None:
+            curfnr += 1
+
+            mypath = os.path.join(dl_root, self.name_usr)
+            os.makedirs(mypath, exist_ok=True)
+            self.filename_local = self.gen_filename(db_con, dl_root)
+
+            if self.filename_local:
+                logger.info("Downloading: {}..., File {} of {}".format(self.filename_local, curfnr, maxfnr))
+                self.date = time.strftime("%Y-%m-%d")
+                self.time = time.strftime("%H:%M:%S")
+                # set downloaded
+                self.downloaded = True
+
                 try:
-                    debug_strings.append("\t{:>20} = {}".format(key, val))
-                # we must absolutely avoid propagating exceptions, and str(value) could cause any
-                # exception, so we must catch any
-                except:
-                    debug_strings.append("ERROR WHILE PRINTING VALUES")
-
-            debug_strings.append("\n" + "-" * 100 + "\n")
-
-        logger.debug("\n".join(debug_strings))
-
-# sys.excepthook is invoked every time an exception is raised and uncaught
-# set own custom function so we can log traceback etc to file
-# from: https://stackoverflow.com/questions/6234405/logging-uncaught-exceptions-in-python by gnu_lorien
-sys.excepthook = handle_exception
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Script to download gonewildaudio/pta posts from either reddit "
-                                                 "or soundgasm.net directly.")
-    # support sub-commands like svn checkout which require different kinds of command-line arguments
-    subparsers = parser.add_subparsers(title='subcommands', description='valid subcommands', help='sub-command help',
-                                       dest="subcmd")  # save name of used subcmd in var
-
-    # process single links by default # nargs="*" -> zero or more arguments
-    # !! -> doesnt work since we need to specify a subcommand since they work like positional arguements
-    # and providing a default subcommand isnt supported atm
-    # create the parser for the "links" subcommand
-    parser_lnk = subparsers.add_parser('links', help='Process single link/s')
-    parser_lnk.add_argument("type", help="Reddit(r) or sgasm(sg) link/s", choices=("r", "sg"))
-    parser_lnk.add_argument("links", help="Links to process. Provide type of links as flag!", nargs="+")
-    # set funct to call when subcommand is used
-    parser_lnk.set_defaults(func=_cl_link)
-
-    parser_sgusr = subparsers.add_parser('sguser', help='Rip sgasm user/s')
-    # nargs="+" -> one or more arguments
-    parser_sgusr.add_argument("names", help="Names of users to rip.", nargs="+")
-    parser_sgusr.set_defaults(func=_cl_rip_users)
-    # Required options are generally considered bad form because users expect options to be optional,
-    # and thus they should be avoided when possible.
-
-    parser_rusr = subparsers.add_parser('redditor', help='Rip redditor/s')
-    parser_rusr.add_argument("limit", type=int, help="How many posts to download when ripping redditor")
-    parser_rusr.add_argument("names", help="Names of users to rip.", nargs="+")
-    # choices -> available options -> error if not contained; default -> default value if not supplied
-    parser_rusr.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
-                             help="Reddit post sorting method (default: top)")
-    parser_rusr.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
-                             choices=("all", "day", "hour", "month", "week", "year"))
-    parser_rusr.set_defaults(func=_cl_redditor)
-    # we could set a function to call with these args parser_foo.set_defaults(func=foo)
-    # call with args.func(args) -> let argparse handle which func to call instead of long if..elif
-    # However, if it is necessary to check the name of the subparser that was invoked, the dest keyword argument
-    # to the add_subparsers(): parser.add_subparsers(dest='subparser_name')
-    # Namespace(subparser_name='ripuser', ...)
-
-    parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file')
-    parser_txt.add_argument("type", help="Reddit(r) or sgasm(sg) link/s in txt", choices=("r", "sg"))
-    parser_txt.add_argument("filename", help="Filename of txt file")
-    parser_txt.set_defaults(func=_cl_fromtxt)
-
-    parser_clip = subparsers.add_parser('watch', help='Watch clipboard for sgasm/reddit links and save them to txt;'
-                                                      ' option to process them immediately')
-    parser_clip.add_argument("type", help="Type of links to watch for: sgasm(sg) or reddit(r)", choices=("sg", "r"))
-    parser_clip.set_defaults(func=_cl_watch)
-
-    # provide shorthands or alt names with aliases
-    parser_sub = subparsers.add_parser('subreddit', aliases=["sub"],
-                                       help='Parse subreddit and download supported links')
-
-    parser_sub.add_argument("sub", help="Name of subreddit")
-    parser_sub.add_argument("limit", type=int, help="How many posts to download")
-    parser_sub.add_argument("-s", "--sort", choices=("hot", "top"), help="Reddit post sorting method (default: top)",
-                            default="top")
-    parser_sub.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
-                            choices=("all", "day", "hour", "month", "week", "year"))
-    # nargs=? One argument will be consumed from the command line if possible
-    # no command-line argument -> default
-    # optional arguments -> option string is present but not followed by a command-line argument -> value from const
-    parser_sub.add_argument("-on", "--only-newer", nargs="?", const=True, default=False, type=float,
-                            help="Only download submission if creation time is newer than provided utc"
-                                 "timestamp or last_dl_time from config if none provided (default: None)")
-    parser_sub.set_defaults(func=_cl_sub)
-
-    parser_se = subparsers.add_parser('search', help='Search subreddit and download supported links')
-    # parser normally uses name of dest=name (which u use to access value with args.name) var for refering to
-    # argument -> --subreddit SUBREDDIT; can be different from option string e.g. -user, dest="name"
-    # can be changed with metavar, when nargs=n -> tuple with n elements
-    # bug in argparse: http://bugs.python.org/issue14074
-    # no tuples allowed as metavars for positional arguments
-    # it works with a list but the help output is wrong:
-    # on usage it uses 2x['SUBREDDIT', 'SEARCHSTRING'] instead of SUBREDDIT SEARCHSTRING
-    # with a tuple and as optional arg it works correctly: [-subsearch SUBREDDIT SEARCHSTRING]
-    # but fails with a list: on opt arg line as well
-    # [-subsearch ['SUBREDDIT', 'SEARCHSTRING'] ['SUBREDDIT', 'SEARCHSTRING']]
-    # only uniform positional arguments allowed basically as in: searchstring searchstring...
-    # always of the same kind
-    # metavar=['SUBREDDIT', 'SEARCHSTRING'])
-    parser_se.add_argument("subname", help="Name of subreddit")
-    parser_se.add_argument("sstr", help=("Searchstring in lucene syntax (see: "
-                                         "https://www.reddit.com/wiki/search)"),
-                           metavar="searchstring")
-    parser_se.add_argument("limit", type=int, help="How many posts to download")
-    parser_se.add_argument("-s", "--sort", choices=("relevance", "hot", "top", "new", "comments"),
-                           help="Reddit post sorting method (default: relevance)", default="relevance")
-    parser_se.add_argument("-t", "--timefilter", help="Value for time filter (default: all)", default="all",
-                           choices=("all", "day", "hour", "month", "week", "year"))
-    parser_se.set_defaults(func=_cl_search)
-
-    parser_cfg = subparsers.add_parser("config", help="Configure script: save location etc.")
-    parser_cfg.add_argument("-p", "--path", help="Set path to root directory, "
-                                                 "where all the files will be downloaded to")
-    parser_cfg.add_argument("-bf", "--backup-freq", metavar="FREQUENCY", type=float,
-                            help="Set auto backup frequency in days")
-    parser_cfg.add_argument("-bn", "--backup-nr", metavar="N-BACKUPS", type=int,
-                            help="Set max. number of backups to keep")
-    parser_cfg.add_argument("-tf", "--tagfilter", help="Set banned strings/tags in reddit title", nargs="+",
-                            metavar="TAG")
-    parser_cfg.add_argument("-tco", "--tag-combo-filter", help="Set banned tag when other isnt present: "
-                                                               "Tag1 is only banned when Tag2 isnt found, synatx"
-                                                               "is: Tag1;Tag2 Tag3;Tag4",
-                            metavar="TAGCOMBO", nargs="+")
-    parser_cfg.add_argument("-smr", "--set-missing-reddit", type=int, choices=(0, 1),
-                            help="Should gwaripper get the info of soundgasm.net-files when coming from reddit even "
-                                 "thouth they already have been downloaded, so missing info can be fille into the DB")
-    parser_cfg.add_argument("-ci", "--client-id", metavar="client_id", type=str,
-                            help="Set client_id which is needed to use reddit functions")                                 
-    parser_cfg.add_argument("-cs", "--client-secret", metavar="client_secret", type=str,
-                            help=("Set client_secret which is needed to use reddit functions if you"
-                                  " registered for the app type 'script'. Use -cs \"\" to remove "
-                                  "client_secret"))  
-    parser_cfg.add_argument("-ici", "--imgur-client-id", metavar="imgur_client_id", type=str,
-                            help=("Set client_id for imgur which is needed to download imgur "
-                                  "images and albumus (but not direct imgur links)"))                                                                                            
-    parser_cfg.set_defaults(func=_cl_config)
-
-    # TOCONSIDER implement verbosity with: stdohandler.setLevel(logging.INFO)?
-    # -> for this to make sense change some logging lvls
-    # parser.add_argument("-v", "--verbosity", help="How much information is  printed in the console")
-    parser.add_argument("-te", "--test", action="store_true")
-
-    # check with: if not len(sys.argv) > 1
-    # if no arguments were passed and call our old input main func; or use argument with default value args.old
-    if not len(sys.argv) > 1:
-        print("No arguments passed! Call this script from the command line with -h to show available commands.")
-        argv_str = input("Simulating command line input!!\n\nType in command line args:\n").split()
-
-        # simulate shell/cmd way of considering strings with spaces in quotation marks as one single arg/string
-        argv_clean = []
-        # index of element in list with first quotation mark
-        first_i = None
-        # iterate over list, keeping track of index with enumerate
-        for i, s in enumerate(argv_str):
-            # found start of quote and were not currently looking for the end of a quote (first_i not set)
-            # ("\"" in s) or ("\'" in s) and not first_i needs to be in extra parentheses  or it will be evaluated like:
-            # True | (False & False) -> True, since only ("\'" in s) and not first_i get connected with and
-            # (("\"" in s) or ("\'" in s)) and not first_i:
-            # (This OR This must be true) AND not This must be false
-            if (s.startswith("\"") or s.startswith("\'")) and not first_i:
-                # element contains whole quote
-                if s.endswith("\"") or s.endswith("\'"):
-                    argv_clean.append(s.strip("\"").strip("\'"))
-                else:
-                    # save index
-                    first_i = i
-                # continue with next element in list
-                continue
-            # found end of quote and were currently looking for the end of a quote (first_i set)
-            elif (s.endswith("\"") or s.endswith("\'")) and first_i:
-                # get slice of list from index of first quot mark to this index: argv_str[first_i:i+1]
-                # due to how slicing works we have to +1 the current i
-                # join the slice with spaces to get the spaces back: " ".join()
-                # get rid of quot marks with strip("\"")
-                # append str to clean list
-                argv_clean.append(" ".join(argv_str[first_i:i + 1]).strip("\"").strip("\'"))
-                # unset first_i
-                first_i = None
-                continue
-            # quote started (first_i set) but didnt end (last element of list)
-            elif i == len(argv_str) - 1 and first_i:
-                argv_clean.append(" ".join(argv_str[first_i:i + 1]).strip("\"").strip("\'"))
-                continue
-            elif not first_i:
-                # normal element of list -> append to clean list
-                argv_clean.append(s)
-        # simulate command line input by passing in list like: ['--sum', '7', '-1', '42']
-        # which is the same as prog.py --sum 7 -1 42 -> this is also used in docs of argparse
-        args = parser.parse_args(argv_clean)
-    else:
-        # parse_args() will only contain attributes for the main parser and the subparser that was selected
-        args = parser.parse_args()
-
-    # if root dir isnt set
-    if ROOTDIR:
-        if args.test:
-            # test code
-            llist = get_sub_from_reddit_urls(["https://old.reddit.com/r/gonewildaudio/comments/8wqzen/f4m_overwatch_joip_come_for_her_stroke_that_cock/"])
-            a = reddit_praw().submission(id="9dg1bk")
-            adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
-            rip_audio_dls(adl_list)
+                    # automatically commits changes to db_con if everything succeeds or does a rollback if an
+                    # exception is raised; exception is still raised and must be caught
+                    with db_con:
+                        # executes the SQL query but leaves commiting it to with db_con in line above
+                        self._add_to_db(db_con)
+                        # func passed as kwarg reporthook gets called once on establishment of the network connection
+                        # and once after each block read thereafter. The hook will be passed three arguments;
+                        # a count of blocks transferred so far, a block size in bytes, and the total size of the file
+                        # total size is -1 if unknown
+                        urllib.request.urlretrieve(self.url_to_file,
+                                                   os.path.abspath(os.path.join(mypath, self.filename_local)),
+                                                   reporthook=prog_bar_dl)
+                except urllib.request.HTTPError as err:
+                    # dl failed set downloaded
+                    self.downloaded = False
+                    logger.warning("HTTP Error {}: {}: \"{}\"".format(err.code, err.reason, self.url_to_file))
+                else:  # only write selftext if file was dled
+                    if self.reddit_info:
+                        # also write reddit selftext in txtfile with same name as audio
+                        self.write_selftext_file(dl_root)
         else:
-            # call func that was selected for subparser/command
-            args.func(args)
-    # rootdir istn set but we want to call _cl_config
-    elif not ROOTDIR and args.subcmd == "config":
-        _cl_config(args)
-    else:
-        print("root_path not set in gwaripper_config.ini, use command config -p 'C:\\absolute\\path'"
-              " to specify where the files will be downloaded to")
+            logger.warning("FILE DOWNLOAD SKIPPED - NO DATA RECEIVED")
 
+        return curfnr
 
-def _cl_link(args):
-    if args.type == "sg":
-        llist = gen_audiodl_from_sglink(args.links)
-        rip_audio_dls(llist)
-    else:
-        llist = get_sub_from_reddit_urls(args.links)
-        adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
-        rip_audio_dls(adl_list)
+    def _add_to_db(self, file_info: FileInfo):
+        """
+        Adds instance attributes and reddit_info values to the database using named SQL query
+        parameters with a dictionary.
+        DOESN'T COMMIT the transaction, since the context manager in self.download() needs to be
+        able to do a rollback if the dl fails
 
+        :return: None
+        """
+        # create dict with keys that correspond to the named parameters in the SQL query
+        # set vals contained in reddit_info to None(Python -> SQLITE: NULL)
+        val_dict = {
+            "date": self.date,
+            "time": self.time,
+            "description": self.descr,
+            "local_filename": self.filename_local,
+            "title": self.title,
+            "url_file": self.url_to_file,
+            "url": self.page_url,
+            "sgasm_user": self.name_usr,
+            "created_utc": None,
+            "r_post_url": None,
+            "reddit_id": None,
+            "reddit_title": None,
+            "reddit_url": None,
+            "reddit_user": None,
+            "subreddit_name": None
+        }
 
-def _cl_redditor(args):
-    limit = args.limit
-    time_filter = args.timefilter
-    for usr in args.names:
-        redditor = reddit_praw().redditor(usr)
-        if args.sort == "hot":
-            sublist = redditor.submissions.hot(limit=limit)
-        elif args.sort == "top":
-            sublist = redditor.submissions.top(limit=limit, time_filter=time_filter)
-        else:  # just get new posts if input doesnt match hot or top
-            sublist = redditor.submissions.new(limit=limit)
-        # to get actual subs sinc praw uses lazy loading
-        sublist = list(sublist)
-        if not sublist:
-            logger.info("No subs recieved from user %s with time_filter %s", usr, args.timefilter)
+        # reddit_info not None -> update dict with actual vals from reddit_info dict
+        # update([other]): Update the dictionary with the key/value pairs from other, overwriting existing keys
+        if self.reddit_info:
+            val_dict.update({
+                "created_utc": self.reddit_info["created_utc"],
+                "r_post_url": self.reddit_info["r_post_url"],
+                "reddit_id": self.reddit_info["id"],
+                "reddit_title": self.reddit_info["title"],
+                "reddit_url": self.reddit_info["permalink"],
+                "reddit_user": self.reddit_info["r_user"],
+                "subreddit_name": self.reddit_info["subreddit"]
+            })
+
+        self.db_con.execute("INSERT INTO Downloads(date, time, description, local_filename, "
+                            "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
+                            "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
+                            ":description, :local_filename, :title, :url_file, :url, :created_utc, "
+                            ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
+                            ":sgasm_user, :subreddit_name)", val_dict)
+
+    def set_missing_reddit_db(self, db_con):
+        """
+        Updates row of file entry in db with reddit_info dict, only sets values if previous
+        entry was NULL/None
+
+        :param db_con: Connection to sqlite db
+        :param self: instance of AudioDownload whose entry should be updated
+        :return: Returns local filename of downloaded audio file
+        """
+        if not self.reddit_info:
             return
-        adl_list = parse_submissions_for_links(sublist, SUPPORTED_HOSTS)
-        if adl_list:
-            rip_audio_dls(adl_list)
-        else:
-            logger.info("No audios found for user %s with time_filter %s", usr, args.timefilter)
+        # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
+        db_con.row_factory = sqlite3.Row
+        # we need to create new cursor after changing row_factory
+        c = db_con.cursor()
+
+        # even though Row class can be accessed both by index (like tuples) and case-insensitively by name
+        # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
+        # new_c will always fetch Row obj and cursor will fetch tuples
+        db_con.row_factory = None
+
+        c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
+        row_cont = c.fetchone()
+
+        set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"),
+                      ("reddit_user", "r_user"), ("created_utc", "created_utc"),
+                      ("reddit_id", "id"), ("subreddit_name", "subreddit"),
+                      ("r_post_url", "r_post_url"))
+
+        upd_cols = []
+        upd_vals = []
+        for col, key in set_helper:
+            if row_cont[col] is None:
+                upd_cols.append("{} = ?".format(col))
+                upd_vals.append(self.reddit_info[key])
+
+        if upd_cols:
+            logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
+            # append url since upd_vals need to include all the param substitutions for ?
+            upd_vals.append(self.page_url)
+            # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would
+            # have to update as well so not a good idea
+            # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(
+            #   ",".join(upd_cols), ",".join("?"*len(upd_cols))))
+
+            # Connection objects can be used as context managers that automatically commit or
+            # rollback transactions.
+            # In the event of an exception, the transaction is rolled back; otherwise, the 
+            # transaction is committed
+            # Unlike with open() etc. connection WILL NOT GET CLOSED
+            with db_con:
+                # join only inserts the string to join on in-between the elements of the 
+                # iterable (none at the end)
+                # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ?
+                # WHERE url_file = ?
+                c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
+        return row_cont["local_filename"]
 
 
-def _cl_rip_users(args):
-    for usr in args.names:
-        rip_usr_to_files(usr)
-
-
-def _cl_fromtxt(args):
-    if not os.path.isfile(args.filename):
-        logger.error("Couldn't find file %s", args.filename)
-        return
-
-    if args.type == "sg":
-        rip_audio_dls(gen_audiodl_from_sglink(utils.txt_to_list(args.filename)))
-    else:
-        llist = get_sub_from_reddit_urls(utils.txt_to_list(args.filename))
-        adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
-        rip_audio_dls(adl_list)
-
-
-def _cl_watch(args):
-    if args.type == "sg":
-        found = watch_clip("sgasm")
-        if found:
-            llist = gen_audiodl_from_sglink(found)
-            rip_audio_dls(llist)
-    else:
-        found = watch_clip("reddit")
-        if found:
-            llist = get_sub_from_reddit_urls(found)
-            adl_list = parse_submissions_for_links(llist, SUPPORTED_HOSTS)
-            rip_audio_dls(adl_list)
-
-
-def _cl_sub(args):
-    sort = args.sort
-    limit = args.limit
-    time_filter = args.timefilter
-    if sort == "top":
-        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit, time_filter=time_filter),
-                                               SUPPORTED_HOSTS, time_check=args.only_newer)
-    else:
-        # new and hot dont use time_filter
-        adl_list = parse_submissions_for_links(parse_subreddit(args.sub, sort, limit), SUPPORTED_HOSTS,
-                                               time_check=args.only_newer)
-    if args.only_newer:
-        write_last_dltime()
-    rip_audio_dls(adl_list)
-
-
-def _cl_search(args):
-    sort = args.sort
-    limit = args.limit
-    time_filter = args.timefilter
-
-    found_subs = search_subreddit(args.subname, args.sstr, limit=limit, time_filter=time_filter,
-                                  sort=sort)
-    adl_list = parse_submissions_for_links(found_subs, SUPPORTED_HOSTS)
-    if adl_list:
-        rip_audio_dls(adl_list)
-    else:
-        logger.warning("No matching subs/links found in {}, with: '{}'".format(args.subname, args.sstr))
-
-
-def _cl_config(args):
-    changed = False
-    if args.path:
-        # normalize path, remove double \ and convert / to \ on windows
-        path_in = os.path.normpath(args.path)
-        os.makedirs(path_in, exist_ok=True)
-        # i dont need to change cwd and ROOTDIR since script gets restarted anyway
-        try:
-            config["Settings"]["root_path"] = path_in
-        except KeyError:
-            # settings setciton not present
-            config["Settings"] = {"root_path": path_in}
-        changed = True
-        print("New root dir is: {}".format(path_in))
-    # not elif since theyre not mutually exclusive
-    if args.backup_freq:
-        try:
-            config["Settings"]["db_bu_freq"] = str(args.backup_freq)
-        except KeyError:
-            # settings setciton not present
-            config["Settings"] = {"db_bu_freq": str(args.backup_freq)}
-        changed = True
-        print("Auto backups are due every {} days now!".format(args.backup_freq))
-    if args.backup_nr:
-        try:
-            config["Settings"]["max_db_bu"] = str(args.backup_nr)
-        except KeyError:
-            # settings setciton not present
-            config["Settings"] = {"max_db_bu": str(args.backup_nr)}
-        changed = True
-        print("{} backups will be kept from now on".format(args.backup_nr))
-    if args.tagfilter:
-        # not needed: .strip(", ")
-        tf_str = ", ".join(args.tagfilter)
-        try:
-            config["Settings"]["tag_filter"] = tf_str
-        except KeyError:
-            # settings setciton not present
-            config["Settings"] = {"tag_filter": tf_str}
-        changed = True
-        print("Banned tags were set to: {}".format(tf_str))
-    if args.tag_combo_filter:
-        t12_str = ";, ".join(args.tag_combo_filter)
-        try:
-            config["Settings"]["tag1_in_but_not_tag2"] = t12_str
-        except KeyError:
-            # settings setciton not present
-            config["Settings"] = {"tag1_in_but_not_tag2": t12_str}
-        changed = True
-        print("Banned tag combos were set to: {}".format(t12_str))
-    if args.set_missing_reddit is not None:  # since 0 evaluates to False
-        smr_bool = bool(args.set_missing_reddit)
-        try:
-            config["Settings"]["set_missing_reddit"] = str(smr_bool)
-        except KeyError:
-            # settings setciton not present
-            config["Settings"] = {"set_missing_reddit": str(smr_bool)}
-        changed = True
-        print("Gwaripper will try to fill in missing reddit info of "
-              "soundgasm.net files: {}".format(smr_bool))
-    if args.client_id:
-        try:
-            config["Reddit"]["client_id"] = str(args.client_id)
-        except KeyError:
-            config["Reddit"] = {"client_id": str(args.client_id)}
-        changed = True
-        print("Successfully set Client ID")
-    if args.client_secret is not None:
-        if args.client_secret:
-            try:
-                config["Reddit"]["client_secret"] = str(args.client_secret)
-            except KeyError:
-                config["Reddit"] = {"client_secret": str(args.client_secret)}
-        else:
-            try:
-                del config["Reddit"]["client_secret"]
-            except KeyError:
-                pass
-        changed = True
-        print("Successfully set Client Secret")    
-    if args.imgur_client_id:
-        try:
-            config["Imgur"]["client_id"] = str(args.imgur_client_id)
-        except KeyError:
-            config["Imgur"] = {"client_id": str(args.imgur_client_id)}
-        changed = True
-        print("Successfully set Imgur Client ID")          
-    if not changed:
-        # print current cfg
-        for sec in config.sections():
-            print("[{}]".format(sec))
-            for option, val in config[sec].items():
-                print("{} = {}".format(option, val))
-            print("")
-        return  # so we dont reach writing of cfg
-    # write updated config
-    write_config_module()
-
-
-# avoid too many function calls since they are expensive in python
 def gen_audiodl_from_sglink(sglinks):
     """
     Generates AudioDownload instances initiated with the sgasm links and returns them in a list
@@ -521,13 +284,6 @@ def rip_audio_dls(dl_list):
 
     :param dl_list: List of AudioDownload instances
     """
-    # when assigning instance Attributes of classes like self.url
-    # Whenever we assign or retrieve any object attribute like url, Python searches it in the object's
-    # __dict__ dictionary -> Therefore, a_file.url internally becomes a_file.__dict__['url'].
-
-    # also possible to use .execute() methods on connection, which then create a cursor object and calls the
-    # corresponding mehtod with given params and returns the cursor
-    conn, c = load_or_create_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
 
     # create dict that has page urls as keys and AudioDownload instances as values
     # dict comrehension: d = {key: value for (key, value) in iterable}
@@ -583,31 +339,6 @@ def rip_usr_to_files(currentusr):
     rip_audio_dls(dl_list)
 
 
-def rip_usr_links(sgasm_usr_url):
-    """
-    Gets all the links to soundgasm.net posts of the user/at user url and returns them in a list
-
-     Use bs4 to select all <a> tags directly beneath <div> with class sound-details
-     Writes content of href attributes of found tags to list and return it
-
-    :param sgasm_usr_url: Url to soundgasm.net user site
-    :return: List of links to soundgasm.net user's posts
-    """
-    site = urllib.request.urlopen(sgasm_usr_url)
-    html = site.read().decode('utf-8')
-    site.close()
-
-    soup = bs4.BeautifulSoup(html, 'html.parser')
-
-    # decision for bs4 vs regex -> more safe and speed loss prob not significant
-    # splits: 874 µs per loop; regex: 1.49 ms per loop; bs4: 84.3 ms per loop
-    anchs = soup.select("div.sound-details > a")
-    user_files = [a["href"] for a in anchs]
-
-    logger.info("Found {} Files!!".format(len(user_files)))
-    return user_files
-
-
 def filter_alrdy_downloaded(dl_dict, db_con):
     """
     Filters out already downloaded urls and returns a set of new urls
@@ -650,7 +381,7 @@ def filter_alrdy_downloaded(dl_dict, db_con):
     return result
 
 
-def watch_clip(site_name):
+def watch_clip():
     """
     Watches clipboard for links of domain
 
@@ -660,12 +391,8 @@ def watch_clip(site_name):
     :param domain: keyword that points to function is_domain_url in clipwatcher_single module
     :return: List of found links, None if there None
     """
-    try:
-        dm = clipwatcher_single.site_keyword_func[site_name]
-    except KeyError:
-        logger.error("Invalid site_name %s", site_name)
-
-    watcher = clipwatcher_single.ClipboardWatcher(dm, clipwatcher_single.print_write_to_txtf,
+    watcher = clipwatcher_single.ClipboardWatcher(clipwatcher_single.is_url,
+                                                  clipwatcher_single.print_write_to_txtf,
                                                   os.path.join(ROOTDIR, "_linkcol"), 0.1)
     try:
         logger.info("Watching clipboard...")
@@ -681,22 +408,3 @@ def watch_clip(site_name):
                 return watcher.found.copy()
             else:
                 return
-
-
-def write_last_dltime():
-    """
-    Sets last dl time in config, creating the "Time" section if it doesnt exist and then
-    writes it to the config file
-
-    :return: None
-    """
-    if config.has_section("Time"):
-        config["Time"]["LAST_DL_TIME"] = str(time.time())
-    else:
-        # create section if it doesnt exist
-        config["Time"] = {"LAST_DL_TIME": str(time.time())}
-    write_config_module()
-
-
-if __name__ == "__main__":
-    main()

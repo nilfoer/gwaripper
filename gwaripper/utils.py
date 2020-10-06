@@ -1,8 +1,65 @@
+import sys
 import os
 import time
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logger.critical("Uncaught exception: ", exc_info=(exc_type, exc_value, exc_traceback))
+
+    if exc_traceback is not None:
+        # printing locals by frame from: Python Cookbook p. 343/343 von Alex Martelli,
+        # Anna Ravenscroft, David Ascher
+        tb = exc_traceback
+        # get innermost traceback
+        while tb.tb_next:
+            tb = tb.tb_next
+
+        stack = []
+        frame = tb.tb_frame
+        # walk backwards to outermost frame -> innermost first in list
+        while frame:
+            stack.append(frame)
+            frame = frame.f_back
+        stack.reverse()  # remove if you want innermost frame first
+
+        # we could filter ouput by filename (frame.f_code.co_filename) so that we only print locals
+        # when we've reached the first frame of that file (could use part of __name__
+        # (here: gwaripper.gwaripper))
+
+        # build debug string by creating list of lines and join them on \n instead of concatenation
+        # since adding strings together means creating a new string (and potentially destroying the old ones)
+        # for each addition
+        # add first string in list literal instead of appending it in the next line -> would be bad practice
+        debug_strings = ["Locals by frame, innermost last"]
+
+        for frame in stack:
+            debug_strings.append("Frame {} in {} at line {}\n{}\n".format(frame.f_code.co_name,
+                                                                          frame.f_code.co_filename,
+                                                                          frame.f_lineno, "-"*100))
+            for key, val in frame.f_locals.items():
+                try:
+                    debug_strings.append("\t{:>20} = {}".format(key, val))
+                # we must absolutely avoid propagating exceptions, and str(value) could cause any
+                # exception, so we must catch any
+                except:
+                    debug_strings.append("ERROR WHILE PRINTING VALUES")
+
+            debug_strings.append("\n" + "-" * 100 + "\n")
+
+        logger.debug("\n".join(debug_strings))
+
+
+# sys.excepthook is invoked every time an exception is raised and uncaught
+# set own custom function so we can log traceback etc to file
+# from: https://stackoverflow.com/questions/6234405/logging-uncaught-exceptions-in-python by gnu_lorien
+sys.excepthook = handle_exception
 
 
 class RequestDelayer:

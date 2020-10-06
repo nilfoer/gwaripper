@@ -196,6 +196,27 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=None):
                                                                fallback=5), next_bu / 24 / 60 / 60))
 
 
+def check_direct_url_for_dl(db_con, direct_url):
+    """
+    Fetches url_file col from db and unpacks the 1-tuples, then checks if direct_url
+    is in the list, if found return True
+
+    :param db_con: Connection to sqlite db
+    :param direct_url: String of direct url to file
+    :return: True if direct_url is in col url_file of db else False
+    """
+    c = db_con.execute("SELECT url_file FROM Downloads")
+    # converting to set would take just as long (for ~10k entries) as searching for it in list
+    # returned as list of 1-tuples, use generator to unpack, so when we find direct_url b4
+    # the last row we dont have to generate the remaining tuples and we only use it once
+    # only minimally faster (~2ms for 10k rows)
+    file_urls = (tup[0] for tup in c.fetchall())
+    if direct_url in file_urls:
+        return True
+    else:
+        return False
+
+
 def set_favorite_entry(db_con, _id, fav_intbool):
     with db_con:
         db_con.execute("UPDATE Downloads SET favorite = ? WHERE id = ?", (fav_intbool, _id))
