@@ -1,14 +1,9 @@
 import logging
-import os
-import re
-import time
 
 import praw
-import bs4
 
 from .config import config
-from .audio_dl import AudioDownload, DELETED_USR_FOLDER
-from .exceptions import NoAPIResponseError, NoAuthenticationError
+from .exceptions import NoAuthenticationError
 
 logger = logging.getLogger(__name__)
 

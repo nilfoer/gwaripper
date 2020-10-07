@@ -30,7 +30,7 @@ class RedditExtractor(BaseExtractor):
         self.praw = reddit_praw()
 
     @classmethod
-    def is_compatible(cls, url):
+    def is_compatible(cls, url: str) -> bool:
         return cls.VALID_REDDIT_URL_RE.match(url)
 
     def extract(self) -> Optional[RedditInfo]:
@@ -70,24 +70,44 @@ class RedditExtractor(BaseExtractor):
         #     # submission is older than lastdltime -> next sub
         #     continue
 
+        ri = None
         submission = self.praw.submission(url=self.url)
 
         if not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2):
             sub_url = submission.url
 
-            ri = RedditInfo(self.url, submission.id, submission.title)
+            ri = RedditInfo(self.url, submission.id, submission.title,
+                            submission.subreddit.display_name)
+            ri.permalink = str(submission.permalink)
+            ri.created_utc = submission.created_utc
+            ri.r_post_url = sub_url
+            try:
+                ri.author = submission.author.name
+            except AttributeError:
+                logger.warning("Author of submission id %s has been deleted! "
+                               "Using None as r_user.", submission.id)
+                ri.author = None
 
-            if sub_url:
+            # sub url not pointing to itself
+            if not submission.is_self:
                 extractor = find_extractor(sub_url)
                 if extractor is not None:
-                    logger.info("{} link found in URL of: {}".format(extractor.EXTRACTOR_NAME,
-                                                                     submission.title))
+                    logger.info("%s link found in URL of: %s", extractor.EXTRACTOR_NAME,
+                                submission.permalink)
                     fi = extractor(sub_url).extract()
+                    # TODO: figure out a way so we don't forget to set this
+                    # requiring it in __init__ would mean we'd have to pass
+                    # it to the extract method which is weird
+                    # TODO mb add parent and reddit_info params to extract
+                    # or add it as attributes to BaseExtractor
                     fi.parent = ri
+                    fi.reddit_info = ri
                     ri.children.append(fi)
                     return ri
 
             if submission.selftext_html is not None:
+                ri.selftext = submission.selftext
+
                 soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
                 # selftext_html is not like the normal html it starts with <div class="md"..
                 # so i can just go through all a
@@ -99,15 +119,20 @@ class RedditExtractor(BaseExtractor):
                 for link in links:
                     href = link["href"]
                     extractor = find_extractor(href)
+                    if extractor is type(self):
+                        # disallow following refs into other reddit submissions
+                        continue
                     if extractor is not None:
-                        logger.info("{} link found in selftext of: {}".format(
-                            extractor.EXTRACTOR_NAME, submission.title))
+                        logger.info("%s link found in selftext of: %s",
+                                    extractor.EXTRACTOR_NAME, submission.permalink)
                         fi = extractor(href).extract()
+                        if fi is None:
+                            continue
                         fi.parent = ri
                         ri.children.append(fi)
 
             if not ri.children:
-                logger.info("No supported link in \"{}\"".format(submission.shortlink))
+                logger.info("No supported link in \"%s\"", submission.shortlink)
                 os.makedirs(os.path.join(ROOTDIR, "_linkcol"), exist_ok=True)
                 with open(os.path.join(ROOTDIR, "_linkcol",
                                        "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
@@ -115,52 +140,13 @@ class RedditExtractor(BaseExtractor):
                     w.write("<h3><a href=\"https://reddit.com{}\">{}"
                             "</a><br/>by {}</h3>\n".format(
                                 submission.permalink, submission.title, submission.author))
-
-            reddit_info = {"title": submission.title, "permalink": str(submission.permalink),
-                           "selftext": submission.selftext,
-                           "created_utc": submission.created_utc, "id": submission.id,
-                           "subreddit": submission.subreddit.display_name,
-                           "r_post_url": sub_url}
-            try:
-                reddit_info["r_user"] = submission.author.name
-            except AttributeError:
-                logger.warning("Author of submission id {} has been deleted! "
-                               "Using None as r_user.".format(submission.id))
-                reddit_info["r_user"] = None
-
-        # # create AudioDownload from found_urls
-        # for host, url in found_urls:
-        #     if "imgur" in host:
-        #         title_sanitized = re.sub(r"[^\w\-_.,\[\] ]", "_", submission.title[0:100])
-        #         user_dir = reddit_info['r_user'] or DELETED_USR_FOLDER
-        #         user_dir = os.path.join(ROOTDIR, f"{user_dir}")
-        #         # direclty download imgur links
-        #         if host == "imgur file":
-        #             imgur = ImgurFile(None, url, user_dir, prefix=title_sanitized)
-        #         else:
-        #             try:
-        #                 if host == "imgur album":
-        #                     imgur = ImgurAlbum(url, user_dir, name=title_sanitized)
-        #                 elif host == "imgur image":
-        #                     imgur = ImgurImage(url, user_dir, prefix=title_sanitized)                         
-        #                 else:
-        #                     logger.error("Unrecognized imgur type: %s", host)
-        #                     continue
-        #             except NoAuthenticationError as e:
-        #                 # repr(e) gives you the exception(and the message string); str(e) only gives the message string
-        #                 logger.error(str(e))
-        #                 continue
-        #             except NoAPIResponseError as e:
-        #                 logger.warning(str(e))
-        #                 continue                        
-        #         imgur.download()
-        #     else:
-        #         dl_list.append(AudioDownload(url, host, reddit_info=reddit_info))
+                # empty collection / no supported links
+                return None
 
         return ri
 
 
-def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None):
+def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None) -> bool:
     """
     Checks praw Submission obj for banned tags (case-insensitive) from keywordlist in title
     returns True if tag is contained. Also returns True if one of the first tags in the tag-combos

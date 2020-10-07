@@ -2,10 +2,11 @@ import re
 
 import bs4
 
+from typing import Optional
 from urllib.parse import quote as url_quote
 
 from .base import BaseExtractor
-from ..info import FileInfo, FileCategory
+from ..info import FileInfo
 from ..exceptions import InfoExtractingError
 
 
@@ -21,10 +22,10 @@ class EraudicaExtractor(BaseExtractor):
         super().__init__(url)
 
     @classmethod
-    def is_compatible(cls, url):
-        return cls.VALID_ERAUDICA_URL_RE.match(url)
+    def is_compatible(cls, url: str) -> bool:
+        return bool(cls.VALID_ERAUDICA_URL_RE.match(url))
 
-    def extract(self):
+    def extract(self) -> Optional[FileInfo]:
         # strip("/gwa") doesnt strip the exact string "/gwa" from the end but instead it strips all
         # the chars contained in that string from the end:
         # "eve/Audio-extravaganza/gwa".strip("/gwa") ->  "eve/Audio-extravaganz"
@@ -59,14 +60,18 @@ class EraudicaExtractor(BaseExtractor):
                 fname = url_quote(fname)
 
                 direct_url = "{}/fd/{}/{}".format(server, dl_token, fname)
-                title = self.reddit_info["title"]
-                ext = fname[-4:]
+                # TODO: garbage in title string: emoticons \r\n lots of duplicate whitespace
+                title = soup.select_one('header.post-header > h2').text
+                ext = fname.rsplit(".", 1)[1]
+
+                # :not(.love-and-favorite-row) doesn't work with bs4
+                descr = "\n\n".join([p.get_text() for p in soup.select('div.description > p')][1:])
 
                 # hardcoded author name
-                return FileInfo(self.__class__, FileCategory.AUDIO, ext, self.url,
-                                direct_url, None, title, None, "Eves-garden")
+                return FileInfo(self.__class__, True, ext, self.url,
+                                direct_url, None, title, descr, "Eves-garden")
             except (IndexError, AttributeError):
                 raise InfoExtractingError(
                         "Error occured while extracting eraudica info - site structure "
                         "probably changed! See if there are updates available!",
-                        self.page_url, html)
+                        self.url, html)

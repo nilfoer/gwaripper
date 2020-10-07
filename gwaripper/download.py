@@ -1,10 +1,17 @@
+import sys
 import os
 import urllib.request
 import logging
 
-from enum import Enum
+from typing import Optional, Dict
+from urllib.error import ContentTooShortError
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_HEADERS = {
+    'User-Agent':
+    'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
+    }
 
 
 def download(url, dl_path):
@@ -33,15 +40,19 @@ def download(url, dl_path):
         return True, headers
 
 
-def download_in_chunks(url, filename):
-    # get head (everythin b4 last part of path ("/" last -> tail empty, filename or dir(without /) -> tail)) of path; no slash in path -> head empty
+def download_in_chunks(url: str, filename: str,
+                       headers: Optional[Dict[str, str]] = None,
+                       prog_bar: bool = False) -> int:
+    # get head (everythin b4 last part of path ("/" last -> tail empty,
+    # filename or dir(without /) -> tail)) of path; no slash in path -> head empty
     dirpath, fn = os.path.split(filename)
     if dirpath:
         os.makedirs(dirpath, exist_ok=True)
 
+    req = urllib.request.Request(url, headers=DEFAULT_HEADERS if headers is None else headers)
     # urlretrieve uses block-size of 8192
     # Before response.read() is called, the contents are not downloaded.
-    with urllib.request.urlopen(url) as response:
+    with urllib.request.urlopen(req) as response:
         meta = response.info()
         reported_file_size = int(meta["Content-Length"])
         # by Alex Martelli
@@ -49,24 +60,35 @@ def download_in_chunks(url, filename):
         # CHUNK = 16 * 1024
         file_size_dl = 0
         chunk_size = 8192
+        block_num = 0
         with open(filename, 'wb') as w:
             while True:
                 chunk = response.read(chunk_size)
+
                 if not chunk:
                     break
 
                 # not chunk_size since the last chunk will probably not be of size chunk_size
                 file_size_dl += len(chunk)
                 w.write(chunk)
+                block_num += 1
+                # copy behaviour of urlretrieve reporthook
+                if prog_bar:
+                    prog_bar_dl(block_num, chunk_size, reported_file_size)
 
-    # from urlretrieve doc: urlretrieve() will raise ContentTooShortError when it detects that the amount of data available was less than the expected amount (which is the size reported by a Content-Length header). This can occur, for example, when the download is interrupted.
-    # The Content-Length is treated as a lower bound: if there’s more data to read, urlretrieve reads more data, but if less data is available, it raises the exception.
+    # from urlretrieve doc: urlretrieve() will raise ContentTooShortError when
+    # it detects that the amount of data available was less than the expected
+    # amount (which is the size reported by a Content-Length header). This can
+    # occur, for example, when the download is interrupted.
+    # The Content-Length is treated as a lower bound: if there’s more data to
+    # read, urlretrieve reads more data, but if less data is available, it
+    # raises the exception.
     if file_size_dl < reported_file_size:
-        logger.warning("Downloaded file's size is samller than the reported size for "
-                       "\"%s\"", url)
-        return False, file_size_dl
+        raise ContentTooShortError(
+                f"Downloaded file's size is samller than the reported size for \"{url}\"",
+                None)
     else:
-        return True, file_size_dl
+        return file_size_dl
 
 
 def get_url_file_size(url):

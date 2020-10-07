@@ -5,7 +5,7 @@ import bs4
 from typing import Optional
 
 from .base import BaseExtractor
-from ..info import FileInfo, FileCollection, FileCategory
+from ..info import FileInfo, FileCollection
 from ..exceptions import InfoExtractingError
 
 
@@ -25,18 +25,19 @@ class SoundgasmExtractor(BaseExtractor):
         super().__init__(url)
 
     @classmethod
-    def is_compatible(cls, url):
-        return cls.VALID_SGASM_FILE_URL_RE.match(url) or cls.VALID_SGASM_USER_URL_RE.match(url)
+    def is_compatible(cls, url: str) -> bool:
+        return bool(cls.VALID_SGASM_FILE_URL_RE.match(url) or
+                    cls.VALID_SGASM_USER_URL_RE.match(url))
 
-    def extract(self):
+    def extract(self) -> Optional[FileInfo]:
         match = SoundgasmExtractor.VALID_SGASM_FILE_URL_RE.match(self.url)
         if not match:
             match = SoundgasmExtractor.VALID_SGASM_USER_URL_RE.match(self.url)
             self.author = match.group(1)
-            self._extract_user()
+            return self._extract_user()
         else:
             self.author = match.group(1)
-            self._extract_file()
+            return self._extract_file()
 
     def _extract_file(self) -> Optional[FileInfo]:
         html = SoundgasmExtractor.get_html(self.url)
@@ -47,7 +48,7 @@ class SoundgasmExtractor(BaseExtractor):
             direct_url = re.search("m4a: \"(.+)\"", html).group(1)
             descr = soup.select_one("div.jp-description > p").text
 
-            return FileInfo(SoundgasmExtractor, FileCategory.AUDIO, "m4a", self.url,
+            return FileInfo(self.__class__, True, "m4a", self.url,
                             direct_url, None, title, descr, self.author)
         except AttributeError:
             raise InfoExtractingError("Error occured while extracting sgasm info - site structure "
@@ -75,6 +76,8 @@ class SoundgasmExtractor(BaseExtractor):
         fcol = FileCollection(self.url, self.author, self.author)
         for url in user_files:
             fi = SoundgasmExtractor(url).extract()
+            if fi is None:
+                continue
             fi.parent = fcol
             fcol.children.append(fi)
 
