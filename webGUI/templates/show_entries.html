@@ -7,7 +7,7 @@
     {% for entry in entries %}
     <div class="entry-container{# ' odd' if loop.index0 % 2 != 0 else '' #}">
         <div class="entry-container-top">
-            <div class="ribbon {{ 'mdb-visible' if entry.favorite else 'mdb-hidden' }}"><span><i class="fas fa-heart"></i></span></div>
+            <div class="ribbon {{ 'gwa-visible' if entry.favorite else 'gwa-hidden' }}"><span><i class="fas fa-heart"></i></span></div>
             <div class="row no-margin">
                 <div class="entry-container-title">
                     {{ entry.reddit_title or entry.title }}
@@ -179,16 +179,16 @@
                 let entry_id = $(event.currentTarget).data("entryId");
                 let fav_intbool = $(event.currentTarget).data("favIntbool");
                 if(fav_intbool == 1) {
-                    ribbon.removeClass("mdb-hidden");
-                    ribbon.addClass("mdb-visible");
+                    ribbon.removeClass("gwa-hidden");
+                    ribbon.addClass("gwa-visible");
 
                     fav_icon.removeClass("fas");
                     fav_icon.addClass("far");
                     fav_btn.data("favIntbool", 0);
                     fav_btn.title = "Un-favorite audio!";
                 } else {
-                    ribbon.removeClass("mdb-visible");
-                    ribbon.addClass("mdb-hidden");
+                    ribbon.removeClass("gwa-visible");
+                    ribbon.addClass("gwa-hidden");
 
                     fav_icon.removeClass("far");
                     fav_icon.addClass("fas");
