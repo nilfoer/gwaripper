@@ -7,10 +7,12 @@ import bs4
 
 from typing import Optional
 
+from praw.models import Submission
+
 from .base import BaseExtractor
 from ..config import KEYWORDLIST, TAG1_BUT_NOT_TAG2, ROOTDIR
 from ..info import RedditInfo
-from ..reddit import reddit_praw
+from ..reddit import reddit_praw, redirect_xpost
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +27,10 @@ class RedditExtractor(BaseExtractor):
             r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/r/(\w+)/comments/"
             r"([A-Za-z0-9]+)/(\w+)?/?", re.IGNORECASE)
 
-    def __init__(self, url):
+    def __init__(self, url, praw_submission: Optional[Submission] = None):
         super().__init__(url)
         self.praw = reddit_praw()
+        self.submission = praw_submission
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
@@ -41,11 +44,12 @@ class RedditExtractor(BaseExtractor):
         check if submission time is newer than last_dl_time loaded from config or utc timestamp
         if supplied with time_check
 
-        If no urls were found log it and append links to html file named like reddit_nurl_%Y-%m-%d_%Hh.html
-        so the user is able to check the subs himself for links
+        If no urls were found log it and append links to html file named like
+        reddit_nurl_%Y-%m-%d_%Hh.html so the user is able to check the subs himself for links
 
-        :param time_check: True -> check if submission time is newer than last dl time from config, type float use
-            this as lastdltime, False or None dont check submission time at all
+        :param time_check: True -> check if submission time is newer than last dl time
+                           from config, type float use this as lastdltime, False or None
+                           dont check submission time at all
         :return: RedditInfo
         """
         # @Hack needed since we directly parse and extract found links in the submission
@@ -71,12 +75,18 @@ class RedditExtractor(BaseExtractor):
         #     continue
 
         ri = None
-        submission = self.praw.submission(url=self.url)
+        if self.submission is None:
+            self.submission = self.praw.submission(url=self.url)
+        submission = self.submission
 
         if not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2):
+            # NOTE: IMPORTANT make sure to only use redirected submission from here on!
+            submission = redirect_xpost(submission)
             sub_url = submission.url
 
-            ri = RedditInfo(self.url, submission.id, submission.title,
+            # rebuild subs url to account for redirection
+            redirected_url = f"{self.praw.config.reddit_url}{submission.permalink}"
+            ri = RedditInfo(redirected_url, submission.id, submission.title,
                             submission.subreddit.display_name)
             ri.permalink = str(submission.permalink)
             ri.created_utc = submission.created_utc
@@ -129,6 +139,7 @@ class RedditExtractor(BaseExtractor):
                         if fi is None:
                             continue
                         fi.parent = ri
+                        fi.reddit_info = ri
                         ri.children.append(fi)
 
             if not ri.children:

@@ -63,11 +63,12 @@ class ImgurImageExtractor(BaseExtractor):
             self.api_response = json.loads(resp) if resp else None
             if self.api_response:
                 direct_url = self.api_response["data"]["link"]
+                self.ext = direct_url.rsplit('.', 1)[1]
             else:
                 raise NoAPIResponseError("No Response recieved", self.api_url)
 
         return FileInfo(self.__class__, False, self.ext, self.url,
-                        direct_url, self.image_hash, None, None, None)
+                        direct_url, self.image_hash, self.image_hash, None, None)
 
 
 class ImgurAlbumExtractor(BaseExtractor):
@@ -133,7 +134,8 @@ class ImgurAlbumExtractor(BaseExtractor):
             logger.warning("No images in album: %s", self.album_hash)
             return None
 
-        fcol = FileCollection(self.url, self.album_hash, self.title)
+        fcol = FileCollection(self.url, self.album_hash,
+                              self.title if self.title else self.album_hash)
         file_infos = []
         for img_e in self.images:
             fi = img_e.extract()

@@ -124,6 +124,9 @@ class FileInfo:
         self.author = author
         self.parent = parent
         self.reddit_info = reddit_info
+        self.downloaded: bool = False
+        # already downloaded and in db; gets set by mark_alrdy_downloaded
+        self.already_downloaded: bool = False
 
     def __str__(self):
         return f"FileInfo<{self.page_url}>"
@@ -148,12 +151,14 @@ class FileInfo:
             # reddit_title can only be a RedditInfo.title
             # but parent_title can also be a RedditInfo.title
             parent_title = self.parent.title if self.parent.title else self.parent.id
-            # TODO IMPORTANT: reddit_info None for erdaudica from reddit post
+
             if self.reddit_info is not None:
                 # reddit_info.subpath -> save everything in that folder
                 # even if further FileCollections would have a subpath
+                # NOTE: IMPORTANT! if we change this behaviour also change
+                # :PassSubpathSelftext
                 if self.reddit_info.subpath:
-                    subpaths.append(self.reddit_info.subpath)
+                    subpaths.append(self.reddit_info.subpath[:70])
                     if parent_title:
                         title.append(parent_title[:30])
                 else:
@@ -268,20 +273,27 @@ class RedditInfo(FileCollection):
     def parent(self, parent):
         raise Exception("RedditInfo is not allowed to have a parent!")
 
-    def write_selftext_file(self, user_path: str):
+    def write_selftext_file(self, root_dir: str, subpath: str, force_path: bool = False):
         """
-        Write selftext to a text file if not None, reddit_info must not be None!!
+        Write selftext to a text file if not None
         Doesnt overwrite already existing selftext file!
 
-        :param user_path: Absolute path to subfolder where files of RedditInfo author are stored
+        :param root_dir: Absolute path to GWARipper root
+        :param user_path: Relative path from root_dir to subfolder where files of
+                          RedditInfo collection are stored
+        :param force_path: Use passed in :subpath: as base for the selftext filename
         :return: None
         """
         if not self.selftext:
             return None
-        filename = sanitize_filename(len(user_path), self.title)
-        # path.join works with joining empty strings
-        os.path.join(user_path, self.subpath, filename)
-        selftext_fn = f"{filename}.txt"
+
+        if force_path:
+            selftext_fn = os.path.join(root_dir, f"{subpath}_selftext.txt")
+        else:
+            filename = sanitize_filename(len(subpath), self.title)
+            # path.join works with joining empty strings
+            filename = os.path.join(root_dir, subpath, filename)
+            selftext_fn = f"{filename}.txt"
 
         if not os.path.isfile(selftext_fn):
             with open(selftext_fn, "w", encoding="UTF-8") as w:

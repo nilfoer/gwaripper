@@ -46,9 +46,10 @@ class SoundgasmExtractor(BaseExtractor):
         try:
             title = soup.select_one("div.jp-title").text
             direct_url = re.search("m4a: \"(.+)\"", html).group(1)
+            ext = direct_url.rsplit('.', 1)[1]
             descr = soup.select_one("div.jp-description > p").text
 
-            return FileInfo(self.__class__, True, "m4a", self.url,
+            return FileInfo(self.__class__, True, ext, self.url,
                             direct_url, None, title, descr, self.author)
         except AttributeError:
             raise InfoExtractingError("Error occured while extracting sgasm info - site structure "

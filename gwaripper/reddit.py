@@ -14,16 +14,20 @@ reddit_client_id = (reddit_client_id if
                     (reddit_client_id and not
                      reddit_client_id.startswith("to get a client id"))
                     else None)
+reddit_instance = None
 
 
 def reddit_praw():
-    if reddit_client_id is None:
-        raise NoAuthenticationError("Client ID is required to access reddit: "
-                                    "https://www.reddit.com/prefs/apps/")
-    reddit = praw.Reddit(client_id=reddit_client_id,
-                         client_secret=config["Reddit"].get("CLIENT_SECRET", None),
-                         user_agent=config["Reddit"]["USER_AGENT"])
-    reddit.read_only = True
+    if reddit_instance is None:
+        if reddit_client_id is None:
+            raise NoAuthenticationError("Client ID is required to access reddit: "
+                                        "https://www.reddit.com/prefs/apps/")
+        reddit = praw.Reddit(client_id=reddit_client_id,
+                             client_secret=config["Reddit"].get("CLIENT_SECRET", None),
+                             user_agent=config["Reddit"]["USER_AGENT"])
+        reddit.read_only = True
+    else:
+        return reddit_instance
     return reddit
 
 
@@ -63,33 +67,36 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     # time_filter – Can be one of: all, day, hour, month, week, year (default: all)
     subreddit = reddit_praw().subreddit(subname)
 
-    found_sub_list = []
     # Returns a generator for submissions that match the search query
     matching_sub_gen = subreddit.search(searchstring, sort=sort, limit=limit,
                                         syntax="lucene", params={'include_over_18': 'on'},
                                         **kwargs)
-    # iterate over generator and append found submissions to list
-    for sub in matching_sub_gen:
-        found_sub_list.append(sub)
-    found_sub_list = redirect_crossposts(found_sub_list)
+    found_sub_list = redirect_crossposts(matching_sub_gen)
     return found_sub_list
 
 
-def get_sub_from_reddit_urls(urllist):
+def redirect_xpost(sub):
     """
-    Filters duplicate urls and returns a list of Submission obj, that the urls are pointing to
-    If the copied submission is a crosspost, the crossposted submission is used instead!
+    Redirects crosspost to the original submission - does nothing
+    to non-crossposted submissions
 
-    :param urllist: List with urls point to reddit submissions
-    :return: List with Submission obj that were obtained from the urls in urllist
+    :param sub: praw.Submission
+    :return: redirected praw.Submission
     """
-    urls_unique = set(urllist)
-    sublist = []
-    for url in urls_unique:
-        sub = reddit_praw().submission(url=url)
-        sublist.append(sub)
-    sublist = redirect_crossposts(sublist)
-    return sublist
+    try:
+        parent = sub.crosspost_parent
+        logger.info("Reddit submission with id %s is a crosspost, using the redirected "
+                    "submission with id %s instead!", sub.id, parent)
+        assert len(sub.crosspost_parent_list) == 1
+        # crosspost_parent has the full name of the submission -> u get id by splitting at '_'
+        # e.g. id 'j6y1n9' has a crosspost_parent of 't3_boo4rq'
+        # The fullname of an object is the object’s type followed by an
+        # underscore and its base-36 id. An example would be t3_boo4rq, where
+        # the t3 signals that it is a Submission, and the submission ID is 1h4f3.
+        sub_redirect = reddit_praw().submission(id=parent.split("_")[1])
+        return sub_redirect
+    except AttributeError:
+        return sub
 
 
 def redirect_crossposts(subs):
@@ -100,15 +107,4 @@ def redirect_crossposts(subs):
     :param subs: Iterable of praw.Submission
     :return: List of praw.Submission
     """
-    result = []
-    for sub in subs:
-        if hasattr(sub, "crosspost_parent"):
-            # crosspost_parent has the full name of the submission -> u get id by splitting at '_'
-            logger.info("Reddit submission with id %s is a crosspost, using the redirected "
-                        "submission with id %s instead!", sub.id, sub.crosspost_parent)
-            assert len(sub.crosspost_parent_list) == 1
-            sub_redirect = reddit_praw().submission(id=sub.crosspost_parent.split("_")[1])
-            result.append(sub_redirect)
-        else:
-            result.append(sub)
-    return result
+    return [redirect_xpost(sub) for sub in subs]

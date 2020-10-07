@@ -2,19 +2,23 @@
 import logging
 import os
 import time
+import datetime
 import re
 import urllib.request
-import sqlite3
+
+import praw
 
 from typing import List, Union, Optional
 
 from .logging_setup import configure_logging
-from . import clipwatcher_single
 from . import utils
-from .config import config, write_config_module, ROOTDIR
+from .config import config, ROOTDIR
 from .extractors import find_extractor
+from .extractors.soundgasm import SoundgasmExtractor
+from .extractors.reddit import RedditExtractor
 from .info import FileInfo, FileCollection, RedditInfo, children_iter_dfs, children_iter_bfs
 from . import download as dl
+from .reddit import reddit_praw
 from .db import load_or_create_sql_db, export_csv_from_sql, backup_db
 from .exceptions import InfoExtractingError
 
@@ -22,12 +26,15 @@ rqd = utils.RequestDelayer(0.25, 0.75)
 
 # configure logging
 # logfn = time.strftime("%Y-%m-%d.log")
-# __name__ = 'gwaripper.gwaripper' -> logging of e.g. 'gwaripper.utils' (when callin getLogger with __name__
+# __name__ = 'gwaripper.gwaripper' -> logging of e.g. 'gwaripper.utils' (when
+# callin getLogger with __name__
 # in utils module) wont be considered a child of this logger
-# we could use logging.config.fileConfig to configure our loggers (call it in main() for example, but with
-# 'disable_existing_loggers': False, otherwise all loggers created by getLogger at module-level will be disabled)
-# or we could configure our logging in __init__.py of our package (top-most level) with __name__ since that is
-# just 'gwaripper' or we can configure our logger for the package by calling getLogger with 'gwaripper'
+# we could use logging.config.fileConfig to configure our loggers (call it in
+# main() for example, but with 'disable_existing_loggers': False, otherwise all loggers
+# created by getLogger at module-level will be disabled)
+# or we could configure our logging in __init__.py of our package (top-most
+# level) with __name__ since that is just 'gwaripper' or we can configure our
+# logger for the package by calling getLogger with 'gwaripper'
 logger = logging.getLogger("gwaripper")
 logger.setLevel(logging.DEBUG)
 
@@ -45,13 +52,31 @@ class GWARipper:
 
     def __init__(self, root_dir):
         self.root_dir = root_dir
-        self.db_con, _ = load_or_create_sql_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
+        self.db_con, _ = load_or_create_sql_db(os.path.join(root_dir, "gwarip_db.sqlite"))
         self.downloads = []
         self.nr_downloads = 0
         self.download_index = 1
 
+    def __enter__(self):
+        return self  # with GWARipper() as x <- x will be self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        # If no exception occurred then these last 3 arguments will all be
+        # None. If an exception occurred in the with block, then you can either
+        # suppress the exception by returning a true value from this method. If
+        # you don't want to suppress errors then you can return a value that
+        # evaluates to False.
+        export_csv_from_sql(os.path.join(self.root_dir, "gwarip_db_exp.csv"), self.db_con)
+        self.db_con.close()
+
+        # auto backup
+        backup_db(os.path.join(self.root_dir, "gwarip_db.sqlite"))
+        return None
+
     def parse_links(self, links: List[str]) -> None:
-        for url in links:
+        # NOTE: deduplicates links list
+        dls = []
+        for url in set(links):
             extractor = find_extractor(url)
             try:
                 info = extractor(url).extract()
@@ -59,13 +84,29 @@ class GWARipper:
                 logger.error("Extraction failed! Skipping URL: %s", url)
                 continue
             if info is not None:
-                self.downloads.append(info)
+                dls.append(info)
 
-        import pickle
-        with open("parsed_b4_nrdls_downloads.pickle", "wb") as f:
-            pickle.dump(self.downloads, f)
-        self.nr_downloads += sum(1 for _, x in children_iter_dfs(self.downloads)
-                                 if isinstance(x, FileInfo))
+        self.downloads.extend(dls)
+        self.nr_downloads += sum(1 for _ in children_iter_dfs(
+                                 dls, file_info_only=True))
+
+    def parse_submissions(self, sublist: List[praw.models.Submission]) -> None:
+        # NOTE: does not deduplicate sublist!!
+        dls = []
+        for sub in sublist:
+            try:
+                reddit = reddit_praw()
+                url = f"{reddit.config.reddit_url}{sub.permalink}"
+                info = RedditExtractor(url, sub).extract()
+            except InfoExtractingError:
+                logger.error("Extraction failed! Skipping URL: %s", url)
+                continue
+            if info is not None:
+                dls.append(info)
+
+        self.downloads.extend(dls)
+        self.nr_downloads += sum(1 for _ in children_iter_dfs(
+                                 dls, file_info_only=True))
 
     def download_all(self) -> None:
         # TODO mb to restrict to [self.download_index + 1: self.nr_downloads + 1]?
@@ -75,6 +116,7 @@ class GWARipper:
     def download(self, info: Union[FileInfo, FileCollection]) -> None:
         if isinstance(info, FileInfo):
             self._download_file(info, info.author)
+            rqd.delay_request()
         else:
             self._download_collection(info)
 
@@ -104,7 +146,14 @@ class GWARipper:
         Calls info.generate_filename to get a valid filename
         Also calls method to add dl to db commits when download is successful, does a rollback
         when not (exception raised).
+
+        :return subpath: Returns subpath to folder file is located in relative to root_dir
         """
+        if info.already_downloaded:
+            logger.info("File was already downloaded, skipped URL: %s", info.page_url)
+            self.nr_downloads -= 1
+            return None
+
         subpath, filename, ext = info.generate_filename(file_index)
 
         mypath = os.path.join(self.root_dir, author_name, subpath)
@@ -118,16 +167,23 @@ class GWARipper:
 
         # TODO retries etc. or use requests lib?
         try:
-            # automatically commits changes to db_con if everything succeeds or does a rollback
-            # if an exception is raised; exception is still raised and must be caught
-            with self.db_con:
-                # executes the SQL query but leaves commiting it to with db_con in line above
-                self._add_to_db(info, filename)
-                # func passed as kwarg reporthook gets called once on establishment
-                # of the network connection and once after each block read thereafter.
-                # The hook will be passed three arguments; a count of blocks transferred
-                # so far, a block size in bytes, and the total size of the file
-                # total size is -1 if unknown
+            if info.is_audio:
+                # automatically commits changes to db_con if everything succeeds or does a rollback
+                # if an exception is raised; exception is still raised and must be caught
+                with self.db_con:
+                    # executes the SQL query but leaves commiting it to with db_con in line above
+                    self._add_to_db(info, filename)
+                    # func passed as kwarg reporthook gets called once on establishment
+                    # of the network connection and once after each block read thereafter.
+                    # The hook will be passed three arguments; a count of blocks transferred
+                    # so far, a block size in bytes, and the total size of the file
+                    # total size is -1 if unknown
+                    #print(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
+                    dl.download_in_chunks(info.direct_url,
+                                          os.path.abspath(os.path.join(mypath, filename)),
+                                          prog_bar=True)
+            else:
+                #print(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
                 dl.download_in_chunks(info.direct_url,
                                       os.path.abspath(os.path.join(mypath, filename)),
                                       prog_bar=True)
@@ -135,25 +191,50 @@ class GWARipper:
             logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
         except urllib.error.ContentTooShortError as err:
             logger.warning(err.msg)
+            # TODO handle this in a better way
+            # technically downloaded but might be corrupt
+            info.downloaded = True
+        else:
+            info.downloaded = True
+
+        return subpath
 
     def _download_collection(self, info: FileCollection):
+        if all(fi.already_downloaded for _, fi in
+                children_iter_dfs(info.children, file_info_only=True)):
+            logger.info("Skipping collection, since all files were already "
+                        "downloaded: %s", info.url)
+            # TODO do this in mark_alrdy_downloaded?
+            self.nr_downloads -= info.nr_files()
+            return None
+
         logger.info("Starting download of collection: %s", info.url)
 
         # collection determines best author_name to use
         # priority is 1. reddit 2. file collection author 3. file author 4. fallbacks
         author_name = info.get_preferred_author_name()
 
+        any_downloads = False
+        with_file_idx = info.nr_files() > 1
         # don't recurse into separate calls for nested FileCollections
         # only have one call per FileCollection that is in self.downloads
         for rel_idx, fi in children_iter_dfs(info.children,
                                              file_info_only=True, relative_enum=True):
-            self._download_file(fi, author_name, rel_idx)
+            # rel_idx is 0-based
+            self._download_file(fi, author_name, (rel_idx + 1) if with_file_idx else 0)
+            any_downloads = any_downloads or fi.downloaded
+            rqd.delay_request()
 
-        # TODO: check for download
-        try:
-            info.write_selftext_file(os.path.join(self.root_dir, author_name))
-        except AttributeError:
-            pass
+        if any_downloads:
+            try:
+                # :PassSubpathSelftext
+                _, fi = next(children_iter_dfs(info.children, file_info_only=True))
+                subpath, _, _ = fi.generate_filename()
+                info.write_selftext_file(self.root_dir,
+                                         os.path.join(author_name, subpath))
+            except AttributeError:
+                raise
+                pass
 
     def _add_to_db(self, info: FileInfo, filename: str) -> None:
         """
@@ -197,45 +278,69 @@ class GWARipper:
             })
 
         self.db_con.execute("INSERT INTO Downloads(date, time, description, local_filename, "
-                            "title, url_file, url, created_utc, r_post_url, reddit_id, reddit_title, "
-                            "reddit_url, reddit_user, sgasm_user, subreddit_name) VALUES (:date, :time, "
-                            ":description, :local_filename, :title, :url_file, :url, :created_utc, "
-                            ":r_post_url, :reddit_id, :reddit_title, :reddit_url, :reddit_user, "
-                            ":sgasm_user, :subreddit_name)", val_dict)
+                            "title, url_file, url, created_utc, r_post_url, reddit_id, "
+                            "reddit_title, reddit_url, reddit_user, sgasm_user, subreddit_name) "
+                            " VALUES (:date, :time, :description, :local_filename, :title, "
+                            ":url_file, :url, :created_utc, :r_post_url, :reddit_id, "
+                            ":reddit_title, :reddit_url, :reddit_user, :sgasm_user, "
+                            ":subreddit_name)", val_dict)
 
-    def filter_alrdy_downloaded(self) -> None:
+    def mark_alrdy_downloaded(self) -> None:
         """
-        Filters out already downloaded urls from self.downlods
+        Marks already downloaded urls from self.downlods as info.already_downloaded = True
         """
+        dl_dict = {info.page_url: info for _, info in children_iter_dfs(
+                   self.downloads, file_info_only=True)}
         c = self.db_con.execute("SELECT url FROM Downloads WHERE url IN "
-                                f"({', '.join(['?']*len(self.downloads))})",
-                                (*self.downloads,))
+                                f"({', '.join(['?']*len(dl_dict.keys()))})",
+                                (*dl_dict.keys(),))
         duplicate = {r[0] for r in c.fetchall()}
 
-        if config.getboolean("Settings", "set_missing_reddit"):
-            for dup in duplicate:
-                # when we got reddit info get sgasm info even if this file was already downloaded b4
-                # then write missing info to df and write selftext to file
-                if dl_dict[dup].reddit_info and ("soundgasm.net/" in dup):
-                    logger.info("Filling in missing reddit info: You can disable this "
-                                "in the settings")
-                    adl = dl_dict[dup]
-                    # get filename from db to write selftext
-                    adl.filename_local = adl.set_missing_reddit_db(db_con)
-                    # TODO due to my db having been used with older versions there are a lot of
-                    # rows where cols local_filename and url are empty -> gen a filename so we can
-                    # write the selftext
-                    if adl.filename_local is None:  # TORELEASE remove
-                        adl.filename_local = re.sub(r"[^\w\-_.,\[\] ]", "_", adl.title[0:110]) + ".m4a"  # TORELEASE remove
-                    adl.write_selftext_file(ROOTDIR)
+        if duplicate and config.getboolean("Settings", "set_missing_reddit"):
+            logger.info("Filling in missing reddit info: You can disable this "
+                        "in the settings")
+            for dupe_url in duplicate:
+                info = dl_dict[dupe_url]
+                # when we got reddit info get sgasm info even if this file was already
+                # downloaded b4 then write missing info to db and write selftext to file
+                if info.reddit_info:
+                    missing, filename_local, added_date, page_usr = (
+                            self.set_missing_reddit_db(info))
+                    if not missing or not info.reddit_info.selftext:
+                        continue
+
+                    legacy_cutoff = datetime.datetime(2020, 10, 6)
+                    if ((info.extractor is SoundgasmExtractor and
+                            (added_date is None or added_date == "None")) or
+                            datetime.datetime.strptime(added_date, "%Y-%m-%d") <= legacy_cutoff):
+                        # TODO due to my db having been used with older versions there are a lot of
+                        # rows where cols local_filename and url are empty -> gen a filename so we
+                        # can write the selftext
+                        if filename_local is None:
+                            filename_local = re.sub(
+                                    r"[^\w\-_.,\[\] ]", "_",
+                                    info.title[0:110]) + ".m4a"
+                        selftext_fn = os.path.join(self.root_dir, page_usr,
+                                                   f"{filename_local}.txt")
+
+                        if not os.path.isfile(selftext_fn):
+                            ri = info.reddit_info
+                            with open(selftext_fn, "w", encoding="UTF-8") as w:
+                                w.write(f"Title: {ri.title}\nPermalink: {ri.permalink}\n"
+                                        f"Selftext:\n\n{ri.selftext}")
+                    else:
+                        # intentionally don't write into subpath that might get used
+                        # by RedditInfo since this file was downloaded without it
+                        file_path = os.path.join(page_usr, filename_local)
+                        info.reddit_info.write_selftext_file(
+                                self.root_dir, file_path, force_path=True)
         if duplicate:
             logger.info("%d files were already downloaded!", len(duplicate))
 
-        # Return a new set with elements in either the set or other but not both.
-        # -> duplicates will get removed from unique_urls
-        self.downloads = list(duplicate.symmetric_difference(self.downloads))
+        for dupe_url in duplicate:
+            dl_dict[dupe_url].already_downloaded = True
 
-    def set_missing_reddit_db(self, db_con):
+    def set_missing_reddit_db(self, info: FileInfo) -> (bool, Optional[str], str, str):
         """
         Updates row of file entry in db with reddit_info dict, only sets values if previous
         entry was NULL/None
@@ -244,23 +349,20 @@ class GWARipper:
         :param self: instance of AudioDownload whose entry should be updated
         :return: Returns local filename of downloaded audio file
         """
-        if not self.reddit_info:
+        if not info.reddit_info:
             return
-        # Row provides both index-based and case-insensitive name-based access to columns with almost no memory overhead
-        db_con.row_factory = sqlite3.Row
-        # we need to create new cursor after changing row_factory
-        c = db_con.cursor()
 
-        # even though Row class can be accessed both by index (like tuples) and case-insensitively by name
-        # reset row_factory to default so we get normal tuples when fetching (should we generate a new cursor)
+        # even though Row class can be accessed both by index (like tuples) and
+        # case-insensitively by name
+        # reset row_factory to default so we get normal tuples when fetching
+        # (should we generate a new cursor)
         # new_c will always fetch Row obj and cursor will fetch tuples
-        db_con.row_factory = None
 
-        c.execute("SELECT * FROM Downloads WHERE url = ?", (self.page_url,))
+        c = self.db_con.execute("SELECT * FROM Downloads WHERE url = ?", (info.page_url,))
         row_cont = c.fetchone()
 
         set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"),
-                      ("reddit_user", "r_user"), ("created_utc", "created_utc"),
+                      ("reddit_user", "author"), ("created_utc", "created_utc"),
                       ("reddit_id", "id"), ("subreddit_name", "subreddit"),
                       ("r_post_url", "r_post_url"))
 
@@ -269,133 +371,20 @@ class GWARipper:
         for col, key in set_helper:
             if row_cont[col] is None:
                 upd_cols.append("{} = ?".format(col))
-                upd_vals.append(self.reddit_info[key])
+                upd_vals.append(getattr(info.reddit_info, key, None))
 
         if upd_cols:
             logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
             # append url since upd_vals need to include all the param substitutions for ?
-            upd_vals.append(self.page_url)
+            upd_vals.append(info.page_url)
             # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would
             # have to update as well so not a good idea
             # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(
             #   ",".join(upd_cols), ",".join("?"*len(upd_cols))))
 
-            # Connection objects can be used as context managers that automatically commit or
-            # rollback transactions.
-            # In the event of an exception, the transaction is rolled back; otherwise, the 
-            # transaction is committed
-            # Unlike with open() etc. connection WILL NOT GET CLOSED
-            with db_con:
-                # join only inserts the string to join on in-between the elements of the 
-                # iterable (none at the end)
-                # format to -> e.g UPDATE Downloads SET url = ?,local_filename = ?
-                # WHERE url_file = ?
-                c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)), upd_vals)
-        return row_cont["local_filename"]
-
-
-def gen_audiodl_from_sglink(sglinks):
-    """
-    Generates AudioDownload instances initiated with the sgasm links and returns them in a list
-
-    :param sglinks: Links to soundgasm.net posts
-    :return: List containing AudioDownload instances that were created with the urls in sglinks
-    """
-    dl_list = []
-    # set -> remove duplicates
-    for link in set(sglinks):
-        a = AudioDownload(link, "sgasm")
-        dl_list.append(a)
-    return dl_list
-
-
-def rip_audio_dls(dl_list):
-    """
-    Accepts list of AudioDownload instances, loads sqlite db and fetches downloaded urls from it.
-    Filters them for new downloads and saves them to disk by calling call_host_get_file_info and download method.
-    Calls backup_db to do automatic backups after all operations are done.
-
-    :param dl_list: List of AudioDownload instances
-    """
-
-    # create dict that has page urls as keys and AudioDownload instances as values
-    # dict comrehension: d = {key: value for (key, value) in iterable}
-    # duplicate keys -> last key value pair is in dict, values of the same key that came before arent
-    # @Hack removing /gwa appendix since we only add the url without /gwa to the db
-    # so we might have duplicate downloads otherwise
-    dl_dict = {audio.page_url[:-4] if audio.page_url.endswith("/gwa") else audio.page_url:
-               audio for audio in dl_list}
-
-    # returns list of new downloads, dl_dict still holds all of them
-    new_dls = filter_alrdy_downloaded(dl_dict, conn)
-
-    filestodl = len(new_dls)
-    dlcounter = 0
-
-    for url in new_dls:
-        audio_dl = dl_dict[url]
-
-        rqd.delay_request()
-        try:
-            audio_dl.call_host_get_file_info()
-        except urllib.request.HTTPError:
-            # page with file info doesnt exist
-            # nothing was added to db yet so we can just skip ahead
-            filestodl -= 1
-            continue
-
-        # sleep between requests so we dont stress the server too much or get banned
-        # using helper class -> only sleep .25s when last request time was less than .5s ago
-        rqd.delay_request()
-        dlcounter = audio_dl.download(conn, dlcounter, filestodl, ROOTDIR)
-
-    # export db to csv -> human readable without tools
-    export_csv_from_sql(os.path.join(ROOTDIR, "gwarip_db_exp.csv"), conn)
-    conn.close()
-
-    # auto backup
-    backup_db(os.path.join(ROOTDIR, "gwarip_db.sqlite"))
-
-
-def rip_usr_to_files(currentusr):
-    """
-    Calls functions to download all the files of sgasm user to disk
-
-    :param currentusr: soundgasm.net username string
-    :return: None
-    """
-    sgasm_usr_url = "https://soundgasm.net/u/{}".format(currentusr)
-    logger.info("Ripping user %s" % currentusr)
-
-    dl_list = gen_audiodl_from_sglink(rip_usr_links(sgasm_usr_url))
-
-    rip_audio_dls(dl_list)
-
-
-def watch_clip():
-    """
-    Watches clipboard for links of domain
-
-    Convert string to python code to be able to pass function to check if clipboard content is
-    what we're looking for to ClipboardWatcher init
-
-    :param domain: keyword that points to function is_domain_url in clipwatcher_single module
-    :return: List of found links, None if there None
-    """
-    watcher = clipwatcher_single.ClipboardWatcher(clipwatcher_single.is_url,
-                                                  clipwatcher_single.print_write_to_txtf,
-                                                  os.path.join(ROOTDIR, "_linkcol"), 0.1)
-    try:
-        logger.info("Watching clipboard...")
-        watcher.run()
-    except KeyboardInterrupt:
-        watcher.stop()
-        logger.info("Stopped watching clipboard!")
-        if watcher.found:
-            logger.info("URLs were saved in: {}\n".format(watcher.txtname))
-            yn = input("Do you want to download found URLs directly? (yes/no):\n")
-            if yn == "yes":
-                # dont return ref so watcher can die
-                return watcher.found.copy()
-            else:
-                return
+            # TODO let caller handle commit?
+            with self.db_con:
+                c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)),
+                          upd_vals)
+        return (row_cont["reddit_id"] is None, row_cont["local_filename"],
+                row_cont["date"], row_cont["sgasm_user"])

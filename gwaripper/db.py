@@ -22,7 +22,7 @@ def load_or_create_sql_db(filename):
     :param filename: Filename string/path to file
     :return: connection to sqlite3 db and cursor instance
     """
-    conn = sqlite3.connect(filename)
+    conn = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
 
     # context mangaer auto-commits changes or does rollback on exception
     with conn:
@@ -69,6 +69,8 @@ def load_or_create_sql_db(filename):
             PRAGMA foreign_keys=on;
         """)
 
+    # Row provides both index-based and case-insensitive name-based access
+    # to columns with almost no memory overhead
     conn.row_factory = sqlite3.Row
 
     return conn, c

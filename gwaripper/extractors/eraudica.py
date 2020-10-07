@@ -60,8 +60,13 @@ class EraudicaExtractor(BaseExtractor):
                 fname = url_quote(fname)
 
                 direct_url = "{}/fd/{}/{}".format(server, dl_token, fname)
-                # TODO: garbage in title string: emoticons \r\n lots of duplicate whitespace
-                title = soup.select_one('header.post-header > h2').text
+                title = re.search("var title = \"(.+)\";", scripts).group(1)
+                # mixes escaped (\\u..) with unescaped unicode
+                # encode to bytes escaping unicode code points
+                # already escaped sequences get esacped as \\\\u.. -> remove extra \\
+                # and unescape back to unicode
+                title = title.encode("unicode-escape").replace(
+                            b'\\\\u', b'\\u').decode('unicode-escape')
                 ext = fname.rsplit(".", 1)[1]
 
                 # :not(.love-and-favorite-row) doesn't work with bs4
