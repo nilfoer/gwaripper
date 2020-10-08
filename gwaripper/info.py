@@ -39,25 +39,30 @@ def children_iter_dfs(start_list: List[Union['FileInfo', 'FileCollection']],
     cur_collection = start_list
     i = 0
     enumerator = 0
+    skipped_fcols = 0
     while True:
         if i >= len(cur_collection):
             if not stack:
                 break
             else:
-                i, cur_collection = stack.pop()
+                i, skipped_fcols, cur_collection = stack.pop()
                 continue
         cur = cur_collection[i]
         try:
             assert cur.children
-            stack.append((i + 1, cur_collection))
+            stack.append((i + 1, skipped_fcols + 1, cur_collection))
             if not file_info_only:
                 yield i if relative_enum else enumerator, cur
                 enumerator += 1
             cur_collection = cur.children
             i = 0
+            skipped_fcols = 0
         except AttributeError:
             # not a FileCollection
-            yield i if relative_enum else enumerator, cur
+            if relative_enum:
+                yield i - skipped_fcols if file_info_only else i, cur
+            else:
+                yield enumerator, cur
             i += 1
             enumerator += 1
 
@@ -80,16 +85,44 @@ def children_iter_bfs(start_list: List[Union['FileInfo', 'FileCollection']],
 
     # queue all the list items here and then queue all children if we
     # come across a FileCollection
-    q = deque([(i, item) for i, item in enumerate(start_list)])
+
+    # Easier to ask for forgiveness than permission
+    # try/except most pythonic, hasattr also okay since goes well with duck typing
+    # using isinstance and type not so good
+    #
+    # asking for permission vs for forgiveness - performance
+    # (hasattr vs try/except AttributeError)
+    # Both approaches are, in my opinion, equally valid, at least in terms of
+    # readability and pythonic-ness. But if 90% of your objects do not have the
+    # attribute bar you'll notice a distinct performance difference between the
+    # two approaches: forgiveness 2.95s vs permission 1.04s
+    # 90% objects have attr: forgiveness 0.31s vs permission 0.48s
+    if file_info_only and relative_enum:
+        q = deque()
+        i = -1
+        for child in start_list:
+            if not hasattr(child, 'children'):
+                i += 1
+            q.append((i, child))
+    else:
+        q = deque([(i, item) for i, item in enumerate(start_list)])
+
     enumerator = 0
     while q:
         i, cur = q.popleft()
-        # Easier to ask for forgiveness than permission
-        # try/except most pythonic, hasattr also okay since goes well with duck typing
-        # using isinstance and type not so good
         try:
             assert cur.children
+
+            if file_info_only and relative_enum:
+                i = -1
+                for child in cur.children:
+                    if not hasattr(child, 'children'):
+                        i += 1
+                    q.append((i, child))
+                continue
+
             q.extend([(i, item) for i, item in enumerate(cur.children)])
+
             if not file_info_only:
                 yield i if relative_enum else enumerator, cur
                 enumerator += 1

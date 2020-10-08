@@ -17,29 +17,34 @@
 # A trailing "/**" matches everything inside. For example, "abc/**" matches all files inside directory "abc", relative to the location of the .gitignore file, with infinite depth.
 # A slash followed by two consecutive asterisks then a slash matches zero or more directories. For example, "a/**/b" matches "a/b", "a/x/b", "a/x/y/b" and so on.
 # Other consecutive asterisks are considered invalid.
-.idea/
-**/__pycache__/
-gwaripper/pyperclip/
-**/config_script.ini
-**/*.log
-**/.ipynb_checkpoints/
-# also ignore wheels since theyre binary and git doesnt deal well with that (cant compress as well etc)
-dist/
-*.egg-info/
-build/
-.cache/
-tests/test_dl/
-tests/test_res/
-tests/_linkcol
+
+# Blacklist everything
+*
+# Whitelist all directories
+!*/
+# Whitelist the file you're interested in. 
+!*.txt
+!*.py
+!*.bat
+
 .*/
-*.swp
-gwaripper/gwaripper_config*.ini
+
+# include everything in tests/ in git since these exact files are needed for the tests and since the code may change and the files could change with the code they need to be version controlled
+# dirs only when prefixed with test_
+!tests/*
+tests/*/
+!tests/test_**
+
 todo.txt
 dependencies/
 venv/
 test_files_bu*
 secrets/
+dist/
+build/
 gwaripper_test.ipynb
 webGUI/static/webfonts
 webGUI/static/*
 !webGUI/static/style.css
+gwaripper/gwaripper_config*.ini
+*.egg-info/
