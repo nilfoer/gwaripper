@@ -1,14 +1,16 @@
 import pytest
 import shutil
 import os
-
-TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
+import hashlib
 
 # hacky way to setup root_path in config so we have a valid place to log to
 from gwaripper.config import config, ROOTDIR
 from gwaripper.logging_setup import configure_logging
+
+TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
+
 config["Settings"]["root_path"] = TESTS_DIR
-configure_logging(os.path.join(TESTS_DIR, "gwaripper.log"))
+configure_logging(os.path.join(TESTS_DIR, "gwaripper_tests.log"))
 
 
 def build_test_dir_furl(rel_path):
@@ -72,3 +74,20 @@ def setup_tmpdir_param():
         break
 
     return tmpdir
+
+
+def gen_hash_from_file(fname, hash_algo_str, _hex=True):
+    # construct a hash object by calling the appropriate constructor function
+    hash_obj = hashlib.new(hash_algo_str)
+    # open file in read-only byte-mode
+    with open(fname, "rb") as f:
+        # only read in chunks of size 4096 bytes
+        for chunk in iter(lambda: f.read(4096), b""):
+            # update it with the data by calling update() on the object
+            # as many times as you need to iteratively update the hash
+            hash_obj.update(chunk)
+    # get digest out of the object by calling digest() (or hexdigest() for hex-encoded string)
+    if _hex:
+        return hash_obj.hexdigest()
+    else:
+        return hash_obj.digest()
