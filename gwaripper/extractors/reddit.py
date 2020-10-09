@@ -11,7 +11,7 @@ from praw.models import Submission
 
 from .base import BaseExtractor
 from ..config import KEYWORDLIST, TAG1_BUT_NOT_TAG2, ROOTDIR
-from ..info import RedditInfo
+from ..info import RedditInfo, children_iter_dfs
 from ..reddit import reddit_praw, redirect_xpost
 
 logger = logging.getLogger(__name__)
@@ -106,12 +106,7 @@ class RedditExtractor(BaseExtractor):
                                 submission.permalink)
                     fi = extractor(sub_url).extract()
                     # TODO: figure out a way so we don't forget to set this
-                    # requiring it in __init__ would mean we'd have to pass
-                    # it to the extract method which is weird
-                    # TODO mb add parent and reddit_info params to extract
-                    # or add it as attributes to BaseExtractor
                     fi.parent = ri
-                    fi.reddit_info = ri
                     ri.children.append(fi)
                     return ri
 
@@ -124,8 +119,8 @@ class RedditExtractor(BaseExtractor):
                 # css selector -> tag a with set href attribute
                 links = soup.select('a[href]')
 
-                # TODO i.redd.it only in sub.url not in selftext and always direct link
-                # so i could just dl it
+                # TODO i.redd.it is always a direct link append FileInfo for it here
+                # without extractor?
                 for link in links:
                     href = link["href"]
                     extractor = find_extractor(href)
@@ -139,10 +134,12 @@ class RedditExtractor(BaseExtractor):
                         if fi is None:
                             continue
                         fi.parent = ri
-                        fi.reddit_info = ri
                         ri.children.append(fi)
 
-            if not ri.children:
+            # didn't find any supported audio links; assume there is an unsupported audio
+            # link in there (otherwise the user wouldn't have supplied this link)
+            # and save url to disk
+            if not any(c.is_audio for _, c in children_iter_dfs(ri.children, file_info_only=True)):
                 logger.info("No supported link in \"%s\"", submission.shortlink)
                 os.makedirs(os.path.join(ROOTDIR, "_linkcol"), exist_ok=True)
                 with open(os.path.join(ROOTDIR, "_linkcol",

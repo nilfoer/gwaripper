@@ -155,6 +155,7 @@ class FileInfo:
         self.title = title
         self.descr = descr
         self.author = author
+        self._parent = None
         self.parent = parent
         self.reddit_info = reddit_info
         self.downloaded: bool = False
@@ -163,6 +164,20 @@ class FileInfo:
 
     def __str__(self):
         return f"FileInfo<{self.page_url}>"
+
+    @property
+    def parent(self):
+        return self._parent
+
+    @parent.setter
+    def parent(self, parent: 'FileCollection'):
+        # NOTE: automatically sets/finds reddit_info if there is one!
+        self._parent = parent
+
+        while parent:
+            if isinstance(parent, RedditInfo):
+                self.reddit_info = parent
+            parent = parent.parent
 
     def generate_filename(self, file_index: int = 0) -> (str, str, str):
         """

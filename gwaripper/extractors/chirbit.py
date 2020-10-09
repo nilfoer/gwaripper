@@ -15,11 +15,12 @@ class ChirbitExtractor(BaseExtractor):
     EXTRACTOR_NAME = "Chirbit"
     BASE_URL = "chirb.it"
 
-    VALID_CHIRBIT_URL_RE = re.compile(r"(?:https?://)?(?:www\.)?chirb\.it/"
-                                      r"([A-Za-z0-9]+)", re.IGNORECASE)
+    VALID_CHIRBIT_URL_RE = re.compile(r"^(?:https?://)?(?:www\.)?chirb\.it/"
+                                      r"([A-Za-z0-9]+)/?$", re.IGNORECASE)
 
     def __init__(self, url):
         super().__init__(url)
+        self.id = ChirbitExtractor.VALID_CHIRBIT_URL_RE.match(url).group(1)
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
@@ -52,7 +53,7 @@ class ChirbitExtractor(BaseExtractor):
             author = soup.select_one('#chirbit-username').text
 
             return FileInfo(self.__class__, True, ext, self.url,
-                            direct_url, None, title, None, author)
+                            direct_url, self.id, title, None, author)
         except (AttributeError, IndexError, TypeError):
             raise InfoExtractingError(
                     "Error occured while extracting chirbit info - site structure "

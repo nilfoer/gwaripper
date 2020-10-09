@@ -23,6 +23,14 @@ class SoundgasmExtractor(BaseExtractor):
 
     def __init__(self, url):
         super().__init__(url)
+        self.is_user = False
+        try:
+            self.author = SoundgasmExtractor.VALID_SGASM_FILE_URL_RE.match(self.url).group(1)
+        except AttributeError:
+            # one of them has to match, since we only should land here
+            # if is_compatible returned True
+            self.author = SoundgasmExtractor.VALID_SGASM_USER_URL_RE.match(self.url).group(1)
+            self.is_user = True
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
@@ -30,13 +38,9 @@ class SoundgasmExtractor(BaseExtractor):
                     cls.VALID_SGASM_USER_URL_RE.match(url))
 
     def extract(self) -> Optional[FileInfo]:
-        match = SoundgasmExtractor.VALID_SGASM_FILE_URL_RE.match(self.url)
-        if not match:
-            match = SoundgasmExtractor.VALID_SGASM_USER_URL_RE.match(self.url)
-            self.author = match.group(1)
+        if self.is_user:
             return self._extract_user()
         else:
-            self.author = match.group(1)
             return self._extract_file()
 
     def _extract_file(self) -> Optional[FileInfo]:

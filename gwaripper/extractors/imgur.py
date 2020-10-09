@@ -40,16 +40,18 @@ class ImgurImageExtractor(BaseExtractor):
         if not client_id:
             raise NoAuthenticationError("In order to download imgur images a Client ID "
                                         "is needed!")
-        self.url = url
         match = self.IMAGE_URL_RE.match(url)
+        self.direct_url = None
+        self.ext = None
+        self.is_direct = False
         if not match:
             match = self.IMAGE_FILE_URL_RE.match(url)
             self.is_direct = True
             self.ext = match.group(2)
+            self.url = f"https://imgur.com/{match.group(1)}"
+            self.direct_url = url
         self.image_hash = match.group(1)
         self.api_url = f"https://api.imgur.com/3/image/{self.image_hash}"
-        self.is_direct = False
-        self.ext = None
         self.api_response = None
 
     @classmethod
@@ -57,7 +59,8 @@ class ImgurImageExtractor(BaseExtractor):
         return cls.IMAGE_FILE_URL_RE.match(url) or cls.IMAGE_URL_RE.match(url)
 
     def extract(self) -> Optional[FileInfo]:
-        direct_url = self.url
+        # TODO: get image title etc. (for direct link as well using hash)
+        direct_url = self.direct_url
         if not self.is_direct:
             resp = ImgurImageExtractor.get_html(self.api_url)
             self.api_response = json.loads(resp) if resp else None
@@ -92,13 +95,9 @@ class ImgurAlbumExtractor(BaseExtractor):
         self.album_hash = self.ALBUM_URL_RE.match(url).group(1)
         self.mp4_always = mp4_always
         self.api_url = f"https://api.imgur.com/3/album/{self.album_hash}"
-        self.api_response = ImgurAlbumExtractor.get_html(self.api_url)
-        if not self.api_response:
-            raise NoAPIResponseError("No Response recieved", self.api_url)
-        self.api_response = json.loads(self.api_response)
-        self.image_count = self.api_response["data"]["images_count"]
+        self.api_response = None
+        self.image_count = None
         self.title = None
-        self.get_album_title()
         self.images = []
 
     @classmethod
@@ -106,7 +105,7 @@ class ImgurAlbumExtractor(BaseExtractor):
         return cls.ALBUM_URL_RE.match(url)
 
     def get_album_title(self) -> str:
-        if self.title is None:
+        if self.title is None and self.api_response:
             self.title = self.api_response["data"]["title"]
         return self.title
 
@@ -128,7 +127,18 @@ class ImgurAlbumExtractor(BaseExtractor):
             img_e = ImgurImageExtractor(furl)
             self.images.append(img_e)
 
+    def _fetch_api_response(self):
+        self.api_response = ImgurAlbumExtractor.get_html(self.api_url)
+        if not self.api_response:
+            raise NoAPIResponseError("No Response recieved", self.api_url)
+        self.api_response = json.loads(self.api_response)
+        self.image_count = self.api_response["data"]["images_count"]
+        self.get_album_title()
+
     def extract(self) -> Optional[FileCollection]:
+        if not self.api_response:
+            self._fetch_api_response()
+
         self._get_single_images()
         if not self.images:
             logger.warning("No images in album: %s", self.album_hash)

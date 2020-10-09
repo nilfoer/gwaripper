@@ -48,3 +48,4 @@ webGUI/static/*
 !webGUI/static/style.css
 gwaripper/gwaripper_config*.ini
 *.egg-info/
+*.swp
