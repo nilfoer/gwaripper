@@ -89,8 +89,8 @@ class RedditExtractor(BaseExtractor):
 
             # rebuild subs url to account for redirection
             redirected_url = f"{self.praw.config.reddit_url}{submission.permalink}"
-            ri = RedditInfo(redirected_url, submission.id, submission.title,
-                            submission.subreddit.display_name)
+            ri = RedditInfo(self.__class__, redirected_url, submission.id, submission.title,
+                            None, submission.subreddit.display_name)
             ri.permalink = str(submission.permalink)
             ri.created_utc = submission.created_utc
             ri.r_post_url = sub_url

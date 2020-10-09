@@ -11,7 +11,6 @@ import gwaripper.config as config
 from gwaripper.db import export_csv_from_sql, backup_db
 
 time_str = time.strftime("%Y-%m-%d")
-TEST_FILES_DIR = os.path.join(TESTS_DIR, "test_res")
 
 
 @pytest.fixture

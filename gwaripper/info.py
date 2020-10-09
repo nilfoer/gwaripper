@@ -2,7 +2,7 @@ import os
 import logging
 import re
 
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Type
 from collections import deque
 
 logger = logging.getLogger(__name__)
@@ -140,8 +140,9 @@ def children_iter_bfs(start_list: List[Union['FileInfo', 'FileCollection']],
 # <py3.7 you have to use a string explicitly
 # p3.7+ you can do: from __future__ import annotations
 # -> and all the type hints will become strings implicitly
+# Type[C] refers to subclasses of C instead of instances
 class FileInfo:
-    def __init__(self, extractor: 'BaseExtractor', is_audio: bool, ext: str,
+    def __init__(self, extractor: Type['BaseExtractor'], is_audio: bool, ext: str,
                  page_url: str, direct_url: str, _id: Optional[str],
                  title: Optional[str], descr: Optional[str], author: Optional[str],
                  parent: Optional['FileCollection'] = None,
@@ -157,6 +158,7 @@ class FileInfo:
         self.author = author
         self._parent = None
         self.parent = parent
+        # NOTE: automatically set/reset when parent gets set
         self.reddit_info = reddit_info
         self.downloaded: bool = False
         # already downloaded and in db; gets set by mark_alrdy_downloaded
@@ -174,6 +176,7 @@ class FileInfo:
         # NOTE: automatically sets/finds reddit_info if there is one!
         self._parent = parent
 
+        self.reddit_info = None
         while parent:
             if isinstance(parent, RedditInfo):
                 self.reddit_info = parent
@@ -216,7 +219,7 @@ class FileInfo:
                     if parent_title:
                         title.append(parent_title[:30])
             else:
-                # we might have nested FileCollections
+                # we might have nested FileCollections; currently not allowed!
                 p = self.parent
                 while p is not None:
                     # give topmost parent double the chars
@@ -232,7 +235,7 @@ class FileInfo:
         # file index and file title are always last
         if file_index:
             title.append(f"{file_index:02d}")
-        title.append(self.title)
+        title.append(self.title or self.id)
         title = "_".join(title)
 
         subpath = os.path.join(*subpaths) if subpaths else ""
@@ -242,27 +245,30 @@ class FileInfo:
 
 
 class FileCollection:
-    def __init__(self, url: str, _id: Optional[str], title: Optional[str],
+    def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: Optional[str],
+                 title: Optional[str], author: Optional[str],
                  children: Optional[List[Union[FileInfo, 'FileCollection']]] = None):
+        self.extractor = extractor
         self.url = url
         self.id = _id
         self.title = title
+        self.author = author
         if children is None:
             children = []
-        self.author = None
         self.children = children
         self._parent = None
 
     def __str__(self):
         return f"FileCollection<{self.url}, children: {len(self.children)}>"
 
+    # TODO: append etc. for children so we don't have to re-count them every time
     def nr_files(self) -> int:
         return sum(1 for _ in children_iter_dfs(self.children, file_info_only=True))
 
     @property
     def subpath(self) -> str:
         if self.nr_files() >= 3:
-            return f"{self.title if self.title else self.id}"
+            return sanitize_filename(0, f"{self.title if self.title else self.id}")
         else:
             return ""
 
@@ -298,10 +304,10 @@ class FileCollection:
 
 
 class RedditInfo(FileCollection):
-    def __init__(self, url: str, _id: Optional[str], title: Optional[str],
-                 subreddit: str,
+    def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: Optional[str],
+                 title: Optional[str], author: Optional[str], subreddit: str,
                  children: Optional[List[Union[FileInfo, 'FileCollection']]] = None):
-        super().__init__(url, _id, title, children=children)
+        super().__init__(extractor, url, _id, title, author, children=children)
         self.permalink = None
         self.selftext = None
         self.created_utc = None
@@ -319,7 +325,7 @@ class RedditInfo(FileCollection):
 
     @parent.setter
     def parent(self, parent):
-        raise Exception("RedditInfo is not allowed to have a parent!")
+        raise AssertionError("RedditInfo is not allowed to have a parent!")
 
     def write_selftext_file(self, root_dir: str, subpath: str, force_path: bool = False):
         """

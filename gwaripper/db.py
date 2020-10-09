@@ -194,27 +194,6 @@ def backup_db(db_path, bu_dir, csv_path=None, force_bu=False):
                                                                fallback=5), next_bu / 24 / 60 / 60))
 
 
-def check_direct_url_for_dl(db_con, direct_url):
-    """
-    Fetches url_file col from db and unpacks the 1-tuples, then checks if direct_url
-    is in the list, if found return True
-
-    :param db_con: Connection to sqlite db
-    :param direct_url: String of direct url to file
-    :return: True if direct_url is in col url_file of db else False
-    """
-    c = db_con.execute("SELECT url_file FROM Downloads")
-    # converting to set would take just as long (for ~10k entries) as searching for it in list
-    # returned as list of 1-tuples, use generator to unpack, so when we find direct_url b4
-    # the last row we dont have to generate the remaining tuples and we only use it once
-    # only minimally faster (~2ms for 10k rows)
-    file_urls = (tup[0] for tup in c.fetchall())
-    if direct_url in file_urls:
-        return True
-    else:
-        return False
-
-
 def set_favorite_entry(db_con, _id, fav_intbool):
     with db_con:
         db_con.execute("UPDATE Downloads SET favorite = ? WHERE id = ?", (fav_intbool, _id))
@@ -260,21 +239,21 @@ class RowData:
 
 
 def get_x_entries(con, x, after=None, before=None, order_by="Downloads.id DESC"):
-        # order by has to come b4 limit/offset
-        query = f"""
-                SELECT * FROM Downloads
-                ORDER BY {order_by}
-                LIMIT ?"""
-        query, vals_in_order = keyset_pagination_statment(
-                query, [], after=after, before=before,
-                order_by=order_by, first_cond=True)
-        c = con.execute(query, (*vals_in_order, x))
-        rows = c.fetchall()
+    # order by has to come b4 limit/offset
+    query = f"""
+            SELECT * FROM Downloads
+            ORDER BY {order_by}
+            LIMIT ?"""
+    query, vals_in_order = keyset_pagination_statment(
+            query, [], after=after, before=before,
+            order_by=order_by, first_cond=True)
+    c = con.execute(query, (*vals_in_order, x))
+    rows = c.fetchall()
 
-        if rows:
-            return [RowData(row) for row in rows]
-        else:
-            return None
+    if rows:
+        return [RowData(row) for row in rows]
+    else:
+        return None
 
 
 def search_assoc_col_string_parse(valuestring, delimiter=";"):

@@ -78,7 +78,7 @@ class SoundgasmExtractor(BaseExtractor):
         anchs = soup.select("div.sound-details > a")
         user_files = [a["href"] for a in anchs]
 
-        fcol = FileCollection(self.url, self.author, self.author)
+        fcol = FileCollection(self.__class__, self.url, self.author, self.author, self.author)
         for url in user_files:
             fi = SoundgasmExtractor(url).extract()
             if fi is None:

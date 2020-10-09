@@ -144,8 +144,9 @@ class ImgurAlbumExtractor(BaseExtractor):
             logger.warning("No images in album: %s", self.album_hash)
             return None
 
-        fcol = FileCollection(self.url, self.album_hash,
-                              self.title if self.title else self.album_hash)
+        fcol = FileCollection(self.__class__, self.url, self.album_hash,
+                              self.title if self.title else self.album_hash,
+                              None)
         file_infos = []
         for img_e in self.images:
             fi = img_e.extract()
