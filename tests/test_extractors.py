@@ -1,9 +1,10 @@
 import pytest
-import re
 import logging
 import os
 import time
 import shutil
+
+import gwaripper.config as config
 
 from gwaripper.reddit import reddit_praw
 from gwaripper.extractors import find_extractor
@@ -13,7 +14,7 @@ from gwaripper.extractors.chirbit import ChirbitExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from gwaripper.extractors.reddit import RedditExtractor, check_submission_banned_tags
 from gwaripper.info import FileInfo
-from utils import build_test_dir_furl, TESTS_DIR
+from utils import setup_tmpdir
 
 
 @pytest.mark.parametrize(
@@ -468,7 +469,7 @@ class DummyExtractor():
                         None, None, None, None, None)
 
 
-def test_extractor_reddit(monkeypatch, caplog):
+def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     # NOTE: use DummyExtractor since we only care about the extracted urls
     # but make sure to still return RedditExtractor since that is used
     # to avoid extracting forther reddit submissions
@@ -477,7 +478,21 @@ def test_extractor_reddit(monkeypatch, caplog):
                              else DummyExtractor)
     monkeypatch.setattr('gwaripper.extractors.find_extractor', mock_findex)
 
-    linkcoldir = os.path.join(TESTS_DIR, "_linkcol")
+    # NOTE: IMPORTANT setup banned keywords and tag1_but_not_2
+    # just assigning a new value will not work if any other module imports
+    # them as "from config import .." then the KEYWORDLIST etc.
+    # will be a symbol in the importing module that holds a ref to KEYWORDLIST
+    # _assigning_ config.KEYWORDLIST from another module will not change KEYWORDLIST
+    # in the other module since it's its own symbol that still holds a ref to the
+    # original value at the time of import
+    # -> import as config.KEYWORDLIST etc. in that module or use methods on mutable
+    # types to change them e.g. list.clear(); list.append()
+    # using import config everywhere so we can do:
+    config.KEYWORDLIST = ['request']
+    config.TAG1_BUT_NOT_TAG2 = [("[script offer]", "[script fill]")]
+
+    tmpdir = setup_tmpdir
+    linkcoldir = os.path.join(tmpdir, "_linkcol")
 
     caplog.set_level(logging.INFO)
     for url, found_urls, attr_val_dict in reddit_extractor_url_expected:

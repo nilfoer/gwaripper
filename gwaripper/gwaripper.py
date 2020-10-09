@@ -12,7 +12,7 @@ from typing import List, Union, Optional
 
 from .logging_setup import configure_logging
 from . import utils
-from .config import config, ROOTDIR
+from . import config
 from .extractors import find_extractor
 from .extractors.soundgasm import SoundgasmExtractor
 from .extractors.reddit import RedditExtractor
@@ -39,20 +39,23 @@ logger = logging.getLogger("gwaripper")
 logger.setLevel(logging.DEBUG)
 
 # only log to file if ROOTDIR is set up so we dont clutter the cwd or the module dir
-if ROOTDIR and os.path.isdir(ROOTDIR):
-    configure_logging(os.path.join(ROOTDIR, "gwaripper.log"))
+if config.ROOTDIR and os.path.isdir(config.ROOTDIR):
+    configure_logging(os.path.join(config.ROOTDIR, "gwaripper.log"))
 
 
 class GWARipper:
+    """
+    Uses config.ROOTDIR as base path for writing and reading files
+    """
 
     headers = {
         'User-Agent':
         'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
         }
 
-    def __init__(self, root_dir):
-        self.root_dir = root_dir
-        self.db_con, _ = load_or_create_sql_db(os.path.join(root_dir, "gwarip_db.sqlite"))
+    def __init__(self):
+        self.db_con, _ = load_or_create_sql_db(
+                os.path.join(config.ROOTDIR, "gwarip_db.sqlite"))
         self.downloads = []
         self.nr_downloads = 0
         self.download_index = 1
@@ -66,11 +69,12 @@ class GWARipper:
         # suppress the exception by returning a true value from this method. If
         # you don't want to suppress errors then you can return a value that
         # evaluates to False.
-        export_csv_from_sql(os.path.join(self.root_dir, "gwarip_db_exp.csv"), self.db_con)
+        export_csv_from_sql(os.path.join(config.ROOTDIR, "gwarip_db_exp.csv"), self.db_con)
         self.db_con.close()
 
         # auto backup
-        backup_db(os.path.join(self.root_dir, "gwarip_db.sqlite"))
+        backup_db(os.path.join(config.ROOTDIR, "gwarip_db.sqlite"),
+                  os.path.join(config.ROOTDIR, "_db-autobu"))
         return None
 
     def parse_links(self, links: List[str]) -> None:
@@ -156,7 +160,7 @@ class GWARipper:
 
         subpath, filename, ext = info.generate_filename(file_index)
 
-        mypath = os.path.join(self.root_dir, author_name, subpath)
+        mypath = os.path.join(config.ROOTDIR, author_name, subpath)
         os.makedirs(mypath, exist_ok=True)
         filename = self._pad_filename_if_exits(mypath, filename, ext)
         filename = f"{filename}.{ext}"
@@ -178,12 +182,10 @@ class GWARipper:
                     # The hook will be passed three arguments; a count of blocks transferred
                     # so far, a block size in bytes, and the total size of the file
                     # total size is -1 if unknown
-                    #print(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
                     dl.download_in_chunks(info.direct_url,
                                           os.path.abspath(os.path.join(mypath, filename)),
                                           prog_bar=True)
             else:
-                #print(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
                 dl.download_in_chunks(info.direct_url,
                                       os.path.abspath(os.path.join(mypath, filename)),
                                       prog_bar=True)
@@ -230,7 +232,7 @@ class GWARipper:
                 # :PassSubpathSelftext
                 _, fi = next(children_iter_dfs(info.children, file_info_only=True))
                 subpath, _, _ = fi.generate_filename()
-                info.write_selftext_file(self.root_dir,
+                info.write_selftext_file(config.ROOTDIR,
                                          os.path.join(author_name, subpath))
             except AttributeError:
                 raise
@@ -320,7 +322,7 @@ class GWARipper:
                             filename_local = re.sub(
                                     r"[^\w\-_.,\[\] ]", "_",
                                     info.title[0:110]) + ".m4a"
-                        selftext_fn = os.path.join(self.root_dir, page_usr,
+                        selftext_fn = os.path.join(config.ROOTDIR, page_usr,
                                                    f"{filename_local}.txt")
 
                         if not os.path.isfile(selftext_fn):
@@ -333,7 +335,7 @@ class GWARipper:
                         # by RedditInfo since this file was downloaded without it
                         file_path = os.path.join(page_usr, filename_local)
                         info.reddit_info.write_selftext_file(
-                                self.root_dir, file_path, force_path=True)
+                                config.ROOTDIR, file_path, force_path=True)
         if duplicate:
             logger.info("%d files were already downloaded!", len(duplicate))
 

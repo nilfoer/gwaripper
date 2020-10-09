@@ -10,7 +10,9 @@ from typing import Optional
 from praw.models import Submission
 
 from .base import BaseExtractor
-from ..config import KEYWORDLIST, TAG1_BUT_NOT_TAG2, ROOTDIR
+# NOTE: IMPORTANT need to be imported as "import foo" rather than "from foo import bar"
+# see :GlobalConfigImport
+from .. import config
 from ..info import RedditInfo, children_iter_dfs
 from ..reddit import reddit_praw, redirect_xpost
 
@@ -79,7 +81,8 @@ class RedditExtractor(BaseExtractor):
             self.submission = self.praw.submission(url=self.url)
         submission = self.submission
 
-        if not check_submission_banned_tags(submission, KEYWORDLIST, TAG1_BUT_NOT_TAG2):
+        if not check_submission_banned_tags(submission,
+                                            config.KEYWORDLIST, config.TAG1_BUT_NOT_TAG2):
             # NOTE: IMPORTANT make sure to only use redirected submission from here on!
             submission = redirect_xpost(submission)
             sub_url = submission.url
@@ -141,8 +144,8 @@ class RedditExtractor(BaseExtractor):
             # and save url to disk
             if not any(c.is_audio for _, c in children_iter_dfs(ri.children, file_info_only=True)):
                 logger.info("No supported link in \"%s\"", submission.shortlink)
-                os.makedirs(os.path.join(ROOTDIR, "_linkcol"), exist_ok=True)
-                with open(os.path.join(ROOTDIR, "_linkcol",
+                os.makedirs(os.path.join(config.ROOTDIR, "_linkcol"), exist_ok=True)
+                with open(os.path.join(config.ROOTDIR, "_linkcol",
                                        "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
                     w.write("<h3><a href=\"https://reddit.com{}\">{}"

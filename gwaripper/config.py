@@ -1,3 +1,5 @@
+# NOTE: IMPORTANT module config MUST only ever be imported as "import foo" rather than
+# "from foo import bar" -> see :GlobalConfigImport
 import os.path
 import time
 import configparser
@@ -42,6 +44,7 @@ if not config.sections():
     config.read_dict(init_cfg)
 
 
+# make sure to only use ROOTDIR and not the value from config in the rest of the program
 # path to dir where the soundfiles will be stored in subfolders
 ROOTDIR = None
 try:

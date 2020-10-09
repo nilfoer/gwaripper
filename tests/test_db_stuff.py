@@ -7,8 +7,8 @@ import time
 # needed for valid logging dir hack
 from utils import gen_hash_from_file, setup_tmpdir, TESTS_DIR
 
+import gwaripper.config as config
 from gwaripper.db import export_csv_from_sql, backup_db
-from gwaripper.config import config, write_config_module
 
 time_str = time.strftime("%Y-%m-%d")
 TEST_FILES_DIR = os.path.join(TESTS_DIR, "test_res")
@@ -63,7 +63,7 @@ def create_db_for_export(setup_tmpdir):
 
 @pytest.fixture
 def create_db_for_bu(setup_tmpdir):
-    config["Settings"]["max_db_bu"] = "5"
+    config.config["Settings"]["max_db_bu"] = "5"
     sql_path = os.path.join(setup_tmpdir, "testdb.sqlite")
     csv_path = os.path.join(setup_tmpdir, "export_test.csv")
 
@@ -112,9 +112,9 @@ def create_db_for_bu(setup_tmpdir):
 
     conn.close()
 
-    config["Settings"]["db_bu_freq"] = "4.5"
-    config["Time"]["last_db_bu"] = "0.0"
-    write_config_module()
+    config.config["Settings"]["db_bu_freq"] = "4.5"
+    config.config["Time"]["last_db_bu"] = "0.0"
+    config.write_config_module()
 
 
 def test_export_csv(create_db_for_export):
@@ -161,8 +161,8 @@ def test_backup_db(last_bu, bu_freq, csv_bu, force, backuped, too_many, create_d
     bu_sql_path = os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str))
     bu_csv_path = os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str))
 
-    config["Settings"]["db_bu_freq"] = bu_freq
-    config["Time"]["last_db_bu"] = last_bu
+    config.config["Settings"]["db_bu_freq"] = bu_freq
+    config.config["Time"]["last_db_bu"] = last_bu
 
     # create files
     if too_many:
@@ -176,9 +176,9 @@ def test_backup_db(last_bu, bu_freq, csv_bu, force, backuped, too_many, create_d
             w.write("")
 
     if csv_bu:
-        backup_db(sql_p, csv_p, force, bu_dir)
+        backup_db(sql_p, bu_dir, csv_p, force)
     else:
-        backup_db(sql_p, None, force, bu_dir)
+        backup_db(sql_p, bu_dir, None, force)
 
     if backuped:
         assert gen_hash_from_file(bu_sql_path, 'md5', _hex=True) == gen_hash_from_file(

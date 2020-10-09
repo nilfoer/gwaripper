@@ -28,6 +28,7 @@ class BaseExtractor:
     BASE_URL = ""
 
     def __init__(self, url):
+        # TODO: replace http with https by default?
         self.url = url
 
     @classmethod

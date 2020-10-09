@@ -138,21 +138,6 @@ def txt_to_list(txtfilename):
         return llist
 
 
-def write_to_txtf(wstring, filename, currentusr):
-    """
-    Appends wstring to filename in dir named currentusr in ROOTDIR
-
-    :param wstring: String to write to file
-    :param filename: Filename
-    :param currentusr: soundgasm.net user name
-    :return: None
-    """
-    mypath = os.path.join(ROOTDIR, currentusr)
-    os.makedirs(mypath, exist_ok=True)
-    with open(os.path.join(mypath, filename), "a", encoding="UTF-8") as w:
-        w.write(wstring)
-
-
 # src: https://gist.github.com/slowkow/7a7f61f495e3dbb7e3d767f97bd7304b
 EMOJI_RE = re.compile("["
                       u"\U0001F600-\U0001F64F"  # emoticons

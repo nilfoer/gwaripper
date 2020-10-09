@@ -3,13 +3,11 @@ import shutil
 import os
 import hashlib
 
-# hacky way to setup root_path in config so we have a valid place to log to
-from gwaripper.config import config, ROOTDIR
+import gwaripper.config as config
 from gwaripper.logging_setup import configure_logging
 
 TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 
-config["Settings"]["root_path"] = TESTS_DIR
 configure_logging(os.path.join(TESTS_DIR, "gwaripper_tests.log"))
 
 
@@ -32,6 +30,7 @@ def setup_tmpdir():
         pass
     os.makedirs(tmpdir)
 
+    config.ROOTDIR = tmpdir
     return tmpdir
     # yield tmpdir
     # # del dir and contents after test is done

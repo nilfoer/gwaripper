@@ -11,7 +11,69 @@ from typing import List
 
 from . import utils
 from . import clipwatcher_single
-from .config import config, write_config_module, ROOTDIR
+# :GlobalConfigImport
+# reason why setting from .. import ROOTDIR; ROOTDIR = 'foo' doesn't work
+# but config.ROOTDIR = 'foo' does
+# The below only applies to immutable objects!!!
+# https://stackoverflow.com/a/3536638 aaronasterling
+# You are using from bar import a. a becomes a symbol in the global scope of
+# the importing module (or whatever scope the import statement occurs in).
+#
+# When you assign a new value to a, you are just changing which value a points
+# too, not the actual value. Try to import bar.py directly with import bar
+# and conduct your experiment there by setting bar.a = 1. This way,
+# you will actually be modifying bar.__dict__['a'] which is the 'real' value of
+# a in this context.
+# This is one of the dangers of using the from foo import bar form of the
+# import statement: it splits bar into two symbols, one visible globally from
+# within foo which starts off pointing to the original value and a different
+# symbol visible in the scope where the import statement is executed. Changing
+# a where a symbol points doesn't change the value that it pointed too.
+#
+# This sort of stuff is a killer when trying to reload a module from the interactive interpreter.
+#
+# NOTE: IMPORTANT not only modules that want to assign to config.ROOTDIR need
+# to import it as import config but also _other_ modules that need to
+# be able to see the updated value/reference
+# -- foo.py
+# conifg = 'bar'
+# -- baz.py
+# import foo
+# foo.config = 'foobar'
+# -- qux.py
+# from foo import config
+# print(config) -> 'bar'
+# import foo
+# print(foo.config) -> 'foobar'
+#
+# other modules can see the changes using the from .. import .. method
+# if the imported type is mutable and you don't use assignment to change
+# it -> foo: list = [] -> foo = ['new list'] doesn't work but
+# foo.appned('same list') does (as in another module will see ['same list']
+# no matter how it was imported)
+#
+# import foo:
+# Imports foo, and creates a reference to that module in the current namespace.
+# from foo import bar:
+# Imports foo, and creates references to all the members listed (bar). Does not
+# set the variable foo.
+# => that's why assigning a new value doesn't work since the reference is
+# to the old bar (using the 2nd method)
+#
+# Summary:
+# Due to the way references and name binding works in Python, if you want to
+# update some symbol in a module, say foo.bar, from outside that module, and
+# have other importing code "see" that change, you have to import foo a using
+# import foo and mustn't use from foo import bar
+# The modules that want to "see" the change need to import it the _SAME_ way!
+
+# TODO: maybe only use config.ROOTDIR to initialize GWARipper root_dir
+# instance var so we don't break consistency of where we're writing if
+# someone uses us as a library (s1 else might also be using
+# us and modifying config.ROOTDIR; only using it when someone uses the cli
+# makes it possible to have multiple GWARipper instances that don't write
+# to the same place etc.; i know this is prob never going to be an issue...)
+from . import config
 from .gwaripper import GWARipper
 from .reddit import reddit_praw, parse_subreddit, search_subreddit
 
@@ -208,7 +270,7 @@ def main():
         # subparser that was selected
         args = parser.parse_args()
 
-    if ROOTDIR:
+    if config.ROOTDIR:
         if args.test:
             # test code
             pass
@@ -217,7 +279,7 @@ def main():
             # call func that was selected for subparser/command
             args.func(args)
     # rootdir istn set but we want to call _cl_config
-    elif not ROOTDIR and args.subcmd == "config":
+    elif not config.ROOTDIR and args.subcmd == "config":
         _cl_config(args)
     else:
         print("root_path not set in gwaripper_config.ini, use command config -p "
@@ -225,7 +287,7 @@ def main():
 
 
 def download_all_links(urls: List[str]) -> None:
-    with GWARipper(ROOTDIR) as gw:
+    with GWARipper(config.ROOTDIR) as gw:
         gw.parse_links(urls)
         gw.mark_alrdy_downloaded()
         gw.download_all()
@@ -251,7 +313,7 @@ def _cl_watch(args):
 
 
 def download_all_subs(sublist: List[praw.models.Submission]) -> None:
-    with GWARipper(ROOTDIR) as gw:
+    with GWARipper(config.ROOTDIR) as gw:
         gw.parse_submissions(sublist)
         gw.mark_alrdy_downloaded()
         gw.download_all()
@@ -397,7 +459,7 @@ def _cl_config(args):
             print("")
         return  # so we dont reach writing of cfg
     # write updated config
-    write_config_module()
+    config.write_config_module()
 
 
 def write_last_dltime():
@@ -412,7 +474,7 @@ def write_last_dltime():
     else:
         # create section if it doesnt exist
         config["Time"] = {"LAST_DL_TIME": str(time.time())}
-    write_config_module()
+    config.write_config_module()
 
 
 def watch_clip() -> List[str]:
@@ -427,7 +489,7 @@ def watch_clip() -> List[str]:
     """
     watcher = clipwatcher_single.ClipboardWatcher(clipwatcher_single.is_url,
                                                   clipwatcher_single.print_write_to_txtf,
-                                                  os.path.join(ROOTDIR, "_linkcol"), 0.1)
+                                                  os.path.join(config.ROOTDIR, "_linkcol"), 0.1)
     try:
         logger.info("Watching clipboard...")
         watcher.run()

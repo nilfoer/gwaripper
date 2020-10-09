@@ -9,7 +9,7 @@ import operator
 
 from functools import reduce
 
-from .config import config, write_config_module, ROOTDIR
+from .config import config, write_config_module
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +103,7 @@ def export_csv_from_sql(filename, db_con):
         csvwriter.writerows(rows)
 
 
-# cant use ROOTDIR in default of bu_dir since it is evaluated at module-level and ROOTDIR might still be None
-def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=None):
+def backup_db(db_path, bu_dir, csv_path=None, force_bu=False):
     """
     Backups db_path and csv_path (if not None) to bu_dir if the time since last backup is greater
     than db_bu_freq (in days, also from cfg) or force_bu is True
@@ -114,14 +113,11 @@ def backup_db(db_path, csv_path=None, force_bu=False, bu_dir=None):
     If next backup isnt due yet announce when next bu will be
 
     :param db_path: Path to .sqlite db
+    :param bu_dir: Path to location of backups
     :param csv_path: Optional, path to csv file thats been exported from sqlite db
     :param force_bu: True -> force backup no matter last_db_bu time
-    :param bu_dir: Path to location of backup uses ROOTDIR/_db-autobu if None (default: None)
     :return: None
     """
-    if bu_dir is None:
-        # could also use dir of db_path instead of ROOTDIR
-        bu_dir = os.path.join(ROOTDIR, "_db-autobu")
     os.makedirs(bu_dir, exist_ok=True)
     # time.time() get utc number
     now = time.time()
