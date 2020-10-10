@@ -15,4 +15,3 @@ recursive-include gwaripper *.py
 global-exclude *.log
 global-exclude *.py[co]
 exclude gwaripper-runner.py
-# recursive-include tests *

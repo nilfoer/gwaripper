@@ -1,10 +1,41 @@
 # NOTE: IMPORTANT module config MUST only ever be imported as "import foo" rather than
 # "from foo import bar" -> see :GlobalConfigImport
+import sys
 import os.path
 import time
 import configparser
 
-MODULE_PATH = os.path.dirname(os.path.realpath(__file__))
+# NOTE: pyinstaller single folder dist and one-file exe
+# sys.frozen -> packaged inside executable -> need to figure out our path
+# and pass changed locations of static and template folders
+#
+# With the --onefile option your files will be compressed inside the exe. When
+# you execute the exe, they are uncompressed and put in a temporal folder
+# somewhere.
+# Tha somewhere changes everytime you execute the file
+#
+# PyInstaller manual
+# https://pyinstaller.readthedocs.io/en/stable/runtime-information.html#using-file
+# PyInstaller bootloader will set the module’s __file__ attribute to the
+# correct path relative to the bundle folder.
+# if you import mypackage.mymodule from a bundled script, then the __file__
+# attribute of that module will be sys._MEIPASS + 'mypackage/mymodule.pyc'
+#
+# for the bundled main script itself the above might not work, as it is unclear
+# where it resides in the package hierarchy. So in when trying to find data
+# files relative to the main script, sys._MEIPASS can be used. The following
+# will get the path to a file other-file.dat next to the main script if not
+# bundled and in the bundle folder if it is bundled
+# It is always best to use absolute paths
+# SOURCE_PATH = os.path.abspath(getattr(sys, '_MEIPASS',
+#                                       os.path.dirname(os.path.realpath(__file__))))
+# but this is _NOT_ the location of the exe that gets launched and since the folder
+# changes (and gets deleted) every time we need to write to the exe location
+# -> use sys.argv[0] or sys.executable
+if getattr(sys, 'frozen', False):  # check if we're bundled in an exe
+    SOURCE_PATH = os.path.dirname(os.path.realpath(sys.argv[0]))
+else:
+    SOURCE_PATH = os.path.dirname(os.path.realpath(__file__))
 
 # init ConfigParser instance
 config = configparser.ConfigParser()
@@ -16,7 +47,7 @@ config = configparser.ConfigParser()
 # using read_file() before calling read() for any optional files
 config.read([
     "gwaripper_config.ini", os.path.expanduser("~/.gwaripper_config.ini"),
-    os.path.join(MODULE_PATH, "gwaripper_config.ini")
+    os.path.join(SOURCE_PATH, "gwaripper_config.ini")
 ], encoding="UTF-8")
 # no sections -> empty config
 if not config.sections():
@@ -70,7 +101,7 @@ def reload_config():
 
     :return: None
     """
-    config.read(os.path.join(MODULE_PATH, "config.ini"))
+    config.read(os.path.join(SOURCE_PATH, "config.ini"))
 
 
 def write_config_module():
@@ -79,7 +110,7 @@ def write_config_module():
 
     :return: None
     """
-    os.makedirs(MODULE_PATH, exist_ok=True)
-    with open(os.path.join(MODULE_PATH, "gwaripper_config.ini"), "w", encoding="UTF-8") as config_file:
+    os.makedirs(SOURCE_PATH, exist_ok=True)
+    with open(os.path.join(SOURCE_PATH, "gwaripper_config.ini"), "w", encoding="UTF-8") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)

@@ -1,3 +1,4 @@
+import sys
 import os
 
 from flask import Flask
@@ -18,8 +19,27 @@ def create_app(test_config=None, **kwargs):
     # we can define instance_path here as kwarg, default is instance (must be abspath)
     # -> so project_root/instance will be the instance folder depending on un/installed
     # module/package
-    app = Flask(__name__, instance_relative_config=True,
-                instance_path=ROOTDIR, **kwargs)
+
+    # NOTE: pyinstaller single folder dist and one-file exe
+    # sys._MEIPASS or sys.frozen -> packaged inside executable
+    # -> need to figure out our path
+    # and pass changed locations of static and template folders
+    # for more info see gwaripper/config.py
+    # contrary to ^ we actually need the temp folder where the uncompressed files
+    # are or their location in the single folder build
+    if getattr(sys, 'frozen', False):
+        bundle_path = os.path.abspath(sys._MEIPASS)
+        template_folder = os.path.join(bundle_path, 'templates')
+        static_folder = os.path.join(bundle_path, 'static')
+
+        app = Flask(__name__, instance_relative_config=True,
+                    instance_path=ROOTDIR, template_folder=template_folder,
+                    static_folder=static_folder, **kwargs)
+        app.logger.info(bundle_path)
+    else:
+        app = Flask(__name__, instance_relative_config=True,
+                    instance_path=ROOTDIR, **kwargs)
+
     # here root_path == N:\coding\tsu-info\manga_db\webGUI
     # instance_path == N:\coding\tsu-info\instance
     app.config.from_mapping(

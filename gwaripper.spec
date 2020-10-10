@@ -3,13 +3,21 @@
 block_cipher = None
 
 a = Analysis(['gwaripper-runner.py'],
-             # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows   
-             pathex=['N:\\coding\\_sgasm-repo',
+             # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see
+             # https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows   
+             pathex=['D:\\SYNC\\coding\\_sgasm-repo',
                      '..\\UniversalCRTDLLs\\x86', '..\\UniversalCRTDLLs\\x64'],
              binaries=[],
              # praw needs praw.ini (which it looks for in 3 places appdata etc. including cwd)
-             # -> include praw.ini in root folder
-             datas=[("venv/Lib/site-packages/praw/praw.ini", ".")],
+             # -> pyinstaller automatically changes __file__ refs to be relative to the bundle
+             # praw was looking praw.ini in ./praw/ because thats were the __file__ presumably
+             # was
+             datas=[
+                ("venv/Lib/site-packages/praw/praw.ini", "praw/"),
+                 # also enclude webgui fils
+                ("webGUI/static", "static"),
+                ("webGUI/templates", "templates")
+             ],
              hiddenimports=[],
              hookspath=[],
              runtime_hooks=[],

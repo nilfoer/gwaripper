@@ -287,7 +287,7 @@ def main():
 
 
 def download_all_links(urls: List[str]) -> None:
-    with GWARipper(config.ROOTDIR) as gw:
+    with GWARipper() as gw:
         gw.parse_links(urls)
         gw.mark_alrdy_downloaded()
         gw.download_all()
@@ -313,7 +313,7 @@ def _cl_watch(args):
 
 
 def download_all_subs(sublist: List[praw.models.Submission]) -> None:
-    with GWARipper(config.ROOTDIR) as gw:
+    with GWARipper() as gw:
         gw.parse_submissions(sublist)
         gw.mark_alrdy_downloaded()
         gw.download_all()
@@ -371,90 +371,90 @@ def _cl_config(args):
         os.makedirs(path_in, exist_ok=True)
         # i dont need to change cwd and ROOTDIR since script gets restarted anyway
         try:
-            config["Settings"]["root_path"] = path_in
+            config.config["Settings"]["root_path"] = path_in
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"root_path": path_in}
+            config.config["Settings"] = {"root_path": path_in}
         changed = True
         print("New root dir is: {}".format(path_in))
     # not elif since theyre not mutually exclusive
     if args.backup_freq:
         try:
-            config["Settings"]["db_bu_freq"] = str(args.backup_freq)
+            config.config["Settings"]["db_bu_freq"] = str(args.backup_freq)
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"db_bu_freq": str(args.backup_freq)}
+            config.config["Settings"] = {"db_bu_freq": str(args.backup_freq)}
         changed = True
         print("Auto backups are due every {} days now!".format(args.backup_freq))
     if args.backup_nr:
         try:
-            config["Settings"]["max_db_bu"] = str(args.backup_nr)
+            config.config["Settings"]["max_db_bu"] = str(args.backup_nr)
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"max_db_bu": str(args.backup_nr)}
+            config.config["Settings"] = {"max_db_bu": str(args.backup_nr)}
         changed = True
         print("{} backups will be kept from now on".format(args.backup_nr))
     if args.tagfilter:
         # not needed: .strip(", ")
         tf_str = ", ".join(args.tagfilter)
         try:
-            config["Settings"]["tag_filter"] = tf_str
+            config.config["Settings"]["tag_filter"] = tf_str
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"tag_filter": tf_str}
+            config.config["Settings"] = {"tag_filter": tf_str}
         changed = True
         print("Banned tags were set to: {}".format(tf_str))
     if args.tag_combo_filter:
         t12_str = ";, ".join(args.tag_combo_filter)
         try:
-            config["Settings"]["tag1_in_but_not_tag2"] = t12_str
+            config.config["Settings"]["tag1_in_but_not_tag2"] = t12_str
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"tag1_in_but_not_tag2": t12_str}
+            config.config["Settings"] = {"tag1_in_but_not_tag2": t12_str}
         changed = True
         print("Banned tag combos were set to: {}".format(t12_str))
     if args.set_missing_reddit is not None:  # since 0 evaluates to False
         smr_bool = bool(args.set_missing_reddit)
         try:
-            config["Settings"]["set_missing_reddit"] = str(smr_bool)
+            config.config["Settings"]["set_missing_reddit"] = str(smr_bool)
         except KeyError:
             # settings setciton not present
-            config["Settings"] = {"set_missing_reddit": str(smr_bool)}
+            config.config["Settings"] = {"set_missing_reddit": str(smr_bool)}
         changed = True
         print("Gwaripper will try to fill in missing reddit info of "
               "soundgasm.net files: {}".format(smr_bool))
     if args.reddit_client_id:
         try:
-            config["Reddit"]["client_id"] = str(args.client_id)
+            config.config["Reddit"]["client_id"] = str(args.client_id)
         except KeyError:
-            config["Reddit"] = {"client_id": str(args.client_id)}
+            config.config["Reddit"] = {"client_id": str(args.client_id)}
         changed = True
         print("Successfully set Client ID")
     if args.reddit_client_secret is not None:
         if args.client_secret:
             try:
-                config["Reddit"]["client_secret"] = str(args.client_secret)
+                config.config["Reddit"]["client_secret"] = str(args.client_secret)
             except KeyError:
-                config["Reddit"] = {"client_secret": str(args.client_secret)}
+                config.config["Reddit"] = {"client_secret": str(args.client_secret)}
         else:
             try:
-                del config["Reddit"]["client_secret"]
+                del config.config["Reddit"]["client_secret"]
             except KeyError:
                 pass
         changed = True
         print("Successfully set Client Secret")
     if args.imgur_client_id:
         try:
-            config["Imgur"]["client_id"] = str(args.imgur_client_id)
+            config.config["Imgur"]["client_id"] = str(args.imgur_client_id)
         except KeyError:
-            config["Imgur"] = {"client_id": str(args.imgur_client_id)}
+            config.config["Imgur"] = {"client_id": str(args.imgur_client_id)}
         changed = True
         print("Successfully set Imgur Client ID")
     if not changed:
         # print current cfg
-        for sec in config.sections():
+        for sec in config.config.sections():
             print("[{}]".format(sec))
-            for option, val in config[sec].items():
+            for option, val in config.config[sec].items():
                 print("{} = {}".format(option, val))
             print("")
         return  # so we dont reach writing of cfg
@@ -469,11 +469,11 @@ def write_last_dltime():
 
     :return: None
     """
-    if config.has_section("Time"):
-        config["Time"]["LAST_DL_TIME"] = str(time.time())
+    if config.config.has_section("Time"):
+        config.config["Time"]["LAST_DL_TIME"] = str(time.time())
     else:
         # create section if it doesnt exist
-        config["Time"] = {"LAST_DL_TIME": str(time.time())}
+        config.config["Time"] = {"LAST_DL_TIME": str(time.time())}
     config.write_config_module()
 
 

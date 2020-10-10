@@ -299,7 +299,7 @@ class GWARipper:
                                 (*dl_dict.keys(),))
         duplicate = {r[0] for r in c.fetchall()}
 
-        if duplicate and config.getboolean("Settings", "set_missing_reddit"):
+        if duplicate and config.config.getboolean("Settings", "set_missing_reddit"):
             logger.info("Filling in missing reddit info: You can disable this "
                         "in the settings")
             for dupe_url in duplicate:

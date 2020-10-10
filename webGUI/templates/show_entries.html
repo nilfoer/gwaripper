@@ -69,7 +69,8 @@
                         Actions:<br/>
                         <div class="entry-expand-icons">
                             {# set favIntbool to opposite of what it is 0 or 1 with 1-val #}
-                            <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - entry.favorite }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
+                            {# need to account  for entry.favorite being None #}
+                            <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - 1 if entry.favorite else None }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
                             <a href="#" class="remove-entry-btn" data-entry-id={{ entry.id }} title="Remove audio!"><i class="fas fa-trash-alt red-fcolor"></i></a>
                         </div>
                     </div>
