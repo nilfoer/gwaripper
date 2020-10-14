@@ -1,7 +1,10 @@
 import pytest
 import shutil
 import os
+import time
 import hashlib
+import random
+import sqlite3
 
 import gwaripper.config as config
 from gwaripper.logging_setup import configure_logging
@@ -11,9 +14,9 @@ TESTS_DIR = os.path.dirname(os.path.realpath(__file__))
 configure_logging(os.path.join(TESTS_DIR, "gwaripper_tests.log"))
 
 
-def build_test_dir_furl(rel_path):
-    conv_slashes = TESTS_DIR.replace("\\", "/")
-    return f"file:///{conv_slashes}/{rel_path}"
+def build_file_url(abspath):
+    conv_slashes = abspath.replace("\\", "/")
+    return f"file:///{conv_slashes}"
 
 
 @pytest.fixture
@@ -75,6 +78,21 @@ def setup_tmpdir_param():
     return tmpdir
 
 
+# we can init this class at start of a function and a failed test will
+# be reproducable if we only use this class or it's rnd attrib to
+# generate our testing input by reseeding with the printed seed
+class RandomHelper():
+    def __init__(self, seed=time.time()):
+        print("SEEDING TESTING PRNG WITH:", seed)
+        self.rnd = random.Random(seed)
+
+    def random_string(
+            self,
+            length,
+            chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefABCDEF"):
+        return "".join(self.rnd.choices(chars, k=length))
+
+
 def gen_hash_from_file(fname, hash_algo_str, _hex=True):
     # construct a hash object by calling the appropriate constructor function
     hash_obj = hashlib.new(hash_algo_str)
@@ -90,3 +108,11 @@ def gen_hash_from_file(fname, hash_algo_str, _hex=True):
         return hash_obj.hexdigest()
     else:
         return hash_obj.digest()
+
+
+def get_all_rowtuples_db(filename, query_str):
+    conn = sqlite3.connect(filename)
+    c = conn.execute(query_str)
+    rows = c.fetchall()
+    conn.close()
+    return rows

@@ -127,7 +127,7 @@ class GWARipper:
 
     def _pad_filename_if_exits(self, dirpath: str, filename: str, ext: str):
         filename_old = filename
-        i = 0
+        i = 1
 
         # file alrdy exists but it wasnt in the url database -> prob same titles
         # only one tag or the ending is different (since fname got cut off, so we
@@ -193,10 +193,20 @@ class GWARipper:
         except urllib.error.HTTPError as err:
             logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
         except urllib.error.ContentTooShortError as err:
-            logger.warning(err.msg)
-            # TODO handle this in a better way
-            # technically downloaded but might be corrupt
-            info.downloaded = True
+            logger.warning(err.reason)
+            logger.warning("File information was not added to DB! Reddit selftext might "
+                           "not be written if this was the only file! "
+                           "It's recommended to manually delete and re-download the file "
+                           "using GWARipper!")
+            if info.parent:
+                logger.warning(
+                        "Containging root collection: %s",
+                        info.reddit_info.url if info.reddit_info is not None
+                        else info.parent.url)
+        except urllib.error.URLError as err:
+            logger.error("URL Error for %s: %s\nExtractor %s is probably broken! "
+                         "Please report this error on github!", info.direct_url,
+                         str(err.reason).strip(), info.extractor)
         else:
             info.downloaded = True
 
@@ -236,8 +246,7 @@ class GWARipper:
                 info.write_selftext_file(config.ROOTDIR,
                                          os.path.join(author_name, subpath))
             except AttributeError:
-                raise
-                pass
+                pass  # not redditinfo
 
     def _add_to_db(self, info: FileInfo, filename: str) -> None:
         """
