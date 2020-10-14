@@ -294,56 +294,40 @@ class GWARipper:
         """
         dl_dict = {info.page_url: info for _, info in children_iter_dfs(
                    self.downloads, file_info_only=True)}
-        c = self.db_con.execute("SELECT url FROM Downloads WHERE url IN "
-                                f"({', '.join(['?']*len(dl_dict.keys()))})",
-                                (*dl_dict.keys(),))
-        duplicate = {r[0] for r in c.fetchall()}
+        dl_dict_furls = {info.direct_url: info for _, info in children_iter_dfs(
+                         self.downloads, file_info_only=True)}
+        nr_items = len(dl_dict)
+        # check both url and url_file since some rows only have the url_file set
+        c = self.db_con.execute("SELECT url, url_file FROM Downloads WHERE url IN "
+                                f"({', '.join(['?']*nr_items)}) "
+                                f"OR url_file IN ({', '.join(['?']*nr_items)})",
+                                (*dl_dict.keys(), *dl_dict_furls.keys()))
+        duplicates = c.fetchall()
 
-        if duplicate and config.config.getboolean("Settings", "set_missing_reddit"):
+        if duplicates and config.config.getboolean("Settings", "set_missing_reddit"):
             logger.info("Filling in missing reddit info: You can disable this "
                         "in the settings")
-            for dupe_url in duplicate:
-                info = dl_dict[dupe_url]
+            for url, file_url in duplicates:
+                try:
+                    info = dl_dict[url]
+                except KeyError:
+                    # url None and using url_file
+                    info = dl_dict_furls[file_url]
                 # when we got reddit info get sgasm info even if this file was already
                 # downloaded b4 then write missing info to db and write selftext to file
                 if info.reddit_info:
-                    missing, filename_local, added_date, page_usr = (
-                            self.set_missing_reddit_db(info))
-                    if not missing or not info.reddit_info.selftext:
-                        continue
+                    self.set_missing_reddit_db(info, use_file_url=url is None)
 
-                    legacy_cutoff = datetime.datetime(2020, 10, 6)
-                    if ((info.extractor is SoundgasmExtractor and
-                            (added_date is None or added_date == "None")) or
-                            datetime.datetime.strptime(added_date, "%Y-%m-%d") <= legacy_cutoff):
-                        # TODO due to my db having been used with older versions there are a lot of
-                        # rows where cols local_filename and url are empty -> gen a filename so we
-                        # can write the selftext
-                        if filename_local is None:
-                            filename_local = re.sub(
-                                    r"[^\w\-_.,\[\] ]", "_",
-                                    info.title[0:110]) + ".m4a"
-                        selftext_fn = os.path.join(config.ROOTDIR, page_usr,
-                                                   f"{filename_local}.txt")
+        if duplicates:
+            logger.info("%d files were already downloaded!", len(duplicates))
 
-                        if not os.path.isfile(selftext_fn):
-                            ri = info.reddit_info
-                            with open(selftext_fn, "w", encoding="UTF-8") as w:
-                                w.write(f"Title: {ri.title}\nPermalink: {ri.permalink}\n"
-                                        f"Selftext:\n\n{ri.selftext}")
-                    else:
-                        # intentionally don't write into subpath that might get used
-                        # by RedditInfo since this file was downloaded without it
-                        file_path = os.path.join(page_usr, filename_local)
-                        info.reddit_info.write_selftext_file(
-                                config.ROOTDIR, file_path, force_path=True)
-        if duplicate:
-            logger.info("%d files were already downloaded!", len(duplicate))
+        for url, file_url in duplicates:
+            try:
+                dl_dict[url].already_downloaded = True
+            except KeyError:
+                dl_dict_furls[file_url].already_downloaded = True
 
-        for dupe_url in duplicate:
-            dl_dict[dupe_url].already_downloaded = True
-
-    def set_missing_reddit_db(self, info: FileInfo) -> (bool, Optional[str], str, str):
+    def set_missing_reddit_db(self, info: FileInfo, use_file_url=False) -> None:
         """
         Updates row of file entry in db with reddit_info dict, only sets values if previous
         entry was NULL/None
@@ -361,7 +345,9 @@ class GWARipper:
         # (should we generate a new cursor)
         # new_c will always fetch Row obj and cursor will fetch tuples
 
-        c = self.db_con.execute("SELECT * FROM Downloads WHERE url = ?", (info.page_url,))
+        c = self.db_con.execute("SELECT * FROM Downloads WHERE "
+                                f"{'url_file' if use_file_url else 'url'} = ?",
+                                (info.direct_url if use_file_url else info.page_url,))
         row_cont = c.fetchone()
 
         set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"),
@@ -375,19 +361,38 @@ class GWARipper:
             if row_cont[col] is None:
                 upd_cols.append("{} = ?".format(col))
                 upd_vals.append(getattr(info.reddit_info, key, None))
+        if use_file_url:
+            upd_cols.append("url = ?")
+            upd_vals.append(info.page_url)
 
         if upd_cols:
             logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
-            # append url since upd_vals need to include all the param substitutions for ?
-            upd_vals.append(info.page_url)
+            # append url/_file since upd_vals need to include all the param substitutions for ?
+            upd_vals.append(info.direct_url if use_file_url else info.page_url)
             # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would
             # have to update as well so not a good idea
             # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(
             #   ",".join(upd_cols), ",".join("?"*len(upd_cols))))
 
-            # TODO let caller handle commit?
             with self.db_con:
-                c.execute("UPDATE Downloads SET {} WHERE url = ?".format(",".join(upd_cols)),
-                          upd_vals)
-        return (row_cont["reddit_id"] is None, row_cont["local_filename"],
-                row_cont["date"], row_cont["sgasm_user"])
+                c.execute(f"UPDATE Downloads SET {','.join(upd_cols)} WHERE "
+                          f"{'url_file' if use_file_url else 'url'} = ?", upd_vals)
+
+        if not info.reddit_info.selftext:
+            return
+
+        filename_local = row_cont['local_filename']
+        page_usr = row_cont['sgasm_user']
+
+        # TODO due to my db having been used with older versions there are a lot of
+        # rows where cols local_filename and url are empty -> gen a filename so we
+        # can write the selftext
+        if filename_local is None:
+            filename_local = re.sub(
+                    r"[^\w\-_.,\[\] ]", "_",
+                    row_cont['title'][0:110]) + ".m4a"
+        # intentionally don't write into subpath that might get used
+        # by RedditInfo since this file was downloaded without it
+        file_path = os.path.join(page_usr, filename_local)
+        info.reddit_info.write_selftext_file(
+                config.ROOTDIR, file_path, force_path=True)

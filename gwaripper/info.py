@@ -342,7 +342,7 @@ class RedditInfo(FileCollection):
             return None
 
         if force_path:
-            selftext_fn = os.path.join(root_dir, f"{subpath}_selftext.txt")
+            selftext_fn = os.path.join(root_dir, f"{subpath}.txt")
         else:
             filename = sanitize_filename(len(subpath), self.title)
             # path.join works with joining empty strings
@@ -350,6 +350,9 @@ class RedditInfo(FileCollection):
             selftext_fn = f"{filename}.txt"
 
         if not os.path.isfile(selftext_fn):
+            # create path since user might have downloaded the file and the moved it
+            # to e.g. a backup
+            os.makedirs(os.path.dirname(selftext_fn), exist_ok=True)
             with open(selftext_fn, "w", encoding="UTF-8") as w:
                 w.write(f"Title: {self.title}\nPermalink: {self.permalink}\n"
                         f"Selftext:\n\n{self.selftext}")
