@@ -405,29 +405,29 @@ reddit_extractor_url_expected = [
          "non-supported", None),
         # i.redd.it in selftext
         # https://old.reddit.com/r/gonewildaudio/comments/izmq8r/fff4m_three_elven_princesses_come_together_to/
-        ("https://www.reddit.com/r/gonewildaudio/comments/ftg63j/"
-         "f4m_the_most_dangerous_game_monster_girl_jinko/",  # 2 sg links in text + imgur album
-         ["https://soundgasm.net/u/POVscribe/The-Most-Dangerous-Game-SFX-MonstergirlJinko",
-          "https://soundgasm.net/u/POVscribe/The-Most-Dangerous-Game-Voice-only-MonstergirlJinko",
-          "https://imgur.com/a/pjQoz4C"],
+        ("https://www.reddit.com/r/gonewildaudio/comments/ewco8n/"
+         "becoming_the_lamia_tribehusband_ffff4m/",  # 1 sg link in text + imgur album
+         ["https://soundgasm.net/u/POVscribe/Becoming-the-Lamia-Tribe-Husband-FFFF4MMonstergirls",
+          "https://imgur.com/a/4iaKN9F"],
          {
              # fcol
-             "url": ('https://www.reddit.com/r/gonewildaudio/comments/ftg63j/'
-                     'f4m_the_most_dangerous_game_monster_girl_jinko/'),
-             "id": 'ftg63j',
-             "title": ("[F4M] The Most Dangerous Game [Monster girl] [Jinko] [Tiger-woman]"
-                       " [Married couple] [Mating season] [Hide and seek] [Gentle Fdom] but"
-                       " [Feral] [Blowjob] [Facesit] [Creampie] [Impreg] [Breeding] "
-                       "[L-bombs] [Aftersex] [Good Boy] Script by /u/EighthSpan"),
+             "url": ('https://www.reddit.com/r/gonewildaudio/comments/ewco8n/'
+                     'becoming_the_lamia_tribehusband_ffff4m/'),
+             "id": 'ewco8n',
+             "title": ("Becoming the Lamia Tribe-Husband [FFFF4M] [Monstergirls][4 Lusty "
+                       "Lamia Ladies][Fivesome/Orgy][Aphrodisiac Venom][Fdom]and[Fsub]"
+                       "[Deflowering][Blowjob][Facial][Many Creampies][Impreg][Breeding]"
+                       "[MoreTagsBelow][Collab] with /u/AuralAllusions /u/DanseuseElectrique "
+                       "/u/valeriethinevalkyrie"),
              "author": "POVscribe",
              # ri
-             "permalink": ("/r/gonewildaudio/comments/ftg63j/f4m_the_most_dangerous"
-                           "_game_monster_girl_jinko/"),
-             "selftext": """I missed Monstergirl Monday, so it's gonna have to be Tigress Thursday, grrrr...\n\nLISTEN: [**The Most Dangerous Game, full SFX**](https://soundgasm.net/u/POVscribe/The-Most-Dangerous-Game-SFX-MonstergirlJinko) {17:40} | or Version 2 with [**less SFX**](https://soundgasm.net/u/POVscribe/The-Most-Dangerous-Game-Voice-only-MonstergirlJinko)\n\n[Script](https://www.reddit.com/r/gonewildaudio/comments/ag2flq/f4m_the_most_dangerous_game_script_offer_jinko/) by u/EighthSpan\n\n[The Jinko, a powerful monster girl that is part tiger and part woman](https://imgur.com/a/pjQoz4C). She is incredibly powerful and agile, and resembles a woman who has feline ears atop her head, along with padded feet, claws, a tail, etc. They are usually a cool and collected species, but once a year they enter their mating season and become deeply lustful and are aggressive in their hunt for a mate.\n\nIn this account, she is in a happy marriage that has been going strong for a handful of years now. She's made a sort of game out of her yearly heat — the first night she enters her mating frenzy, she and her husband play a game of hide and seek, where he hides and runs from her, making her more desperate and needy as she hunts for her prey...\n\nBut she *always* catches him and takes what she craves, without fail... ^(to make her a tiger mom)\n\n\\+ + + + + + +\n\nWant more Monstergirl from me?\n\n[Becoming the Lamia Tribe-Husband](https://www.reddit.com/r/gonewildaudio/comments/ewco8n/becoming_the_lamia_tribehusband_ffff4m/) (collab)\n\n[Breeding by Mooooo-nlight](https://www.reddit.com/r/gonewildaudio/comments/emll6k/f4m_breeding_by_mooooonlight_monstergirl/)\n\n\\+ + + + + + +\n\n*All SFX thanks to Creative Commons copyright-free license via Freesound. All characters depicted are adults 18+.*""",
-             "created_utc": 1585803069.0,
+             "permalink": ("/r/gonewildaudio/comments/ewco8n/"
+                           "becoming_the_lamia_tribehusband_ffff4m/"),
+             "selftext": """^(More tags: \\[Multiple orgasms\\]\\[Fingering\\]\\[Cunnilingus\\]\\[Taking Turns\\]\\[Multiple Positions\\])\n\n**Premise**: A well-known mercenary gets invited to a remote desert town for a special contract. When he arrives, he learns the town is a small tribal [lamia](https://imgur.com/a/4iaKN9F) queendom, whose queen has a very special offer for him….\n\n4 lusty Lamia ladies assemble to fill this [script](https://www.reddit.com/r/gonewildaudio/comments/e4495x/becoming_the_lamia_tribehusbandscript/) offered by u/RamblingKnight.\n\n**LISTEN**: [**Becoming the Lamia Tribe-Husband**](https://soundgasm.net/u/POVscribe/Becoming-the-Lamia-Tribe-Husband-FFFF4MMonstergirls) {41 min}\n\n"*You will give up your old life to come live here, and be the father of our children. You will devote the rest of your life to mating with us.…..*\n\n*…..and of course satiate our tribe’s ……every desire….."*\n\n\\+ + + + + + +\n\n**CAST**:\n\nDiana, our Queen, u/AuralAllusions\n\nKassia, Captain of the Guard, by u/POVscribe\n\nSophia, the court priestess, by u/DanseuseElectrique\n\nEris, the Queen\'s concubine, by u/valeriethinevalkyrie\n\n**PRODUCTION**:\n\nSound Editor/Mixer: u/Kilbeggan32 (Want to sound *this* good? Check out his [page](https://www.reddit.com/r/Kilbeggan32/) to learn more.)\n\nProject Manager: u/POVscribe\n\nAll music/sounds are copyright/royalty-free.\n\n\\+ + + + + + +\n\n^(A wholly fictional fantasy made by, about, and for adults 18+)""",
+             "created_utc": 1580419842.0,
              "subreddit": "gonewildaudio",
-             "r_post_url": ("https://www.reddit.com/r/gonewildaudio/comments/ftg63j/"
-                            "f4m_the_most_dangerous_game_monster_girl_jinko/"),
+             "r_post_url": ("https://www.reddit.com/r/gonewildaudio/comments/ewco8n/"
+                            "becoming_the_lamia_tribehusband_ffff4m/"),
          }),
          ("https://www.reddit.com/r/pillowtalkaudio/comments/feagis/f4m_seven_minutes"
           "_in_heaven_with_your_crush/",  # xpost with one sgasm link in text
