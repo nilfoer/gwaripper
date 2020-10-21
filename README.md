@@ -2,6 +2,12 @@
 Script to download (mainly) audio files either by parsing reddit submissions for supported links or by directly downloading from soundgasm.net, eraudica.com etc. You can download single links, entire users or the top submissions of *gonewildaudio* of the last week. Going through reddit is preferred since more post information can
 be saved, if a selftext is present it will be saved alongside the audio file. Searching reddit and downloading submissions by redditors is also supported. Saves the info of downloaded files in a SQLite database but also exports it to csv.
 
+## GWARipper has a WebGUI too!
+
+It supports rating and favoriting of audios, full-text-search, embedding files from your drive or the original source and more!
+
+![GWARipper WebGUI Desktop](https://i.imgur.com/nLqPT5T.png)
+
 ## Download
 You can either download the [bundled executable](https://github.com/nilfoer/gwaripper/releases) for Windows that has all the dependencies included. The exe will uncompress the bundled dependencies including data like HTML templates, into a temporary folder in your `APPDATA` folder e.g. `C:\Users\nilfoer\AppData\Local\Temp\_MEI175512`. If that is not what you want, use one of the other options!
 
