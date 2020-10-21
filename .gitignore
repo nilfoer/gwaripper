@@ -34,6 +34,7 @@
 !tests/*
 tests/*/
 !tests/test_**
+tests/*.log
 
 todo.txt
 dependencies/

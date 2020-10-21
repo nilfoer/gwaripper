@@ -15,8 +15,8 @@ a = Analysis(['gwaripper-runner.py'],
              datas=[
                 ("venv/Lib/site-packages/praw/praw.ini", "praw/"),
                  # also enclude webgui fils
-                ("webGUI/static", "static"),
-                ("webGUI/templates", "templates")
+                ("gwaripper_webGUI/static", "static"),
+                ("gwaripper_webGUI/templates", "templates")
              ],
              hiddenimports=[],
              hookspath=[],

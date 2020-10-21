@@ -425,17 +425,17 @@ def _cl_config(args):
               "soundgasm.net files: {}".format(smr_bool))
     if args.reddit_client_id:
         try:
-            config.config["Reddit"]["client_id"] = str(args.client_id)
+            config.config["Reddit"]["client_id"] = str(args.reddit_client_id)
         except KeyError:
-            config.config["Reddit"] = {"client_id": str(args.client_id)}
+            config.config["Reddit"] = {"client_id": str(args.reddit_client_id)}
         changed = True
         print("Successfully set Client ID")
     if args.reddit_client_secret is not None:
-        if args.client_secret:
+        if args.reddit_client_secret:
             try:
-                config.config["Reddit"]["client_secret"] = str(args.client_secret)
+                config.config["Reddit"]["client_secret"] = str(args.reddit_client_secret)
             except KeyError:
-                config.config["Reddit"] = {"client_secret": str(args.client_secret)}
+                config.config["Reddit"] = {"client_secret": str(args.reddit_client_secret)}
         else:
             try:
                 del config.config["Reddit"]["client_secret"]

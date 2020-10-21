@@ -1,4 +1,6 @@
 # MANIFEST.in
+# https://stackoverflow.com/a/25964691
+# MANIFEST.in seems targetted for python versions <= 2.6, I'm not sure if higher versions even look at it
 exclude .gitignore
 include README.md
 exclude gwaripper/config*.ini
@@ -14,4 +16,10 @@ recursive-include gwaripper *.py
 # exclude log files and pyc or pyo files
 global-exclude *.log
 global-exclude *.py[co]
+global-exclude tags
 exclude gwaripper-runner.py
+# include all webGUI/static files
+recursive-include gwaripper_webGUI/static *
+recursive-include gwaripper_webGUI/static/webfonts *
+recursive-include gwaripper_webGUI/templates *
+recursive-include gwaripper_webGUI/templates/auth *

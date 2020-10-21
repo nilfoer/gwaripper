@@ -138,7 +138,7 @@ class GWARipper:
             i += 1
             # :02d -> pad number with 0 to a width of 2, d -> digit(int)
             filename = f"{filename_old}_{i:02d}"
-        if i:
+        if i > 1:
             logger.info("FILE ALREADY EXISTS - ADDED: _%02d", i)
         return filename
 

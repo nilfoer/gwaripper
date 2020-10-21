@@ -36,7 +36,7 @@ def load_or_create_sql_db(filename):
                 r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,
                 reddit_url TEXT, reddit_user TEXT,
                 sgasm_user TEXT, subreddit_name TEXT, rating REAL,
-                favorite INTEGER);
+                favorite INTEGER NOT NULL DEFAULT 0);
 
             -- full text-search virtual table
             -- only stores the idx due to using parameter content='..'

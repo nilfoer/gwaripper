@@ -70,7 +70,7 @@
                         <div class="entry-expand-icons">
                             {# set favIntbool to opposite of what it is 0 or 1 with 1-val #}
                             {# need to account  for entry.favorite being None #}
-                            <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - 1 if entry.favorite else None }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
+                            <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - entry.favorite if entry.favorite is not none else 1 }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
                             <a href="#" class="remove-entry-btn" data-entry-id={{ entry.id }} title="Remove audio!"><i class="fas fa-trash-alt red-fcolor"></i></a>
                         </div>
                     </div>
@@ -208,7 +208,14 @@
 					// let jquery know that flask is returning json data
 					// (data in func below)
 					dataType: "json"
-				});
+                }).done(function(data) {
+                    if (data.error) {
+                        console.log(data.error);
+                    } else {
+                        // set to opposite
+                        fav_btn.data("favIntbool", 1 - fav_intbool);
+                    }
+                });
             });
 			$('.rate-star').click(function(event) {
                 let rate_container = $(event.currentTarget).parents(".rate");
