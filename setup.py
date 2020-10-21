@@ -1,7 +1,20 @@
 import setuptools
+import os
 
 with open("README.md", "r", encoding="UTF-8") as fh:
     long_description = fh.read()
+
+
+webgui_data = []
+for dirpath, dirnames, filenames in os.walk(os.path.abspath('gwaripper_webGUI')):
+    try:
+        dirnames.remove('__pycache__')
+    except ValueError:
+        pass
+    for fn in filenames:
+        if fn.endswith('.py'):
+            continue
+        webgui_data.append(os.path.join(dirpath, fn))
 
 
 setuptools.setup(
@@ -19,16 +32,19 @@ setuptools.setup(
     python_requires='>=3.6',
     install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw==6", "beautifulsoup4>=4.5.3,<=4.6.3"],
     tests_require=['pytest'],
+    # using MANIFEST.in for these files does not seem to work!
     # non-python data that should be included in the pkg
-    # mapping from package name to a list of relative path names that should be
+    # mapping from package name to a list of relative (to package) path names that should be
     # copied into the package
-    package_data={},
+    package_data={
+        'gwaripper_webGUI': webgui_data,
+        },
     entry_points={
         'console_scripts': [
             # linking the executable gwaripper here to running the python
             # function main in the gwaripper module
             'gwaripper=gwaripper.cli:main',
-            'gwaripper_webGUI=webGUI.start_webgui:main',
+            'gwaripper_webGUI=gwaripper_webGUI.start_webgui:main',
         ]},
     classifiers=[
         "Programming Language :: Python :: 3",

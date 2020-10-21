@@ -5,7 +5,7 @@ be saved, if a selftext is present it will be saved alongside the audio file. Se
 ## Download
 You can either download the [bundled executable](https://github.com/nilfoer/gwaripper/releases) for Windows that has all the dependencies included. The exe will uncompress the bundled dependencies including data like HTML templates, into a temporary folder in your `APPDATA` folder e.g. `C:\Users\nilfoer\AppData\Local\Temp\_MEI175512`. If that is not what you want, use one of the other options!
 
-Or you can download the [source](https://github.com/nilfoer/gwaripper/archive/master.zip), unzip it and then install it using:
+Or you can download the [GWARipper-version.zip](https://github.com/nilfoer/gwaripper/releases) on the releases page (downloading the auto-generated source will not work if you want to use the webGUI, since static third-party files like fonts or bootstrap3 are not tracked by git!), unzip it and then install it using:
 ```
 > python -m pip install .
 ```
