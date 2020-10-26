@@ -49,8 +49,10 @@
                     <div class="entry-expand-actions">
                         Source:<br/>
                         <div class="entry-expand-icons">
-                            {% set r_url = entry.r_post_url if entry.r_post_url and ('reddit' in entry.r_post_url) else entry.reddit_url %}
+                            {% if entry.reddit_url %}
+                            {% set r_url = 'https://reddit.com' + entry.reddit_url if not entry.reddit_url.startswith('http') else entry.reddit_url %}
                             <a href={{ r_url if r_url else '#' }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
+                            {% endif %}
                             <a href={{ entry.url if entry.url else '#' }} title="Visit audio source page!"><i class="fas fa-globe-americas"></i></a>
                         </div>
                         <br/>

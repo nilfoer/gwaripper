@@ -82,6 +82,10 @@ class GWARipper:
         dls = []
         for url in set(links):
             extractor = find_extractor(url)
+            if extractor is None:
+                logger.warning("Found no exctractor for URL: %s", url)
+                continue
+
             try:
                 info = extractor(url).extract()
             except InfoExtractingError:

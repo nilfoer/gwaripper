@@ -23,7 +23,7 @@ setuptools.setup(
     description="A script that rips and downloads audio files from the gonewildaudio subreddit.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="",
+    url="https://github.com/nilfoer/gwaripper",
     author="nilfoer",
     author_email="",
     license="MIT",

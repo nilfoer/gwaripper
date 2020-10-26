@@ -7,7 +7,7 @@ import pyperclip
 
 logger = logging.getLogger(__name__)
 
-URL_RE = re.compile(r"^(?:https?://)?(?:\w\.)*?[-A-Za-z0-9]{2,61}\.{a-z}{2,61}/.+")
+URL_RE = re.compile(r"^(?:https?://)?(?:[-A-Za-z0-9]{1,61}\.)*[-A-Za-z0-9]{2,61}\.[a-z]{2,61}/.+")
 
 
 def is_url(s):
