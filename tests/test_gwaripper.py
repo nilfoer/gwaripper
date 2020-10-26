@@ -12,6 +12,8 @@ from gwaripper.gwaripper import GWARipper
 from gwaripper.db import load_or_create_sql_db
 from gwaripper.info import FileInfo, RedditInfo, FileCollection
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
+from gwaripper.extractors.reddit import RedditExtractor
+from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from utils import build_file_url, TESTS_DIR, setup_tmpdir, RandomHelper, get_all_rowtuples_db
 
 # TODO?
@@ -823,3 +825,54 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
     # should not commit adding fi5 to db!!
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+
+
+def test_parse_links(setup_tmpdir, monkeypatch, caplog):
+    tmpdir = setup_tmpdir
+    cfg.ROOTDIR = tmpdir
+
+    soundgasmfi = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
+                           'https://page.url/asjfgl3oi5j23/file.mp3', "sfkjl",  # id
+                           "Title",  # title
+                           None, "author")
+    monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor.extract',
+                        lambda x: soundgasmfi)
+    imgurmimgfi = FileInfo(ImgurImageExtractor, None, None, "url",
+                           "direct url", None, None, None, None)
+    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurImageExtractor.extract',
+                        lambda x: imgurmimgfi)
+    imguralbumfc = FileCollection(ImgurAlbumExtractor, "https://imgur.com/a/k23j4", "k23j4",
+                                  "Test", "author", [imgurmimgfi, imgurmimgfi])
+    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurAlbumExtractor.extract',
+                        lambda x: imguralbumfc)
+    redditinfo = RedditInfo(RedditExtractor, "url", "id", "title",
+                            'author', 'subreddit', [soundgasmfi, imguralbumfc])
+    monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor.extract',
+                        lambda x: redditinfo)
+    monkeypatch.setattr('gwaripper.extractors.chirbit.ChirbitExtractor.extract',
+                        lambda x: None)
+
+    # expected = [
+    #         redditinfo,
+    #         soundgasmfi
+    #         ]
+
+    # include duplictate urls
+    urls = [
+            'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
+            'https://no-supported.found/id/243kwd/',
+            'https://chirb.it/hnz5aB',  # returns None
+            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
+            'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
+            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
+            ]
+
+    with GWARipper() as gwa:
+        gwa.parse_links(urls)
+
+    assert gwa.nr_downloads == 4
+    assert f"Skipping URL: {urls[2]}" in caplog.text
+    # no comparison operators defined currently can't sort and compare list
+    assert len(gwa.downloads) == 2
+    assert redditinfo in gwa.downloads
+    assert soundgasmfi in gwa.downloads

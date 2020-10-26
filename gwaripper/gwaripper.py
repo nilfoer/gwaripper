@@ -89,9 +89,12 @@ class GWARipper:
             try:
                 info = extractor(url).extract()
             except InfoExtractingError:
+                info = None
+
+            if info is None:
                 logger.error("Extraction failed! Skipping URL: %s", url)
                 continue
-            if info is not None:
+            else:
                 dls.append(info)
 
         self.downloads.extend(dls)
