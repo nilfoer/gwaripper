@@ -9,8 +9,10 @@ import re
 # from typing import TYPE_CHECKING
 from typing import (
         Optional, Union, List, Type, Tuple, Iterator, Sequence,
-        Deque, TYPE_CHECKING, cast
+        Deque, TYPE_CHECKING, cast, overload
         )
+from typing_extensions import Literal
+
 # instead of a conditional import we could use import gwaripper.extractors.base
 # and then use a string 'gwaripper.extractors.base.BaseExtractor'
 # or from .extractors import base with string 'base.BaseExtractor'
@@ -74,8 +76,32 @@ def sanitize_filename(subpath_len: int, filename: str):
 # def f_good(x: Sequence[A]) -> A:
     # return x[0]
 # f_good(new_lst) # OK
+
+# overload return type of iter function based on file_info_only param
+# overload decoreated declarations are not allowed to have a function body
+# and have to be adjacent to the actual implementation
+# using Literal introduced in py3.8 (or from typing_extension pkg) it would
+# be possible to have an overload based on the caller passing a literal True
+# or False (a variable would still just have type bool unless annoteted with
+# Literal[True/False])
+@overload
 def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
-                      file_info_only: bool = False,
+                      file_info_only: Literal[False],
+                      relative_enum: bool = False) -> Iterator[
+                              Tuple[int, Union['FileInfo', 'FileCollection']]]: ...
+
+
+@overload
+def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
+                      file_info_only: Literal[True],
+                      relative_enum: bool = False) -> Iterator[
+                              Tuple[int, 'FileInfo']]: ...
+
+
+# only allow literals for file_info_only otherwise we'd do one more overload
+# for a normal bool
+def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
+                      file_info_only: bool,  # can't be a default arg
                       relative_enum: bool = False) -> Iterator[
                               Tuple[int, Union['FileInfo', 'FileCollection']]]:
     """
@@ -124,8 +150,22 @@ def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
             enumerator += 1
 
 
+@overload
 def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
-                      file_info_only: bool = False,
+                      file_info_only: Literal[False],
+                      relative_enum: bool = False) -> Iterator[
+                              Tuple[int, Union['FileInfo', 'FileCollection']]]: ...
+
+
+@overload
+def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
+                      file_info_only: Literal[True],
+                      relative_enum: bool = False) -> Iterator[
+                              Tuple[int, 'FileInfo']]: ...
+
+
+def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
+                      file_info_only: bool,
                       relative_enum: bool = False) -> Iterator[
                               Tuple[int, Union['FileInfo', 'FileCollection']]]:
     """
@@ -371,7 +411,7 @@ class FileCollection:
         names = [self.author]
 
         # bfs yields the names in level order level0 then level1 etc.
-        for _, child in children_iter_bfs(self.children):
+        for _, child in children_iter_bfs(self.children, file_info_only=False):
             if child.author:
                 names.append(child.author)
 

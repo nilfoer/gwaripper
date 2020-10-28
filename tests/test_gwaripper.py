@@ -14,6 +14,7 @@ from gwaripper.info import FileInfo, RedditInfo, FileCollection
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.reddit import RedditExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
+from gwaripper.exceptions import InfoExtractingError
 from utils import build_file_url, TESTS_DIR, setup_tmpdir, RandomHelper, get_all_rowtuples_db
 
 # TODO?
@@ -24,7 +25,6 @@ TESTS_FILES_DIR = os.path.join(TESTS_DIR, "test_dl")
 
 def test_set_missing_reddit(setup_tmpdir):
     tmpdir = setup_tmpdir
-    cfg.ROOTDIR = tmpdir
 
     test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
     test_con, test_c = load_or_create_sql_db(test_db)
@@ -205,7 +205,6 @@ def test_set_missing_reddit(setup_tmpdir):
 
 def test_add_to_db(setup_tmpdir):
     tmpdir = setup_tmpdir
-    cfg.ROOTDIR = tmpdir
 
     test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
     test_con, test_c = load_or_create_sql_db(test_db)
@@ -315,7 +314,6 @@ def test_add_to_db(setup_tmpdir):
 
 def test_mark_alrdy_downloaded(setup_tmpdir):
     tmpdir = setup_tmpdir
-    cfg.ROOTDIR = tmpdir
     cfg.config["Settings"]["set_missing_reddit"] = "False"
 
     test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
@@ -497,7 +495,6 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
 
 def test_download(setup_tmpdir, monkeypatch, caplog):
     tmpdir = setup_tmpdir
-    cfg.ROOTDIR = tmpdir
 
     rnd = RandomHelper()
 
@@ -816,7 +813,6 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
 def test_parse_links(setup_tmpdir, monkeypatch, caplog):
     tmpdir = setup_tmpdir
-    cfg.ROOTDIR = tmpdir
 
     soundgasmfi = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
                            'https://page.url/asjfgl3oi5j23/file.mp3', "sfkjl",  # id
@@ -840,6 +836,12 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
     monkeypatch.setattr('gwaripper.extractors.chirbit.ChirbitExtractor.extract',
                         lambda x: None)
 
+    def raises_iee(self):
+        raise InfoExtractingError('msg', 'url', 'html')
+
+    monkeypatch.setattr('gwaripper.extractors.eraudica.EraudicaExtractor.extract',
+                        raises_iee)
+
     # expected = [
     #         redditinfo,
     #         soundgasmfi
@@ -853,6 +855,7 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
             'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
             'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
             'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
+            'https://www.eraudica.com/e/eve/2015/Escaped-Audio-Title-Eraudica/gwa',
             ]
 
     with GWARipper() as gwa:
@@ -864,3 +867,27 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
     assert len(gwa.downloads) == 2
     assert redditinfo in gwa.downloads
     assert soundgasmfi in gwa.downloads
+
+    caplog.clear()
+    urls_new = [urls[1]]
+    with GWARipper() as gwa:
+        gwa.parse_links(urls_new)
+    assert f"Found no extractor for URL: {urls_new[0]}" in caplog.text
+    # no comparison operators defined currently can't sort and compare list
+    assert len(gwa.downloads) == 0
+
+    caplog.clear()
+    urls_new = [urls[2]]
+    with GWARipper() as gwa:
+        gwa.parse_links(urls_new)
+    assert f"Skipping URL: {urls_new[0]}" in caplog.text
+    # no comparison operators defined currently can't sort and compare list
+    assert len(gwa.downloads) == 0
+
+    caplog.clear()
+    urls_new = [urls[6]]
+    with GWARipper() as gwa:
+        gwa.parse_links(urls_new)
+    assert f"Extraction failed! Skipping URL: {urls_new[0]}" in caplog.text
+    # no comparison operators defined currently can't sort and compare list
+    assert len(gwa.downloads) == 0

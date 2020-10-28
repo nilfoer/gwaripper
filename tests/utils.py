@@ -33,7 +33,7 @@ def setup_tmpdir():
         pass
     os.makedirs(tmpdir)
 
-    config.ROOTDIR = tmpdir
+    config.set_root(tmpdir)
     return tmpdir
     # yield tmpdir
     # # del dir and contents after test is done

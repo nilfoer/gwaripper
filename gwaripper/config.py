@@ -78,16 +78,9 @@ if not config.sections():
     config.read_dict(init_cfg)
 
 
-# make sure to only use ROOTDIR and not the value from config in the rest of the program
-# path to dir where the soundfiles will be stored in subfolders
-ROOTDIR = None
-try:
-    ROOTDIR = config["Settings"]["root_path"]
-except KeyError:
-    pass
-
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
-# load from config ini, split at comma, strip whitespaces, ensure that they are lowercase with .lower()
+# load from config ini, split at comma, strip whitespaces, ensure that they are
+# lowercase with .lower()
 KEYWORDLIST: List[str] = [x.strip().lower() for x in config["Settings"]["tag_filter"].split(",")]
 
 # tag1 is only banned if tag2 isnt there, in cfg file: tag1;tag2;, tag3;tag4;, ...
@@ -96,6 +89,17 @@ if config.has_option("Settings", "tag1_in_but_not_tag2"):
     for tag_comb in config["Settings"]["tag1_in_but_not_tag2"].split(";,"):
         tag1, tag2 = tag_comb.strip().split(";")
         TAG1_BUT_NOT_TAG2.append((tag1.strip().lower(), tag2.strip().lower()))
+
+
+def get_root() -> str:
+    """
+    raises KeyError if no root_path is set
+    """
+    return config["Settings"]["root_path"]
+
+
+def set_root(root_path: str) -> None:
+    config["Settings"]["root_path"] = root_path
 
 
 def reload_config() -> None:

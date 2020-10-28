@@ -3,7 +3,7 @@ import os
 
 from flask import Flask
 
-from gwaripper.config import ROOTDIR
+from gwaripper.config import get_root
 
 from .webGUI import main_bp, init_app
 from .csrf import init_app as csrf_init_app
@@ -20,6 +20,8 @@ def create_app(test_config=None, **kwargs):
     # -> so project_root/instance will be the instance folder depending on un/installed
     # module/package
 
+    root_dir = get_root()
+
     # NOTE: pyinstaller single folder dist and one-file exe
     # sys._MEIPASS or sys.frozen -> packaged inside executable
     # -> need to figure out our path
@@ -33,12 +35,12 @@ def create_app(test_config=None, **kwargs):
         static_folder = os.path.join(bundle_path, 'static')
 
         app = Flask(__name__, instance_relative_config=True,
-                    instance_path=ROOTDIR, template_folder=template_folder,
+                    instance_path=root_dir, template_folder=template_folder,
                     static_folder=static_folder, **kwargs)
         app.logger.info(bundle_path)
     else:
         app = Flask(__name__, instance_relative_config=True,
-                    instance_path=ROOTDIR, **kwargs)
+                    instance_path=root_dir, **kwargs)
 
     # here root_path == N:\coding\tsu-info\manga_db\webGUI
     # instance_path == N:\coding\tsu-info\instance

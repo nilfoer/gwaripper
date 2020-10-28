@@ -8,9 +8,8 @@ import urllib.request
 
 import praw
 
-from typing import List, Union, Optional, cast, Dict
+from typing import List, Union, Optional, cast, Dict, ClassVar
 
-from .logging_setup import configure_logging
 from . import utils
 from . import config
 from .extractors import find_extractor
@@ -41,24 +40,20 @@ rqd = utils.RequestDelayer(0.25, 0.75)
 logger = logging.getLogger("gwaripper")
 logger.setLevel(logging.DEBUG)
 
-# only log to file if ROOTDIR is set up so we dont clutter the cwd or the module dir
-if config.ROOTDIR and os.path.isdir(config.ROOTDIR):
-    configure_logging(os.path.join(config.ROOTDIR, "gwaripper.log"))
-
 
 class GWARipper:
     """
-    Uses config.ROOTDIR as base path for writing and reading files
+    Uses config.get_root() as base path for writing and reading files
     """
 
-    headers = {
+    headers: ClassVar[Dict[str, str]] = {
         'User-Agent':
         'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
         }
 
     def __init__(self):
         self.db_con, _ = load_or_create_sql_db(
-                os.path.join(config.ROOTDIR, "gwarip_db.sqlite"))
+                os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.downloads = []
         self.nr_downloads = 0
         self.download_index = 1
@@ -72,12 +67,12 @@ class GWARipper:
         # suppress the exception by returning a true value from this method. If
         # you don't want to suppress errors then you can return a value that
         # evaluates to False.
-        export_csv_from_sql(os.path.join(config.ROOTDIR, "gwarip_db_exp.csv"), self.db_con)
+        export_csv_from_sql(os.path.join(config.get_root(), "gwarip_db_exp.csv"), self.db_con)
         self.db_con.close()
 
         # auto backup
-        backup_db(os.path.join(config.ROOTDIR, "gwarip_db.sqlite"),
-                  os.path.join(config.ROOTDIR, "_db-autobu"))
+        backup_db(os.path.join(config.get_root(), "gwarip_db.sqlite"),
+                  os.path.join(config.get_root(), "_db-autobu"))
         return None
 
     def parse_links(self, links: List[str]) -> None:
@@ -86,21 +81,22 @@ class GWARipper:
         for url in set(links):
             extractor = find_extractor(url)
             if extractor is None:
-                logger.warning("Found no exctractor for URL: %s", url)
+                logger.warning("Found no extractor for URL: %s", url)
                 continue
 
             try:
                 info = extractor(url).extract()
             except InfoExtractingError:
-                info = None
-
-            if info is None:
                 logger.error("Extraction failed! Skipping URL: %s", url)
                 continue
             else:
-                dls.append(info)
+                if info is None:
+                    logger.warning("Skipping URL: %s", url)
+                else:
+                    dls.append(info)
 
         self.downloads.extend(dls)
+        # can also pass (args defined as) positional args by keyword
         self.nr_downloads += sum(1 for _ in children_iter_dfs(
                                  dls, file_info_only=True))
 
@@ -174,7 +170,7 @@ class GWARipper:
 
         subpath, filename, ext = info.generate_filename(file_index)
 
-        mypath = os.path.join(config.ROOTDIR, author_name, subpath)
+        mypath = os.path.join(config.get_root(), author_name, subpath)
         os.makedirs(mypath, exist_ok=True)
         filename = self._pad_filename_if_exits(mypath, filename, ext)
         filename = f"{filename}.{ext}"
@@ -259,7 +255,7 @@ class GWARipper:
                 subpath, _, _ = cast(FileInfo, fi).generate_filename()
                 # assuming RedditInfo and excepting AttributeError
                 cast(RedditInfo, info).write_selftext_file(
-                        config.ROOTDIR, os.path.join(author_name, subpath))
+                        config.get_root(), os.path.join(author_name, subpath))
             except AttributeError:
                 pass  # not redditinfo
 
@@ -421,4 +417,4 @@ class GWARipper:
         # by RedditInfo since this file was downloaded without it
         file_path = os.path.join(page_usr, filename_local)
         info.reddit_info.write_selftext_file(
-                config.ROOTDIR, file_path, force_path=True)
+                config.get_root(), file_path, force_path=True)

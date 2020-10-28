@@ -122,7 +122,7 @@ def test_preferred_author():
     fc2.author = None
     assert fc2.get_preferred_author_name() == fi4.author
 
-    for _, c in children_iter_dfs(ri.children):
+    for _, c in children_iter_dfs(ri.children, file_info_only=False):
         c.author = None
 
     # reddit info but no author foudn -> deleted user

@@ -35,11 +35,11 @@ def test_children_iter_dfs():
     start = [lvl1a, lvl1b, lvl1c, lvl1d, lvl1e]
 
     with pytest.raises(AssertionError):
-        fail = [x for x in children_iter_dfs(start)]
+        fail = [x for x in children_iter_dfs(start, file_info_only=False)]
 
     lvl3a.children.append(lvl3e)
 
-    assert [x for x in children_iter_dfs(start)] == [
+    assert [x for x in children_iter_dfs(start, file_info_only=False)] == [
             (0, lvl1a), (1, lvl1b),
             (2, lvl1c),  # parent
                         (3, lvl2a),
@@ -52,7 +52,7 @@ def test_children_iter_dfs():
                                     (12, lvl3a),  # parent
                                                  (13, lvl3e)]
 
-    assert [x for x in children_iter_dfs(start, relative_enum=True)] == [
+    assert [x for x in children_iter_dfs(start, file_info_only=False, relative_enum=True)] == [
             (0, lvl1a), (1, lvl1b),
             (2, lvl1c),  # parent
                         (0, lvl2a),
@@ -105,11 +105,11 @@ def test_children_iter_bfs():
     start = [lvl1a, lvl1b, lvl1c, lvl1d, lvl1e]
 
     with pytest.raises(AssertionError):
-        fail = [x for x in children_iter_bfs(start)]
+        fail = [x for x in children_iter_bfs(start, file_info_only=False)]
 
     lvl3a.children.append(lvl3e)
 
-    assert [x for x in children_iter_bfs(start)] == [
+    assert [x for x in children_iter_bfs(start, file_info_only=False)] == [
             (0, lvl1a), (1, lvl1b), (2, lvl1c), (3, lvl1d), (4, lvl1e),
             # parent lvl1c
             (5, lvl2a), (6, lvl2b), (7, lvl2c),
@@ -123,7 +123,7 @@ def test_children_iter_bfs():
             (13, lvl3e)
             ]
 
-    assert [x for x in children_iter_bfs(start, relative_enum=True)] == [
+    assert [x for x in children_iter_bfs(start, file_info_only=False, relative_enum=True)] == [
             (0, lvl1a), (1, lvl1b), (2, lvl1c), (3, lvl1d), (4, lvl1e),
             # parent lvl1c
             (0, lvl2a), (1, lvl2b), (2, lvl2c),

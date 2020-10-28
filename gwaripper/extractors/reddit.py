@@ -153,9 +153,10 @@ class RedditExtractor(BaseExtractor):
                        children_iter_dfs(ri.children, file_info_only=True)):
                 logger.info("No supported link in \"%s\"", submission.shortlink)
 
-                os.makedirs(os.path.join(cast(str, config.ROOTDIR), "_linkcol"), exist_ok=True)
+                root_dir = config.get_root()
+                os.makedirs(os.path.join(root_dir, "_linkcol"), exist_ok=True)
 
-                with open(os.path.join(cast(str, config.ROOTDIR), "_linkcol",
+                with open(os.path.join(root_dir, "_linkcol",
                                        "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
                     w.write("<h3><a href=\"https://reddit.com{}\">{}"
@@ -190,7 +191,7 @@ def check_submission_banned_tags(submission: Submission, keywordlist: List[str],
 
     for keyword in keywordlist:
         if keyword in subtitle:
-            logger.info(
+            logger.warning(
                     "Banned keyword '{}' in: {}\n\t slink: {}".format(
                         keyword, subtitle, submission.shortlink))
             return True
@@ -199,8 +200,8 @@ def check_submission_banned_tags(submission: Submission, keywordlist: List[str],
         for tag_b, tag_in in tag1_but_not_2:
             # tag_b is only banned if tag_in isnt found in subtitle
             if (tag_b in subtitle) and not (tag_in in subtitle):
-                logger.info("Banned keyword: no '{}' in title where '{}' is in: {}\n\t "
-                            "slink: {}".format(tag_in, tag_b, subtitle, submission.shortlink))
+                logger.warning("Banned keyword: no '{}' in title where '{}' is in: {}\n\t "
+                               "slink: {}".format(tag_in, tag_b, subtitle, submission.shortlink))
                 return True
     return False
 
