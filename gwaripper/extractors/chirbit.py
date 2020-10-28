@@ -3,7 +3,7 @@ import base64
 
 import bs4
 
-from typing import Optional
+from typing import Optional, ClassVar, Pattern, Match, cast
 
 from .base import BaseExtractor
 from ..info import FileInfo
@@ -12,19 +12,19 @@ from ..exceptions import InfoExtractingError
 
 class ChirbitExtractor(BaseExtractor):
 
-    EXTRACTOR_NAME = "Chirbit"
-    BASE_URL = "chirb.it"
+    EXTRACTOR_NAME: ClassVar[str] = "Chirbit"
+    BASE_URL: ClassVar[str] = "chirb.it"
 
-    VALID_CHIRBIT_URL_RE = re.compile(r"^(?:https?://)?(?:www\.)?chirb\.it/"
-                                      r"([A-Za-z0-9]+)/?$", re.IGNORECASE)
+    VALID_CHIRBIT_URL_RE: ClassVar[Pattern] = re.compile(
+            r"^(?:https?://)?(?:www\.)?chirb\.it/([A-Za-z0-9]+)/?$", re.IGNORECASE)
 
-    def __init__(self, url):
+    def __init__(self, url: str):
         super().__init__(url)
-        self.id = ChirbitExtractor.VALID_CHIRBIT_URL_RE.match(url).group(1)
+        self.id: str = cast(Match, ChirbitExtractor.VALID_CHIRBIT_URL_RE.match(url)).group(1)
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
-        return cls.VALID_CHIRBIT_URL_RE.match(url)
+        return bool(cls.VALID_CHIRBIT_URL_RE.match(url))
 
     def extract(self) -> Optional[FileInfo]:
         """
@@ -34,6 +34,9 @@ class ChirbitExtractor(BaseExtractor):
         :return: FileInfo
         """
         html = ChirbitExtractor.get_html(self.url)
+        if not html:
+            return None
+
         soup = bs4.BeautifulSoup(html, "html.parser")
 
         try:

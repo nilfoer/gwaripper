@@ -7,7 +7,7 @@ import logging
 
 import praw
 
-from typing import List
+from typing import List, Optional
 
 from . import utils
 from . import clipwatcher_single
@@ -367,7 +367,11 @@ def _cl_config(args):
     changed = False
     if args.path:
         # normalize path, remove double \ and convert / to \ on windows
-        path_in = os.path.normpath(args.path)
+        if args.path[0] == '~':
+            # abspath does not expand ~ (and neither does realpath)
+            path_in = os.path.abspath(os.path.expanduser(os.path.normpath(args.path)))
+        else:
+            path_in = os.path.abspath(os.path.normpath(args.path))
         os.makedirs(path_in, exist_ok=True)
         # i dont need to change cwd and ROOTDIR since script gets restarted anyway
         try:
@@ -421,8 +425,7 @@ def _cl_config(args):
             # settings setciton not present
             config.config["Settings"] = {"set_missing_reddit": str(smr_bool)}
         changed = True
-        print("Gwaripper will try to fill in missing reddit info of "
-              "soundgasm.net files: {}".format(smr_bool))
+        print("Gwaripper will try to fill in missing reddit info: {}" .format(smr_bool))
     if args.reddit_client_id:
         try:
             config.config["Reddit"]["client_id"] = str(args.reddit_client_id)
@@ -477,7 +480,7 @@ def write_last_dltime():
     config.write_config_module()
 
 
-def watch_clip() -> List[str]:
+def watch_clip() -> Optional[List[str]]:
     """
     Watches clipboard for links of domain
 
@@ -485,7 +488,7 @@ def watch_clip() -> List[str]:
     what we're looking for to ClipboardWatcher init
 
     :param domain: keyword that points to function is_domain_url in clipwatcher_single module
-    :return: List of found links, None if there None
+    :return: ClipboardWatcher instance or None
     """
     watcher = clipwatcher_single.ClipboardWatcher(clipwatcher_single.is_url,
                                                   clipwatcher_single.print_write_to_txtf,
@@ -503,4 +506,4 @@ def watch_clip() -> List[str]:
                 # dont return ref so watcher can die
                 return watcher.found.copy()
             else:
-                return
+                return None

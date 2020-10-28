@@ -3,45 +3,52 @@ import os.path
 import pytest
 
 from gwaripper.info import FileInfo, FileCollection, RedditInfo, children_iter_dfs, DELETED_USR_FOLDER
-from gwaripper.extractors.base import BaseExtractor
+# from gwaripper.extractors.base import BaseExtractor
+# doesn't work since it leads to circ dep
+from gwaripper.extractors import base
 
 
 def test_reddit_info_no_parents_allowed():
-    ri = RedditInfo(None, None, None, None, None, None)
+    ri = RedditInfo(None, None, None, None, None, None, 'sfasd', 1234.0)
     with pytest.raises(AssertionError) as exc:
-        ri.parent = RedditInfo(None, None, None, None, None, None)
+        ri.parent = RedditInfo(None, None, None, None, None, None, 'sfasd', 1234.0)
     assert "RedditInfo is not allowed to have a parent!" == str(exc.value)
 
 
 def generate_redditinfo_tree(parent_set_fcol=False):
-    fi1 = FileInfo(BaseExtractor, True, 'm4a', "https://soundgasm.net/u/test-1/File-Name-Test",
+    fi1 = FileInfo(base.BaseExtractor, True, 'm4a',
+                   "https://soundgasm.net/u/test-1/File-Name-Test",
                    "https://soudngasm.net/4uowl4235248sla242.m4a", None,
                    "This is a test audio", "Description for test audio", "authorname")
-    fi2 = FileInfo(BaseExtractor, True, 'mp3', "https://eraudica.com/e/Eraudica-Test-Title",
+    fi2 = FileInfo(base.BaseExtractor, True, 'mp3',
+                   "https://eraudica.com/e/Eraudica-Test-Title",
                    "https://eraudica.com/EraudicaTestTitle.mp3?adfs=safs234", None,
                    "This is an eraudica test audio", "eraudica Description", "Eves-garden")
-    fi3 = FileInfo(BaseExtractor, True, 'm4a', "https://soundgasm.net/u/test-2/Foo-File-Name-Test",
+    fi3 = FileInfo(base.BaseExtractor, True, 'm4a',
+                   "https://soundgasm.net/u/test-2/Foo-File-Name-Test",
                    "https://soudngasm.net/ali3425238sdf9232.m4a", None,
                    "This is a super test audio", "Description sfas for test audio", "fooname")
-    fi4 = FileInfo(BaseExtractor, False, 'mp4', "https://imgur.com/35HLlk54",
+    fi4 = FileInfo(base.BaseExtractor, False, 'mp4',
+                   "https://imgur.com/35HLlk54",
                    "https://i.imgur.com/35HLlk54", "35HLlk54",
                    None, "Animated descr", "xhabbaa")
-    fi5 = FileInfo(BaseExtractor, False, 'jpg', "https://imgur.com/H4sD65ff",
+    fi5 = FileInfo(base.BaseExtractor, False, 'jpg', "https://imgur.com/H4sD65ff",
                    "https://i.imgur.com/H4sD65ff", "H4sD65ff",
                    "Title instead of ID", "Still img descr", "xhabbaa")
 
-    fc1 = FileCollection(BaseExtractor, "https://imaginary-audio-playlist/3432209",
+    fc1 = FileCollection(base.BaseExtractor, "https://imaginary-audio-playlist/3432209",
                          "3432209", "Bestest playlist around that somehow also has a"
                          " needlessly long title that does not seem to end so we "
                          "can test filename generation", "dank-author")
-    fc2 = FileCollection(BaseExtractor, "https://imgur.com/a/5Fkz89D",
+    fc2 = FileCollection(base.BaseExtractor, "https://imgur.com/a/5Fkz89D",
                          "5Fkz89D", "Imgur album TT 0123456789012345 xtra xtra", "xhabbaa")
 
-    ri = RedditInfo(BaseExtractor, "https://reddit.com/r/pillowtalkaudio/comments/6ghk3/f4a_"
+    ri = RedditInfo(base.BaseExtractor, "https://reddit.com/r/pillowtalkaudio/comments/6ghk3/f4a_"
                     "asmr_breathy_whispers_for_you", "6ghk3", "[F4M][ASMR] Breathy Whispers "
                     "For You [Extremely Long Title] ⛸📱🤳🤵 This Title Is Supposed To Be "
                     "Ridiculously Long [With] [So Many More Tags] [Max Path Is Crying Right Now] "
-                    "🤢✔😎🙌 [#EmojisMakeEverythingBetter]", "xhabbaa", "pillowtalkaudio")
+                    "🤢✔😎🙌 [#EmojisMakeEverythingBetter]", "xhabbaa", "pillowtalkaudio",
+                    "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0)
 
     # only set parent on fileinfos since we might test parent propagation
     fi3.parent = fc1

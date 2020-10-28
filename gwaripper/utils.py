@@ -4,6 +4,8 @@ import time
 import re
 import logging
 
+from typing import Optional, Callable, List
+
 logger = logging.getLogger(__name__)
 
 
@@ -71,7 +73,8 @@ class RequestDelayer:
     Sleep if time since last request is smaller than time_gap on mode "last-request" (default)
     example for time_gap 1s delay:0.25s:
     RQ 0.25s -> DELAY RQ 0.1s -> DELAY RQ 1.5s RQ 10s RQ...
-    -> min time between RQ: 0.25s(delay), max time between RQ when delay was issued < time_gap+delay
+    -> min time between RQ: 0.25s(delay),
+    -> max time between RQ when delay was issued < time_gap+delay
 
     Note: self.last_delay or request will be set to current time after delaying
 
@@ -80,20 +83,28 @@ class RequestDelayer:
     :param mode: Check if delay is needed based on either "last-request" or "last-delay"
     """
 
-    def __init__(self, delay, time_gap, mode="last-request"):
+    # bug in mypy can't assign to callable attribute since it thinks that
+    # we're trying to assign to a function
+    # workaround is defining it as Optional and then wrapping it in a method
+    # mypy removes self argument from Callable
+    _delay_func: Optional[Callable[[], None]]
+
+    def __init__(self, delay: float, time_gap: float, mode: str = "last-request"):
         self.delay = delay
         self.time_gap = time_gap
-        self.last_delay = None
-        self.last_request = None
+        self.last_delay: Optional[float] = None
+        self.last_request: Optional[float] = None
+
         if mode == "last-delay":
-            self.delay_func = self._delay_mode_delay
+            self._delay_func = self._delay_mode_delay
         else:
-            self.delay_func = self._delay_mode_request
+            self._delay_func = self._delay_mode_request
 
-    def delay_request(self):
-        self.delay_func()
+    def delay_request(self) -> None:
+        assert self._delay_func is not None
+        self._delay_func()
 
-    def _delay_mode_delay(self):
+    def _delay_mode_delay(self) -> None:
         now = time.time()
         # delay based on last delay time
         # time since last delay > time_gap -> delay
@@ -103,12 +114,13 @@ class RequestDelayer:
                 time.sleep(self.delay)
                 self.last_delay = now
             else:
-                logger.debug("Not delayed: time since last delay {} s".format(now - self.last_delay))
+                logger.debug("Not delayed: time since last delay {} s".format(
+                    now - self.last_delay))
         else:
             time.sleep(self.delay)
             self.last_delay = now
 
-    def _delay_mode_request(self):
+    def _delay_mode_request(self) -> None:
         now = time.time()
         # delay based on last request time
         # time since last request < time_gap -> delay
@@ -118,14 +130,15 @@ class RequestDelayer:
                 time.sleep(self.delay)
                 self.last_request = now
             else:
-                logger.debug("Not delayed: time since last request {} s".format(now - self.last_request))
+                logger.debug("Not delayed: time since last request {} s".format(
+                    now - self.last_request))
                 self.last_request = now
         else:
             # dont sleep on first request
             self.last_request = now
 
 
-def txt_to_list(txtfilename):
+def txt_to_list(txtfilename: str) -> List[str]:
     """
     Reads in file, splits at newline and returns that list
 

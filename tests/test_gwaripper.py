@@ -68,11 +68,8 @@ def test_set_missing_reddit(setup_tmpdir):
                   "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "LEAVE_PRESENT_FIELDS_UNCHANGED77")
     ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                     "inserted_reddit_id", "isnerted_reddit_title", "inserted-reddit-user",
-                    "inserted/subreddit", [fi])
-    ri.permalink = "inserted_rddt_url"
+                    "inserted/subreddit", 'inserted_rddt_url', 1254323.0, children=[fi])
     ri.selftext = None
-    ri.created_utc = 1254323.0
-    ri.subreddit = "ssssubreddit"
     ri.r_post_url = "url-to-self-or-outgoing"
 
     # nothing should happen
@@ -145,10 +142,9 @@ def test_set_missing_reddit(setup_tmpdir):
                   "LEAVE_PRESENT_FIELDS_UNCHANGED_user")
     ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                     "LEAVE_PRESENT_FIELDS_UNCHANGED", "isnerte222d_reddit_title",
-                    "inserted-reddit-user", "inserted/subreddit", [fi])
-    ri.permalink = "inserted_rddt2_url"
+                    "inserted-reddit-user", "inserted/subreddit", "inserted_rddt2_url",
+                    11111111.0, [fi])
     ri.selftext = "selfff2fffftext"
-    ri.created_utc = 11111111.0
     ri.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
     fi.parent = ri
 
@@ -179,10 +175,9 @@ def test_set_missing_reddit(setup_tmpdir):
                   "LEAVE_PRESENT_sgsFIELDS_UNCHANGED_user")
     ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                     "LEAVE_PRESENT_FIELDS_UNCHANGED", "LEAVE_TITLE_FIELD_UNCHANGED",
-                    "inserted-reddit3-user", "inserted3/subreddit", [fi])
-    ri.permalink = "inserted_rddt3_url"
+                    "inserted-reddit3-user", "inserted3/subreddit", "inserted_rddt3_url",
+                    111111.0, [fi])
     ri.selftext = "selfff3fffdszlbdftext"
-    ri.created_utc = 111111.0
     ri.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
     fi.parent = ri
 
@@ -246,11 +241,9 @@ def test_add_to_db(setup_tmpdir):
                   "This is another description", "testy_user")
     ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                     "26iw32o", "Best title on reddit [SFW]", "testy_ruser",
-                    "inserted/subreddit", [fi])
-    ri.permalink = "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
+                    "pillowtalkaudio", "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
+                    1602557093.0, [fi])
     ri.selftext = None
-    ri.created_utc = 1602557093.0
-    ri.subreddit = "pillowtalkaudio"
     ri.r_post_url = "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
     fi.parent = ri
 
@@ -365,11 +358,8 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
                    "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "LEAVE_PRESENT_FIELDS_UNCHANGED77")
     ri1 = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                      "inserted_reddit_id", "isnerted_reddit_title", "inserted-reddit-user",
-                     "inserted/subreddit", [fi1])
-    ri1.permalink = "inserted_rddt_url"
+                     "ssssubreddit", "inserted_rddt_url", 1254323.0, [fi1])
     ri1.selftext = None
-    ri1.created_utc = 1254323.0
-    ri1.subreddit = "ssssubreddit"
     ri1.r_post_url = "url-to-self-or-outgoing"
     fi1.parent = ri1
 
@@ -381,10 +371,9 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
                    "LEAVE_PRESENT_FIELDS_UNCHANGED_user")
     ri2 = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                      "LEAVE_PRESENT_FIELDS_UNCHANGED", "isnerte222d_reddit_title",
-                     "inserted-reddit-user", "inserted/subreddit", [fi2])
-    ri2.permalink = "inserted_rddt2_url"
+                     "inserted-reddit-user", "inserted/subreddit", "inserted_rddt2_url",
+                     11111111.0, [fi2])
     ri2.selftext = "selfff2fffftext"
-    ri2.created_utc = 11111111.0
     ri2.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
     fi2.parent = ri2
 
@@ -395,10 +384,9 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
                    "LEAVE_PRESENT_sgsFIELDS_UNCHANGED_user")
     ri3 = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                      "LEAVE_PRESENT_FIELDS_UNCHANGED", "LEAVE_TITLE_FIELD_UNCHANGED",
-                     "inserted-reddit3-user", "inserted3/subreddit", [fi3])
-    ri3.permalink = "inserted_rddt3_url"
+                     "inserted-reddit3-user", "inserted3/subreddit", "inserted_rddt3_url",
+                     111111.0, [fi3])
     ri3.selftext = "selfff3fffdszlbdftext"
-    ri3.created_utc = 111111.0
     ri3.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
     fi3.parent = ri3
 
@@ -659,7 +647,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     #                "This is the description", "page_user")
     # ri2 = RedditInfo(object, "url-not-used-when-adding-to-db",
     #                  "r3dd1tid", "Best title on reddit [SFW]", "reddit_user",
-    #                  "subreddit", [fi1])
+    #                  "subreddit", [fi1])  MISSING permalink+created_utc
     fi2 = FileInfo(object, True, "m4a", "https://page.url/2l345jsaofjso932",
                    build_file_url(os.path.join(testdl_files, "fi2")), None,  # id
                    rnd.random_string(20),  # title
@@ -681,10 +669,9 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     fi4_fn = f"Reddit_title _ as sub_path_02_{fi4.title}.{fi4.ext}"
     ri1 = RedditInfo(object, "https://dont-use-this-url/in-db",
                      rnd.random_string(6), "Reddit:title / as sub\\path", "reddit_user",
-                     rnd.random_string(15), [fi2, fc1, fi4])
-    ri1.permalink = "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
+                     rnd.random_string(15), "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
+                     1602557093.0, [fi2, fc1, fi4])
     ri1.selftext = "selftext_should not have been written"
-    ri1.created_utc = 1602557093.0
     ri1.r_post_url = "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
     # set parent
     fi2.parent = ri1
@@ -846,7 +833,8 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
     monkeypatch.setattr('gwaripper.extractors.imgur.ImgurAlbumExtractor.extract',
                         lambda x: imguralbumfc)
     redditinfo = RedditInfo(RedditExtractor, "url", "id", "title",
-                            'author', 'subreddit', [soundgasmfi, imguralbumfc])
+                            'author', 'subreddit', 'permalink', 12345.0,
+                            [soundgasmfi, imguralbumfc])
     monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor.extract',
                         lambda x: redditinfo)
     monkeypatch.setattr('gwaripper.extractors.chirbit.ChirbitExtractor.extract',

@@ -8,7 +8,7 @@ import urllib.request
 
 import praw
 
-from typing import List, Union, Optional
+from typing import List, Union, Optional, cast, Dict
 
 from .logging_setup import configure_logging
 from . import utils
@@ -16,7 +16,10 @@ from . import config
 from .extractors import find_extractor
 from .extractors.soundgasm import SoundgasmExtractor
 from .extractors.reddit import RedditExtractor
-from .info import FileInfo, FileCollection, RedditInfo, children_iter_dfs, children_iter_bfs
+from .info import (
+        FileInfo, FileCollection, RedditInfo, children_iter_dfs, children_iter_bfs,
+        UNKNOWN_USR_FOLDER
+        )
 from . import download as dl
 from .reddit import reddit_praw
 from .db import load_or_create_sql_db, export_csv_from_sql, backup_db
@@ -150,7 +153,7 @@ class GWARipper:
         return filename
 
     def _download_file(self, info: FileInfo, author_name: Optional[str],
-                       file_index: int = 0) -> str:
+                       file_index: int = 0) -> Optional[str]:
         """
         Will download the file to dl_root in a subfolder named like the reddit user name
         if that one is not available the extracted (from the page) author of the file gets
@@ -165,6 +168,9 @@ class GWARipper:
             logger.info("File was already downloaded, skipped URL: %s", info.page_url)
             self.nr_downloads -= 1
             return None
+
+        if not author_name:
+            author_name = UNKNOWN_USR_FOLDER
 
         subpath, filename, ext = info.generate_filename(file_index)
 
@@ -220,7 +226,7 @@ class GWARipper:
         return subpath
 
     def _download_collection(self, info: FileCollection):
-        if all(fi.already_downloaded for _, fi in
+        if all(cast(FileInfo, fi).already_downloaded for _, fi in
                 children_iter_dfs(info.children, file_info_only=True)):
             logger.info("Skipping collection, since all files were already "
                         "downloaded: %s", info.url)
@@ -241,17 +247,19 @@ class GWARipper:
         for rel_idx, fi in children_iter_dfs(info.children,
                                              file_info_only=True, relative_enum=True):
             # rel_idx is 0-based
-            self._download_file(fi, author_name, (rel_idx + 1) if with_file_idx else 0)
-            any_downloads = any_downloads or fi.downloaded
+            self._download_file(cast(FileInfo, fi),
+                                author_name, (rel_idx + 1) if with_file_idx else 0)
+            any_downloads = any_downloads or cast(FileInfo, fi).downloaded
             rqd.delay_request()
 
         if any_downloads:
             try:
                 # :PassSubpathSelftext
                 _, fi = next(children_iter_dfs(info.children, file_info_only=True))
-                subpath, _, _ = fi.generate_filename()
-                info.write_selftext_file(config.ROOTDIR,
-                                         os.path.join(author_name, subpath))
+                subpath, _, _ = cast(FileInfo, fi).generate_filename()
+                # assuming RedditInfo and excepting AttributeError
+                cast(RedditInfo, info).write_selftext_file(
+                        config.ROOTDIR, os.path.join(author_name, subpath))
             except AttributeError:
                 pass  # not redditinfo
 
@@ -266,7 +274,7 @@ class GWARipper:
         """
         # create dict with keys that correspond to the named parameters in the SQL query
         # set vals contained in reddit_info to None(Python -> SQLITE: NULL)
-        val_dict = {
+        val_dict: Dict[str, Optional[str]] = {
             "date": time.strftime("%Y-%m-%d"),
             "time": time.strftime("%H:%M:%S"),
             "description": info.descr,
@@ -287,7 +295,7 @@ class GWARipper:
         if info.reddit_info:
             reddit_info = info.reddit_info
             val_dict.update({
-                "created_utc":    reddit_info.created_utc,
+                "created_utc":    str(reddit_info.created_utc),
                 "r_post_url":     reddit_info.r_post_url,
                 "reddit_id":      reddit_info.id,
                 "reddit_title":   reddit_info.title,
@@ -308,10 +316,12 @@ class GWARipper:
         """
         Marks already downloaded urls from self.downlods as info.already_downloaded = True
         """
-        dl_dict = {info.page_url: info for _, info in children_iter_dfs(
-                   self.downloads, file_info_only=True)}
-        dl_dict_furls = {info.direct_url: info for _, info in children_iter_dfs(
-                         self.downloads, file_info_only=True)}
+        dl_dict = {cast(FileInfo, info).page_url: cast(FileInfo, info)
+                   for _, info in children_iter_dfs(
+                       self.downloads, file_info_only=True)}
+        dl_dict_furls = {cast(FileInfo, info).direct_url: cast(FileInfo, info)
+                         for _, info in children_iter_dfs(
+                             self.downloads, file_info_only=True)}
         nr_items = len(dl_dict)
         # check both url and url_file since some rows only have the url_file set
         c = self.db_con.execute("SELECT url, url_file FROM Downloads WHERE url IN "

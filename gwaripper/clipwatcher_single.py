@@ -3,6 +3,8 @@ import os
 import logging
 import re
 
+from typing import Callable, List, Any
+
 import pyperclip
 
 logger = logging.getLogger(__name__)
@@ -10,15 +12,15 @@ logger = logging.getLogger(__name__)
 URL_RE = re.compile(r"^(?:https?://)?(?:[-A-Za-z0-9]{1,61}\.)*[-A-Za-z0-9]{2,61}\.[a-z]{2,61}/.+")
 
 
-def is_url(s):
-    return URL_RE.match(s)
+def is_url(s) -> bool:
+    return bool(URL_RE.match(s))
 
 
-def print_to_stdout(clipboard_content):
+def print_to_stdout(clipboard_content) -> None:
     logger.info("Found url: %s" % str(clipboard_content))
 
 
-def print_write_to_txtf(wstring, linkdir, txtname):
+def print_write_to_txtf(wstring, linkdir, txtname) -> None:
     print_to_stdout(wstring)
     if not os.path.exists(linkdir):
         os.makedirs(linkdir)
@@ -34,22 +36,26 @@ class ClipboardWatcher:
     To safely stop the thread, I wait for -c (Keyboard-interrupt) and tell the thread to stop itself.
     In the initialization of the class, you also have a parameter pause to control how long to wait between tries.
     by Thorsten Kranz"""
+
     # predicate ist bedingung ob gesuchter clip content
     # hier beim aufruf in main funktion is_url_but_not_sgasm
-    def __init__(self, predicate, callback, txtpath, pause=5.):
+    def __init__(self, predicate: Callable[[str], bool],
+                 callback: Callable[[str, str, str], None],
+                 txtpath: str, pause: float = 5.):
         self._predicate = predicate
         self._callback = callback
         self._txtpath = txtpath
         self._pause = pause
-        self._stopping = False
-        self.txtname = time.strftime("%Y-%m-%d_%Hh.txt")
-        self.found = []
+        self._stopping: bool = False
+        self.txtname: str = time.strftime("%Y-%m-%d_%Hh.txt")
+        self.found: List[str] = []
 
-    def run(self):
-        recent_value = ""
+    def run(self) -> None:
+        recent_value: str = ""
         while not self._stopping:
-            tmp_value = pyperclip.paste()
-            if tmp_value != recent_value:
+            # clipboard value might not be str
+            tmp_value: Any = pyperclip.paste()
+            if isinstance(tmp_value, str) and tmp_value != recent_value:
                 recent_value = tmp_value
                 # if predicate is met
                 if self._predicate(recent_value):
@@ -59,7 +65,7 @@ class ClipboardWatcher:
                     self.found.append(recent_value)
             time.sleep(self._pause)
 
-    def stop(self):
+    def stop(self) -> None:
         self._stopping = True
 
 

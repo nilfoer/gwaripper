@@ -1,6 +1,7 @@
 import sys
 import os
 import urllib.request
+import urllib.error
 import logging
 
 from typing import Optional, Dict
@@ -14,7 +15,7 @@ DEFAULT_HEADERS = {
     }
 
 
-def download(url, dl_path):
+def download(url: str, dl_path: str):
     """
     Will download the file to dl_path, return True on success
 
@@ -22,18 +23,19 @@ def download(url, dl_path):
     :param maxfnr: Max files to download
     :return: Current file nr(int)
     """
-    # get head (everythin b4 last part of path ("/" last -> tail empty, filename or dir(without /) -> tail)) of path; no slash in path -> head empty
+    # get head (everythin b4 last part of path ("/" last -> tail empty,
+    # filename or dir(without /) -> tail)) of path; no slash in path -> head empty
     dirpath, fn = os.path.split(dl_path)
     if dirpath:
         os.makedirs(dirpath, exist_ok=True)
 
     try:
         _, headers = urllib.request.urlretrieve(url, dl_path)  # reporthook=prog_bar_dl)
-    except urllib.request.HTTPError as err:
+    except urllib.error.HTTPError as err:
         # catch this more detailed first then broader one (HTTPError is subclass of URLError)
         logger.warning("HTTP Error %s: %s: \"%s\"", err.code, err.reason, url)
         return False, None
-    except urllib.request.URLError as err:
+    except urllib.error.URLError as err:
         logger.warning("URL Error %s: \"%s\"", err.reason, url)
         return False, None
     else:
@@ -91,14 +93,14 @@ def download_in_chunks(url: str, filename: str,
         return file_size_dl
 
 
-def get_url_file_size(url):
+def get_url_file_size(url: str) -> int:
     """Returns file size in bytes that is reported in Content-Length Header"""
     with urllib.request.urlopen(url) as response:
         reported_file_size = int(response.info()["Content-Length"])
     return reported_file_size
 
 
-def prog_bar_dl(blocknum, blocksize, totalsize):
+def prog_bar_dl(blocknum: int, blocksize: int, totalsize: int) -> None:
     """
     Displays a progress bar to sys.stdout
 

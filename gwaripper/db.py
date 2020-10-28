@@ -7,6 +7,7 @@ import csv
 import re
 import operator
 
+from typing import Tuple, Optional, Set
 from functools import reduce
 
 from .config import config, write_config_module
@@ -14,7 +15,10 @@ from .config import config, write_config_module
 logger = logging.getLogger(__name__)
 
 
-def load_or_create_sql_db(filename):
+# E. Langloise: PEP 519 recommends using typing.Union[str, bytes, os.PathLike]
+# for filenames
+# only use str for now
+def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cursor]:
     """
     Creates connection to sqlite3 db and a cursor object.
     Creates file and tables if it doesn't exist!
@@ -22,7 +26,8 @@ def load_or_create_sql_db(filename):
     :param filename: Filename string/path to file
     :return: connection to sqlite3 db and cursor instance
     """
-    conn = sqlite3.connect(filename, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn: sqlite3.Connection = sqlite3.connect(filename,
+                                               detect_types=sqlite3.PARSE_DECLTYPES)
 
     # context mangaer auto-commits changes or does rollback on exception
     with conn:
@@ -76,7 +81,7 @@ def load_or_create_sql_db(filename):
     return conn, c
 
 
-def export_csv_from_sql(filename, db_con):
+def export_csv_from_sql(filename: str, db_con: sqlite3.Connection):
     """
     Fetches and writes all rows (with all cols) in db_con's database to the file filename using
     writerows() from the csv module
@@ -89,21 +94,24 @@ def export_csv_from_sql(filename, db_con):
     """
     # newline="" <- important otherwise weird behaviour with multiline cells (adding \r) etc.
     with open(filename, "w", newline="", encoding="utf-8") as csvfile:
-        # excel dialect -> which line terminator(\r\n), delimiter(,) to use, when to quote cells etc.
+        # excel dialect -> which line terminator(\r\n), delimiter(,) to use,
+        # when to quote cells etc.
         csvwriter = csv.writer(csvfile, dialect="excel", delimiter=";")
 
         # get rows from db
         c = db_con.execute("SELECT * FROM Downloads")
         rows = c.fetchall()
 
-        # cursor.description -> sequence of 7-item sequences each containing info describing one result column
+        # cursor.description -> sequence of 7-item sequences each containing
+        # info describing one result column
         col_names = [description[0] for description in c.description]
         csvwriter.writerow(col_names)  # header
         # write the all the rows to the file
         csvwriter.writerows(rows)
 
 
-def backup_db(db_path, bu_dir, csv_path=None, force_bu=False):
+def backup_db(db_path: str, bu_dir: str,
+              csv_path: Optional[str] = None, force_bu: bool = False):
     """
     Backups db_path and csv_path (if not None) to bu_dir if the time since last backup is greater
     than db_bu_freq (in days, also from cfg) or force_bu is True
@@ -122,8 +130,8 @@ def backup_db(db_path, bu_dir, csv_path=None, force_bu=False):
     # time.time() get utc number
     now = time.time()
     # freq in days convert to secs since utc time is in secs since epoch
-    freq_secs = config.getfloat("Settings", "db_bu_freq", fallback=5.0) * 24 * 60 * 60
-    elapsed_time = now - config.getfloat("Time", "last_db_bu", fallback=0.0)
+    freq_secs: float = config.getfloat("Settings", "db_bu_freq", fallback=5.0) * 24 * 60 * 60
+    elapsed_time: float = now - config.getfloat("Time", "last_db_bu", fallback=0.0)
 
     # if time since last db bu is greater than frequency in settings or we want to force a bu
     # time.time() is in gmt/utc whereas time.strftime() uses localtime
@@ -134,13 +142,15 @@ def backup_db(db_path, bu_dir, csv_path=None, force_bu=False):
 
         # by confused00 https://codereview.stackexchange.com/questions/78643/create-sqlite-backups
         # Lock database before making a backup
-        # After a BEGIN IMMEDIATE, no other database connection will be able to write to the database
-        # persists until the next COMMIT or ROLLBACK
+        # After a BEGIN IMMEDIATE, no other database connection will be able to
+        # write to the database persists until the next COMMIT or ROLLBACK
         con.execute('begin immediate')
         # Make new backup file
-        # shutil.copy2 also copies metadata -> ctime (Unix: time of the last metadata change, Win: creation time
-        # for path) doesnt change -> use mtime for sorting (doesnt change but we can assume oldest bu also has oldest
-        # mtime) whereas ctime could be the same for all) or use shutil.copy -> only copies permission not m,ctime etc
+        # shutil.copy2 also copies metadata -> ctime (Unix: time of the last
+        # metadata change, Win: creation time for path) doesnt change -> use mtime
+        # for sorting (doesnt change but we can assume oldest bu also has oldest
+        # mtime) whereas ctime could be the same for all) or use shutil.copy ->
+        # only copies permission not m,ctime etc
         shutil.copy(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
         # Unlock database
         con.rollback()
@@ -157,57 +167,49 @@ def backup_db(db_path, bu_dir, csv_path=None, force_bu=False):
         # write config to file
         write_config_module()
 
-        # TOCONSIDER Assumption even if f ends with .sqlite it might stil be a dir
-        # -> we could check for if..and os.path.isfile(os.path.join(bu_dir, f))
-        # iterate over listdir, add file to list if isfile returns true
-        bu_dir_list = [os.path.join(bu_dir, f) for f in os.listdir(bu_dir) if f.endswith(".sqlite")]
-        # we could also use list(filter(os.path.isfile, bu_dir_list)) but then we need to have a list with PATHS
-        # but we need the paths for os.path.getctime anyway
-        # filter returns iterator!! that yields items which function is true -> only files
-        # iterator -> have to iterate over it or pass it to function that does that -> list() creates a list from it
-        # filter prob slower than list comprehension WHEN you call other function (def, lambda, os.path.isfile),
-        # WHEREAS you would use a simple if x == "bla" in the list comprehension, here prob same speed
+        bu_dir_list = [os.path.join(bu_dir, f) for f in os.listdir(bu_dir)
+                       if f.endswith(".sqlite")]
 
         # if there are more files than number of bu allowed (2 files per bu atm)
         if len(bu_dir_list) > (config.getint("Settings", "max_db_bu", fallback=5)):
-            # use creation time (getctime) for sorting, due to how name the files we could also sort alphabetically
+            # use creation time (getctime) for sorting, due to how name the
+            # files we could also sort alphabetically
             bu_dir_list = sorted(bu_dir_list, key=os.path.getctime)
 
             oldest = os.path.basename(bu_dir_list[0])
             logger.info("Too many backups, deleting oldest one: {}".format(oldest))
-            # TOCONSIDER Robustness check if file is really the one (sqlite) we want to delete first?
-            # TOCONSIDER keep deleting till nr of bu == max_db_bu? only relevant if user copied files in there
+
             os.remove(bu_dir_list[0])
             # try to delete csv of same day, since bu of csv is optional
             try:
                 os.remove(os.path.join(bu_dir, oldest[:-7] + "_exp.csv"))
             except FileNotFoundError:
                 logger.debug("No csv file backup of that day")
-            # if the try clause does not raise an exception
             else:
                 logger.info("Also deleted csv backup, that was created on the same day!")
     else:
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
-        logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück! Die nächste Sicherung ist "
-                    "in {: .2f} Tagen!".format(config.getfloat("Settings", "db_bu_freq",
-                                                               fallback=5), next_bu / 24 / 60 / 60))
+        logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück!"
+                    "Die nächste Sicherung ist in {: .2f} Tagen!".format(
+                        config.getfloat("Settings", "db_bu_freq", fallback=5.0),
+                        next_bu / 24 / 60 / 60))
 
 
-def set_favorite_entry(db_con, _id, fav_intbool):
+def set_favorite_entry(db_con: sqlite3.Connection, _id: int, fav_intbool: int) -> None:
     with db_con:
         db_con.execute("UPDATE Downloads SET favorite = ? WHERE id = ?", (fav_intbool, _id))
 
 
-def set_rating(db_con, _id, rating):
+def set_rating(db_con: sqlite3.Connection, _id: int, rating: float):
     with db_con:
         db_con.execute("UPDATE Downloads SET rating = ? WHERE id = ?", (rating, _id))
 
 
-def remove_entry(db_con, _id, root_dir):
+def remove_entry(db_con: sqlite3.Connection, _id: int, root_dir: str):
     c = db_con.execute("SELECT * FROM Downloads WHERE id = ?", (_id,))
     row = RowData(c.fetchone())
-    local_filename = row.local_filename
+    local_filename: str = row.local_filename
     if not local_filename:
         logger.error("Couldn't remove entry due to a missing local_filename entry! Title: %s",
                      row.title)
@@ -231,14 +233,16 @@ def remove_entry(db_con, _id, root_dir):
 
 # helper class to turn attribute-based acces into dict-like acces on sqlite3.Row
 class RowData:
-    def __init__(self, row):
+    def __init__(self, row: sqlite3.Row):
         self.row = row
 
     def __getattr__(self, attr):
         return self.row[attr]
 
 
-def get_x_entries(con, x, after=None, before=None, order_by="Downloads.id DESC"):
+def get_x_entries(con: sqlite3.Connection, x: int,
+                  after: Optional[int] = None, before: Optional[int] = None,
+                  order_by: str = "Downloads.id DESC"):
     # order by has to come b4 limit/offset
     query = f"""
             SELECT * FROM Downloads
@@ -289,9 +293,9 @@ def validate_order_by_str(order_by):
 WORD_RE = re.compile(r'([^"^\s]+)\s*|"([^"]+)"\s*')
 
 
-VALID_SEARCH_COLS = {"title", "rating", "sgasm_user", "reddit_user", "reddit_url"
-                     "r_post_url", "reddit_id", "url"}
-ASSOCIATED_COLUMNS = {}
+VALID_SEARCH_COLS: Set[str] = {"title", "rating", "sgasm_user", "reddit_user", "reddit_url"
+                               "r_post_url", "reddit_id", "url"}
+ASSOCIATED_COLUMNS: Set[str] = set()
 
 
 def search_sytnax_parser(search_str,

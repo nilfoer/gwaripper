@@ -5,6 +5,8 @@ import os.path
 import time
 import configparser
 
+from typing import cast, List, Optional, Tuple
+
 # NOTE: pyinstaller single folder dist and one-file exe
 # sys.frozen -> packaged inside executable -> need to figure out our path
 # and pass changed locations of static and template folders
@@ -32,6 +34,7 @@ import configparser
 # but this is _NOT_ the location of the exe that gets launched and since the folder
 # changes (and gets deleted) every time we need to write to the exe location
 # -> use sys.argv[0] or sys.executable
+SOURCE_PATH: str
 if getattr(sys, 'frozen', False):  # check if we're bundled in an exe
     SOURCE_PATH = os.path.dirname(os.path.realpath(sys.argv[0]))
 else:
@@ -85,17 +88,17 @@ except KeyError:
 
 # banned TAGS that will exclude the file from being downloaded (when using reddit)
 # load from config ini, split at comma, strip whitespaces, ensure that they are lowercase with .lower()
-KEYWORDLIST = [x.strip().lower() for x in config["Settings"]["tag_filter"].split(",")]
+KEYWORDLIST: List[str] = [x.strip().lower() for x in config["Settings"]["tag_filter"].split(",")]
 
 # tag1 is only banned if tag2 isnt there, in cfg file: tag1;tag2;, tag3;tag4;, ...
-TAG1_BUT_NOT_TAG2 = []
+TAG1_BUT_NOT_TAG2: List[Tuple[str, str]] = []
 if config.has_option("Settings", "tag1_in_but_not_tag2"):
     for tag_comb in config["Settings"]["tag1_in_but_not_tag2"].split(";,"):
         tag1, tag2 = tag_comb.strip().split(";")
         TAG1_BUT_NOT_TAG2.append((tag1.strip().lower(), tag2.strip().lower()))
 
 
-def reload_config():
+def reload_config() -> None:
     """
     Convenience function to update values in config by reading config file
 
@@ -104,13 +107,14 @@ def reload_config():
     config.read(os.path.join(SOURCE_PATH, "config.ini"))
 
 
-def write_config_module():
+def write_config_module() -> None:
     """
     Convenience function to write config file
 
     :return: None
     """
     os.makedirs(SOURCE_PATH, exist_ok=True)
-    with open(os.path.join(SOURCE_PATH, "gwaripper_config.ini"), "w", encoding="UTF-8") as config_file:
+    with open(os.path.join(SOURCE_PATH, "gwaripper_config.ini"),
+              "w", encoding="UTF-8") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)

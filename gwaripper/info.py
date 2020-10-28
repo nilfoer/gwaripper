@@ -2,12 +2,32 @@ import os
 import logging
 import re
 
-from typing import Optional, Union, List, Type
+# https://www.stefaanlippens.net/circular-imports-type-hints-python.html
+# only reason for possible circular dependency here is because
+# of type hinting -> use a *conditional import* that is only active in
+# "type hinting mode"
+# from typing import TYPE_CHECKING
+from typing import (
+        Optional, Union, List, Type, Tuple, Iterator, Sequence,
+        Deque, TYPE_CHECKING, cast
+        )
+# instead of a conditional import we could use import gwaripper.extractors.base
+# and then use a string 'gwaripper.extractors.base.BaseExtractor'
+# or from .extractors import base with string 'base.BaseExtractor'
+#
+# ^ DOES NOT WORK!
+#
+# NOTE: was said to work on a mypy github issue but it doesn't seem to work here
+# and still results in a cricular dependency
+if TYPE_CHECKING:
+    from .extractors.base import BaseExtractor
 from collections import deque
+
 
 logger = logging.getLogger(__name__)
 
 DELETED_USR_FOLDER = "deleted_users"
+UNKNOWN_USR_FOLDER = "_unknown_user_files"
 # own limit; nothing to do with OS dependent MAX_PATH
 FILENAME_MAX_LEN = 185
 
@@ -20,9 +40,44 @@ def sanitize_filename(subpath_len: int, filename: str):
     return re.sub(r"[^\w\-_.,\[\] ]", "_", filename[:chars_remaining])
 
 
-def children_iter_dfs(start_list: List[Union['FileInfo', 'FileCollection']],
+# start_list: List[..] resulted in type error
+# Argument 1 to "children_iter_dfs" has incompatible type "List[FileInfo]";
+# expected "List[Union[FileInfo, FileCollection]]"
+#
+# Compatibility of container types
+# The following program generates a mypy error, since List[int] is not
+# compatible with List[object]:
+#
+# def f(l: List[object], k: List[int]) -> None:
+#     l = k  # Type check error: incompatible types in assignment
+#
+# The reason why the above assignment is disallowed is that allowing the
+# assignment could result in non-int values stored in a list of int:
+# def f(l: List[object], k: List[int]) -> None:
+#     l = k
+#     l.append('x')
+#     print(k[-1])  # Ouch; a string in List[int]
+#
+# Sequence is covariant and immutable unlike List[x] which is invariant and allows mutation
+# most mutable generic collections are invariant
+# class A: ...
+# class B(A): ...
+#
+# lst = [A(), A()]  # Inferred type is List[A]
+# new_lst = [B(), B()]  # inferred type is List[B]
+# lst = new_lst  # mypy will complain about this, because List is invariant
+#
+# def f_bad(x: List[A]) -> A:
+    # return x[0]
+# f_bad(new_lst) # Fails
+
+# def f_good(x: Sequence[A]) -> A:
+    # return x[0]
+# f_good(new_lst) # OK
+def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: bool = False,
-                      relative_enum: bool = False) -> (int, Union['FileInfo', 'FileCollection']):
+                      relative_enum: bool = False) -> Iterator[
+                              Tuple[int, Union['FileInfo', 'FileCollection']]]:
     """
     Iterator over a list containing FileInfo or FileCollection objects and their
     childrne using DFS
@@ -35,8 +90,8 @@ def children_iter_dfs(start_list: List[Union['FileInfo', 'FileCollection']],
     """
     # NOTE: dfs to iter all of the downloads since FileCollections can be recursive
     # only one level though since only RedditInfo is allowed as parent for FileCollection
-    stack = []
-    cur_collection = start_list
+    stack: List[Tuple[int, int, Sequence[Union['FileInfo', 'FileCollection']]]] = []
+    cur_collection: Sequence[Union['FileInfo', 'FileCollection']] = start_list
     i = 0
     enumerator = 0
     skipped_fcols = 0
@@ -49,12 +104,14 @@ def children_iter_dfs(start_list: List[Union['FileInfo', 'FileCollection']],
                 continue
         cur = cur_collection[i]
         try:
-            assert cur.children
+            # ignoring type error by casting since we just assume it's a file collection
+            # and except the error when it's not
+            assert cast(FileCollection, cur).children
             stack.append((i + 1, skipped_fcols + 1, cur_collection))
             if not file_info_only:
                 yield i if relative_enum else enumerator, cur
                 enumerator += 1
-            cur_collection = cur.children
+            cur_collection = cast(FileCollection, cur).children
             i = 0
             skipped_fcols = 0
         except AttributeError:
@@ -67,9 +124,10 @@ def children_iter_dfs(start_list: List[Union['FileInfo', 'FileCollection']],
             enumerator += 1
 
 
-def children_iter_bfs(start_list: List[Union['FileInfo', 'FileCollection']],
+def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: bool = False,
-                      relative_enum: bool = False) -> (int, Union['FileInfo', 'FileCollection']):
+                      relative_enum: bool = False) -> Iterator[
+                              Tuple[int, Union['FileInfo', 'FileCollection']]]:
     """
     Iterator over a list containing FileInfo or FileCollection objects and their
     childrne using DFS
@@ -98,7 +156,7 @@ def children_iter_bfs(start_list: List[Union['FileInfo', 'FileCollection']],
     # two approaches: forgiveness 2.95s vs permission 1.04s
     # 90% objects have attr: forgiveness 0.31s vs permission 0.48s
     if file_info_only and relative_enum:
-        q = deque()
+        q: Deque[Tuple[int, Union['FileInfo', 'FileCollection']]] = deque()
         i = -1
         for child in start_list:
             if not hasattr(child, 'children'):
@@ -111,17 +169,20 @@ def children_iter_bfs(start_list: List[Union['FileInfo', 'FileCollection']],
     while q:
         i, cur = q.popleft()
         try:
-            assert cur.children
+            # ignoring type error since we just assume it's a file collection
+            # and except the error when it's not
+            assert cast(FileCollection, cur).children
 
             if file_info_only and relative_enum:
                 i = -1
-                for child in cur.children:
+                for child in cast(FileCollection, cur).children:
                     if not hasattr(child, 'children'):
                         i += 1
                     q.append((i, child))
                 continue
 
-            q.extend([(i, item) for i, item in enumerate(cur.children)])
+            q.extend([(i, item) for i, item in
+                      enumerate(cast(FileCollection, cur).children)])
 
             if not file_info_only:
                 yield i if relative_enum else enumerator, cur
@@ -156,7 +217,7 @@ class FileInfo:
         self.title = title
         self.descr = descr
         self.author = author
-        self._parent = None
+        self._parent: Optional['FileCollection'] = None
         self.parent = parent
         # NOTE: automatically set/reset when parent gets set
         self.reddit_info = reddit_info
@@ -182,7 +243,7 @@ class FileInfo:
                 self.reddit_info = parent
             parent = parent.parent
 
-    def generate_filename(self, file_index: int = 0) -> (str, str, str):
+    def generate_filename(self, file_index: int = 0) -> Tuple[str, str, str]:
         """
         Generates filename to save file locally by replacing chars in the title that are not:
         \\w(regex) - , . _ [ ] or a whitespace(" ")
@@ -236,15 +297,35 @@ class FileInfo:
         if file_index:
             title.append(f"{file_index:02d}")
         title.append(self.title or self.id)
-        title = "_".join(title)
+        # mypy doesn't allow re-definition of variables by default
+        # since in python re-using the same variable doesn't avoid the allocation
+        # contrary to statically compiled it will not save an allocation
+        # function locals are just stored as pointers in an array for the function's scope
+        # see https://docs.python-guide.org/writing/structure/#dynamic-typing
+        # Variables are not a segment of the computer’s memory where some value
+        # is written, they are ‘tags’ or ‘names’ pointing to objects.
+        # Some guidelines help to avoid this issue:
+        # - Avoid using the same variable name for different things.
+        # - It is better to use different names even for things that are related,
+        #   when they have a different type
+        #   There is no efficiency gain when reusing names: the assignments
+        #   will have to create new objects anyway
+        title_combined: str = "_".join(title)
 
         subpath = os.path.join(*subpaths) if subpaths else ""
 
-        filename = sanitize_filename(len(subpath), title)
+        filename = sanitize_filename(len(subpath), title_combined)
         return (subpath, filename, self.ext)
 
 
 class FileCollection:
+
+    # TODO: we only want to allow RedditInfo to contain other FileCollections
+    # since we can't do it by re-defining children's type in the derived class
+    # we'd have to split them up unless we're okay with just having the
+    # parent property only allow RedditInfo as a parent
+    children: List[Union[FileInfo, 'FileCollection']]
+
     def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: Optional[str],
                  title: Optional[str], author: Optional[str],
                  children: Optional[List[Union[FileInfo, 'FileCollection']]] = None):
@@ -254,9 +335,10 @@ class FileCollection:
         self.title = title
         self.author = author
         if children is None:
-            children = []
-        self.children = children
-        self._parent = None
+            self.children = []
+        else:
+            self.children = children
+        self._parent: Optional[RedditInfo] = None
 
     def __str__(self):
         return f"FileCollection<{self.url}, children: {len(self.children)}>"
@@ -281,7 +363,8 @@ class FileCollection:
         self._parent = parent
         # NOTE: set reddit_info on all children when parent gets set since we
         # only accept RedditInfo as parent for FileCollections currently
-        for child in self.children:
+        # see TODO above children declaration
+        for child in cast(List[FileInfo], self.children):
             child.reddit_info = parent
 
     def get_preferred_author_name(self) -> str:
@@ -294,7 +377,7 @@ class FileCollection:
 
         # @Hack
         names.append(DELETED_USR_FOLDER if isinstance(self, RedditInfo) else None)
-        names.append("_unknown_user_files")
+        names.append(UNKNOWN_USR_FOLDER)
 
         # preferred_author_name determines subfolder that the file gets save in
         # return DELETED_USR_FOLDER if neither RedditInfo or parent author nor the files
@@ -304,15 +387,42 @@ class FileCollection:
 
 
 class RedditInfo(FileCollection):
-    def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: Optional[str],
-                 title: Optional[str], author: Optional[str], subreddit: str,
+
+    # title of super class' type was inferred from __init__ parameters
+    # You can declare types of variables in the class body explicitly using a
+    # type annotation
+    # overwrite base class Optional[str] type for title
+    title: str
+    # if a title should be a class variable use title: ClassVar[str] instead
+    # then mypy checks if that attribute gets assigned using the instance
+    # and warns you
+
+    # can't redefine types of variables that were already defined in a base class
+    # because then the expectation/promise of the derived class having at least
+    # the same (type inlcuded when checked like it is here with mypy or in a
+    # statically compiled language) attributes and methods as the base class
+    # RedditInfo having a different type for attribute children would mean
+    # we can't just create a function that takes FileCollection as a parameter
+    # since it would suddenly be confronted with different types that the base
+    # class didn't allow and our function obviously doesn't expect
+    # NOTE not allowed: children: List[Union[FileInfo, 'FileCollection']]
+
+    # a reddit submission (reddit's side) always has an id and a title
+    # author might have been deleted
+    def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: str,
+                 title: str, author: Optional[str], subreddit: str, permalink: str,
+                 created_utc: float,
                  children: Optional[List[Union[FileInfo, 'FileCollection']]] = None):
-        super().__init__(extractor, url, _id, title, author, children=children)
-        self.permalink = None
-        self.selftext = None
-        self.created_utc = None
-        self.subreddit = subreddit
-        self.r_post_url = None
+        super().__init__(extractor, url, _id, title, author)
+        if children is None:
+            self.children = []
+        else:
+            self.children = children
+        self.permalink = permalink
+        self.created_utc = created_utc
+        self.subreddit: str = subreddit
+        self.selftext: Optional[str] = None
+        self.r_post_url: Optional[str] = None
 
     def __str__(self):
         return f"RedditInfo<{self.url}, children: {len(self.children)}>"

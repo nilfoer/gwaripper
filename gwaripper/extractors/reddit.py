@@ -5,7 +5,7 @@ import logging
 
 import bs4
 
-from typing import Optional
+from typing import Optional, cast, Match, Pattern, ClassVar, List, Tuple, Type
 
 from praw.models import Submission
 
@@ -13,7 +13,7 @@ from .base import BaseExtractor
 # NOTE: IMPORTANT need to be imported as "import foo" rather than "from foo import bar"
 # see :GlobalConfigImport
 from .. import config
-from ..info import RedditInfo, children_iter_dfs
+from ..info import FileInfo, RedditInfo, children_iter_dfs
 from ..reddit import reddit_praw, redirect_xpost
 
 logger = logging.getLogger(__name__)
@@ -21,22 +21,22 @@ logger = logging.getLogger(__name__)
 
 class RedditExtractor(BaseExtractor):
 
-    EXTRACTOR_NAME = "Reddit"
-    BASE_URL = "reddit.com"
+    EXTRACTOR_NAME: ClassVar[str] = "Reddit"
+    BASE_URL: ClassVar[str] = "reddit.com"
 
     # grp1: subreddit, grp2: reddit id, grp3: title
-    VALID_REDDIT_URL_RE = re.compile(
+    VALID_REDDIT_URL_RE: ClassVar[Pattern] = re.compile(
             r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/r/(\w+)/comments/"
             r"([A-Za-z0-9]+)/(\w+)?/?", re.IGNORECASE)
 
-    def __init__(self, url, praw_submission: Optional[Submission] = None):
+    def __init__(self, url: str, praw_submission: Optional[Submission] = None):
         super().__init__(url)
         self.praw = reddit_praw()
         self.submission = praw_submission
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
-        return cls.VALID_REDDIT_URL_RE.match(url)
+        return bool(cls.VALID_REDDIT_URL_RE.match(url))
 
     def extract(self) -> Optional[RedditInfo]:
         """
@@ -79,20 +79,19 @@ class RedditExtractor(BaseExtractor):
         ri = None
         if self.submission is None:
             self.submission = self.praw.submission(url=self.url)
-        submission = self.submission
+        submission: Submission = self.submission
 
         if not check_submission_banned_tags(submission,
                                             config.KEYWORDLIST, config.TAG1_BUT_NOT_TAG2):
             # NOTE: IMPORTANT make sure to only use redirected submission from here on!
             submission = redirect_xpost(submission)
-            sub_url = submission.url
+            sub_url: str = submission.url
 
             # rebuild subs url to account for redirection
-            redirected_url = f"{self.praw.config.reddit_url}{submission.permalink}"
+            redirected_url: str = f"{self.praw.config.reddit_url}{submission.permalink}"
             ri = RedditInfo(self.__class__, redirected_url, submission.id, submission.title,
-                            None, submission.subreddit.display_name)
-            ri.permalink = str(submission.permalink)
-            ri.created_utc = submission.created_utc
+                            None, submission.subreddit.display_name, str(submission.permalink),
+                            submission.created_utc)
             ri.r_post_url = sub_url
             try:
                 ri.author = submission.author.name
@@ -103,11 +102,15 @@ class RedditExtractor(BaseExtractor):
 
             # sub url not pointing to itself
             if not submission.is_self:
-                extractor = find_extractor(sub_url)
+                extractor: Optional[Type[BaseExtractor]] = find_extractor(sub_url)
                 if extractor is not None:
                     logger.info("%s link found in URL of: %s", extractor.EXTRACTOR_NAME,
                                 submission.permalink)
                     fi = extractor(sub_url).extract()
+                    if fi is None:
+                        logger.error("Could not extract URL that the submission points to: %s",
+                                     sub_url)
+                        return None
                     # TODO: figure out a way so we don't forget to set this
                     fi.parent = ri
                     ri.children.append(fi)
@@ -139,13 +142,20 @@ class RedditExtractor(BaseExtractor):
                         fi.parent = ri
                         ri.children.append(fi)
 
+                if len(ri.children) < len(links):
+                    logger.warning("There were unsupported URLs in submission: %s",
+                                   self.url)
+
             # didn't find any supported audio links; assume there is an unsupported audio
             # link in there (otherwise the user wouldn't have supplied this link)
             # and save url to disk
-            if not any(c.is_audio for _, c in children_iter_dfs(ri.children, file_info_only=True)):
+            if not any(cast(FileInfo, c).is_audio for _, c in
+                       children_iter_dfs(ri.children, file_info_only=True)):
                 logger.info("No supported link in \"%s\"", submission.shortlink)
-                os.makedirs(os.path.join(config.ROOTDIR, "_linkcol"), exist_ok=True)
-                with open(os.path.join(config.ROOTDIR, "_linkcol",
+
+                os.makedirs(os.path.join(cast(str, config.ROOTDIR), "_linkcol"), exist_ok=True)
+
+                with open(os.path.join(cast(str, config.ROOTDIR), "_linkcol",
                                        "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
                           'a', encoding="UTF-8") as w:
                     w.write("<h3><a href=\"https://reddit.com{}\">{}"
@@ -157,7 +167,8 @@ class RedditExtractor(BaseExtractor):
         return ri
 
 
-def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None) -> bool:
+def check_submission_banned_tags(submission: Submission, keywordlist: List[str],
+                                 tag1_but_not_2: Optional[List[Tuple[str, str]]] = None) -> bool:
     """
     Checks praw Submission obj for banned tags (case-insensitive) from keywordlist in title
     returns True if tag is contained. Also returns True if one of the first tags in the tag-combos
@@ -169,7 +180,8 @@ def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None) -
 
     :param submission: praw Submission obj to scan for banned tags in title
     :param keywordlist: banned keywords/tags
-    :param tag1_but_not_2: List of 2-tuples, first tag(str) is only banned if second isn't contained
+    :param tag1_but_not_2: List of 2-tuples, first tag(str) is only banned if
+                           second isn't contained
     :return: True if submission is banned from downloading else False
     """
     # checks submissions title for banned words contained in keywordlist
@@ -193,7 +205,7 @@ def check_submission_banned_tags(submission, keywordlist, tag1_but_not_2=None) -
     return False
 
 
-def check_submission_time(submission, lastdltime):
+def check_submission_time(submission: Submission, lastdltime: float) -> bool:
     """
     Check if utc timestamp of submission is greater (== older) than lastdltime
 

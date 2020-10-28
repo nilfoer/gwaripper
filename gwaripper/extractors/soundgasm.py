@@ -2,7 +2,7 @@ import re
 
 import bs4
 
-from typing import Optional
+from typing import Optional, Union, cast, Match, ClassVar, Pattern
 
 from .base import BaseExtractor
 from ..info import FileInfo, FileCollection
@@ -10,26 +10,32 @@ from ..exceptions import InfoExtractingError
 
 
 class SoundgasmExtractor(BaseExtractor):
-    EXTRACTOR_NAME = "Soundgasm"
-    BASE_URL = "soundgasm.net"
+    EXTRACTOR_NAME: ClassVar[str] = "Soundgasm"
+    BASE_URL: ClassVar[str] = "soundgasm.net"
 
     # grp1: sgasm username, grp2: title
-    VALID_SGASM_FILE_URL_RE = re.compile(r"(?:https?://)?(?:www\.)?soundgasm\.net/(?:u|user)/"
-                                         r"([-A-Za-z0-9_]+)/([-A-Za-z0-9_]+)/?",
-                                         re.IGNORECASE)
-    VALID_SGASM_USER_URL_RE = re.compile(r"(?:https?://)?(?:www\.)?soundgasm\.net/(?:u|user)/"
-                                         r"([-A-Za-z0-9_]+)/?",
-                                         re.IGNORECASE)
+    VALID_SGASM_FILE_URL_RE: ClassVar[Pattern] = re.compile(
+            r"(?:https?://)?(?:www\.)?soundgasm\.net/(?:u|user)/"
+            r"([-A-Za-z0-9_]+)/([-A-Za-z0-9_]+)/?",
+            re.IGNORECASE)
+    VALID_SGASM_USER_URL_RE: ClassVar[Pattern] = re.compile(
+            r"(?:https?://)?(?:www\.)?soundgasm\.net/(?:u|user)/([-A-Za-z0-9_]+)/?",
+            re.IGNORECASE)
 
-    def __init__(self, url):
+    author: str
+
+    def __init__(self, url: str):
         super().__init__(url)
-        self.is_user = False
+        self.is_user: bool = False
         try:
-            self.author = SoundgasmExtractor.VALID_SGASM_FILE_URL_RE.match(self.url).group(1)
+            # one of them has to match since they matched before in is_compatible
+            self.author = cast(Match, SoundgasmExtractor.VALID_SGASM_FILE_URL_RE.match(
+                self.url)).group(1)
         except AttributeError:
             # one of them has to match, since we only should land here
             # if is_compatible returned True
-            self.author = SoundgasmExtractor.VALID_SGASM_USER_URL_RE.match(self.url).group(1)
+            self.author = cast(Match, SoundgasmExtractor.VALID_SGASM_USER_URL_RE.match(
+                self.url)).group(1)
             self.is_user = True
 
     @classmethod
@@ -37,7 +43,7 @@ class SoundgasmExtractor(BaseExtractor):
         return bool(cls.VALID_SGASM_FILE_URL_RE.match(url) or
                     cls.VALID_SGASM_USER_URL_RE.match(url))
 
-    def extract(self) -> Optional[FileInfo]:
+    def extract(self) -> Optional[Union[FileInfo, FileCollection]]:
         if self.is_user:
             return self._extract_user()
         else:
@@ -45,16 +51,23 @@ class SoundgasmExtractor(BaseExtractor):
 
     def _extract_file(self) -> Optional[FileInfo]:
         html = SoundgasmExtractor.get_html(self.url)
+        if not html:
+            return None
+
         soup = bs4.BeautifulSoup(html, "html.parser")
 
         try:
             title = soup.select_one("div.jp-title").text
-            direct_url = re.search("m4a: \"(.+)\"", html).group(1)
+            direct_url = cast(Match, re.search("m4a: \"(.+)\"", html)).group(1)
             ext = direct_url.rsplit('.', 1)[1]
             descr = soup.select_one("div.jp-description > p").text
 
             return FileInfo(self.__class__, True, ext, self.url,
-                            direct_url, None, title, descr, self.author)
+                            # use cast supress type checker warning, since we just assume it's
+                            # a str and not None because otherwise we would've gotten an Exception
+                            # NOTE: cast actually doesn't perform any runtime checks it's
+                            # just there to help the type checker
+                            cast(str, direct_url), None, title, descr, self.author)
         except AttributeError:
             raise InfoExtractingError("Error occured while extracting sgasm info - site structure "
                                       "probably changed! See if there are updates available!",
@@ -71,6 +84,9 @@ class SoundgasmExtractor(BaseExtractor):
          Writes content of href attributes of found tags to list and return it
         """
         html = SoundgasmExtractor.get_html(self.url)
+        if not html:
+            return None
+
         soup = bs4.BeautifulSoup(html, 'html.parser')
 
         # decision for bs4 vs regex -> more safe and speed loss prob not significant

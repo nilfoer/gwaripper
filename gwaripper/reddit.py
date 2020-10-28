@@ -2,6 +2,8 @@ import logging
 
 import praw
 
+from typing import Optional, List, Iterator
+
 from .config import config
 from .exceptions import NoAuthenticationError
 
@@ -9,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 # installed app -> only client_id needed, but read-only access until we get a refresh_token
 # for this script read-only access is enough
-reddit_client_id = config["Reddit"]["CLIENT_ID"]
+reddit_client_id: Optional[str] = config["Reddit"]["CLIENT_ID"]
 reddit_client_id = (reddit_client_id if
                     (reddit_client_id and not
                      reddit_client_id.startswith("to get a client id"))
@@ -17,7 +19,7 @@ reddit_client_id = (reddit_client_id if
 reddit_instance = None
 
 
-def reddit_praw():
+def reddit_praw() -> praw.Reddit:
     if reddit_instance is None:
         if reddit_client_id is None:
             raise NoAuthenticationError("Client ID is required to access reddit: "
@@ -31,7 +33,7 @@ def reddit_praw():
     return reddit
 
 
-def parse_subreddit(subreddit, sort, limit, time_filter=None):
+def parse_subreddit(subreddit: str, sort: str, limit: int, time_filter: Optional[str] = None):
     """
     Return limit number of submissions in subreddit with sorting method provided with sort
 
@@ -50,7 +52,8 @@ def parse_subreddit(subreddit, sort, limit, time_filter=None):
         logger.warning("Sort must be either 'hot' or 'top'!")
 
 
-def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
+def search_subreddit(subname: str, searchstring: str, limit: int = 100,
+                     sort: str = "top", **kwargs) -> List[praw.models.Submission]:
     """
     Search subreddit(subname) with searchstring and return limit number of submission with
     sorting method = sort. Passes along kwargs to praw's search method.
@@ -68,20 +71,21 @@ def search_subreddit(subname, searchstring, limit=100, sort="top", **kwargs):
     subreddit = reddit_praw().subreddit(subname)
 
     # Returns a generator for submissions that match the search query
-    matching_sub_gen = subreddit.search(searchstring, sort=sort, limit=limit,
-                                        syntax="lucene", params={'include_over_18': 'on'},
-                                        **kwargs)
+    matching_sub_gen: Iterator[praw.models.Submission] = subreddit.search(
+            searchstring, sort=sort, limit=limit,
+            syntax="lucene", params={'include_over_18': 'on'},
+            **kwargs)
     found_sub_list = redirect_crossposts(matching_sub_gen)
     return found_sub_list
 
 
-def redirect_xpost(sub):
+def redirect_xpost(sub: praw.models.Submission) -> praw.models.Submission:
     """
     Redirects crosspost to the original submission - does nothing
     to non-crossposted submissions
 
-    :param sub: praw.Submission
-    :return: redirected praw.Submission
+    :param sub: praw.models.Submission
+    :return: redirected praw.models.Submission
     """
     try:
         parent = sub.crosspost_parent
@@ -99,12 +103,12 @@ def redirect_xpost(sub):
         return sub
 
 
-def redirect_crossposts(subs):
+def redirect_crossposts(subs: Iterator[praw.models.Submission]) -> List[praw.models.Submission]:
     """
     Redirects crossposts to the original submission and returns them as a list - does nothing
     to non-crossposted submissions
 
-    :param subs: Iterable of praw.Submission
-    :return: List of praw.Submission
+    :param subs: Iterable of praw.models.Submission
+    :return: List of praw.models.Submission
     """
     return [redirect_xpost(sub) for sub in subs]
