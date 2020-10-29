@@ -30,7 +30,9 @@ setuptools.setup(
     keywords="script reddit gonewildaudio download scraping",
     packages=setuptools.find_packages(exclude=['tests*']),
     python_requires='>=3.6',
-    install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw==6", "beautifulsoup4>=4.5.3,<=4.6.3"],
+    install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw==6", "beautifulsoup4>=4.5.3,<=4.6.3",
+                      # 3.7.2 would be enough but mypy 0.782 uses >=3.7.4
+                      "typing-extensions>=3.7.4"],
     tests_require=['pytest'],
     # using MANIFEST.in for these files does not seem to work!
     # non-python data that should be included in the pkg
