@@ -1,22 +1,27 @@
 class GWARipperError(Exception):
     """Base exception for GWARipper"""
-    pass
 
-
-class InfoExtractingError(GWARipperError):
-    def __init__(self, msg, url, html):
-        # Call the base class constructor with the parameters it needs
-        super(InfoExtractingError, self).__init__(msg)  # read up on super
-        self.url = url
-        self.html = html
-
-
-class NoAPIResponseError(GWARipperError):
-    def __init__(self, m, api_url):
-        super().__init__(m)
-        self.api_url = api_url
+    def __init__(self, msg: str):
+        super().__init__()
+        self.msg = msg
 
 
 class NoAuthenticationError(GWARipperError):
-    def __init__(self, m):
+    def __init__(self, m: str):
         super().__init__(m)
+
+
+class InfoExtractingError(GWARipperError):
+    def __init__(self, msg: str, url: str):
+        super().__init__(msg)
+        self.url = url
+
+
+class NoAPIResponseError(InfoExtractingError):
+    def __init__(self, m: str, api_url: str):
+        super().__init__(m, api_url)
+
+
+class AuthenticationFailed(InfoExtractingError):
+    def __init__(self, m: str, url: str):
+        super().__init__(m, url)

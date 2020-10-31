@@ -1,19 +1,17 @@
-import os
-import time
 import re
 import logging
 
 import bs4
 
-from typing import Optional, cast, Match, Pattern, ClassVar, List, Tuple, Type
+from typing import Optional, cast, Pattern, ClassVar, List, Tuple, Type
 
 from praw.models import Submission
 
-from .base import BaseExtractor
+from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport
 # NOTE: IMPORTANT need to be imported as "import foo" rather than "from foo import bar"
 # see :GlobalConfigImport
 from .. import config
-from ..info import FileInfo, RedditInfo, children_iter_dfs
+from ..info import RedditInfo, children_iter_dfs
 from ..reddit import reddit_praw, redirect_xpost
 
 logger = logging.getLogger(__name__)
@@ -29,6 +27,17 @@ class RedditExtractor(BaseExtractor):
             r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/r/(\w+)/comments/"
             r"([A-Za-z0-9]+)/(\w+)?/?", re.IGNORECASE)
 
+    REDDIT_DOMAIN_RE: ClassVar[Pattern] = re.compile(
+            r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/(\w+)", re.IGNORECASE)
+
+    FILTER_URLS_RE: ClassVar[List[Pattern]] = [
+            re.compile(r"^(?:https?://)?(?:www\.)?soundcloud\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?clyp.it/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?vocaroo\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?sndup\.net/", re.IGNORECASE),
+            ]
+
     def __init__(self, url: str, praw_submission: Optional[Submission] = None):
         super().__init__(url)
         self.praw = reddit_praw()
@@ -38,45 +47,28 @@ class RedditExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_REDDIT_URL_RE.match(url))
 
-    def extract(self) -> Optional[RedditInfo]:
+    @classmethod
+    def is_unsupported_audio_url(cls, url: str) -> bool:
+        return any(filtered_re.match(url) for filtered_re in
+                   RedditExtractor.FILTER_URLS_RE)
+
+    def _extract(self) -> Tuple[Optional[RedditInfo], ExtractorReport]:
         """
         Searches .url and .selftext_html of a reddit submission for supported urls.
 
-        Checks if submission title contains banned tags and if time_check doesnt evaluate to False
-        check if submission time is newer than last_dl_time loaded from config or utc timestamp
-        if supplied with time_check
-
-        If no urls were found log it and append links to html file named like
-        reddit_nurl_%Y-%m-%d_%Hh.html so the user is able to check the subs himself for links
-
-        :param time_check: True -> check if submission time is newer than last dl time
-                           from config, type float use this as lastdltime, False or None
-                           dont check submission time at all
-        :return: RedditInfo
+        Checks if submission title contains banned tags
         """
         # @Hack needed since we directly parse and extract found links in the submission
         # but can't import at module level (absolute import also doesn't work since it's
         # the __init__ we're trying to import and that _creates_ the package) because it
         # would lead to circular ref
         from . import find_extractor
-        # TODO: time_check=False):
+        # TODO do the equivalent of the time check code using praw when searching
+        # for submissions etc. since that is the only place it was being used at
 
-        # time_check can be True, False, or a float, only load dltime if True -> use is True
-        # if time_check is True:
-        #     # get new lastdltime from cfg
-        #     reload_config()
-        #     lastdltime = config.getfloat("Time", "last_dl_time", fallback=0.0)
-        # elif isinstance(time_check, (int, float)):
-        #     lastdltime = time_check
-        # else:
-        #     lastdltime = None
+        ri: Optional[RedditInfo] = None
+        report: ExtractorReport = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
 
-        # lastdltime gets evaluated first -> only calls func if lastdltime not None
-        # if lastdltime and not check_submission_time(submission, lastdltime):
-        #     # submission is older than lastdltime -> next sub
-        #     continue
-
-        ri = None
         if self.submission is None:
             self.submission = self.praw.submission(url=self.url)
         submission: Submission = self.submission
@@ -103,20 +95,25 @@ class RedditExtractor(BaseExtractor):
             # sub url not pointing to itself
             if not submission.is_self:
                 extractor: Optional[Type[BaseExtractor]] = find_extractor(sub_url)
+
                 if extractor is not None:
                     logger.info("%s link found in URL of: %s", extractor.EXTRACTOR_NAME,
                                 submission.permalink)
-                    fi = extractor(sub_url).extract()
+                    fi, child_report = extractor.extract(sub_url, parent=ri,
+                                                         parent_report=report)
                     if fi is None:
-                        logger.error("Could not extract URL that the submission points to: %s",
-                                     sub_url)
-                        return None
-                    # TODO: figure out a way so we don't forget to set this
-                    fi.parent = ri
-                    ri.children.append(fi)
-                    return ri
+                        logger.error("Could not extract from URL that the submission "
+                                     "points to: %s", sub_url)
+                        return None, report
+                else:
+                    ri = None
+                    logger.warning("Outgoing submission URL is not supported: %s", sub_url)
+                    report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
+                    report.children.append(
+                            ExtractorReport(sub_url, ExtractorErrorCode.NO_EXTRACTOR))
 
-            if submission.selftext_html is not None:
+            # elif is fine since posts with outgoing urls can't have a selftext
+            elif submission.selftext_html is not None:
                 ri.selftext = submission.selftext
 
                 soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
@@ -136,36 +133,33 @@ class RedditExtractor(BaseExtractor):
                     if extractor is not None:
                         logger.info("%s link found in selftext of: %s",
                                     extractor.EXTRACTOR_NAME, submission.permalink)
-                        fi = extractor(href).extract()
-                        if fi is None:
-                            continue
-                        fi.parent = ri
-                        ri.children.append(fi)
+                        fi, extr_msgs = extractor.extract(href, parent=ri,
+                                                          parent_report=report)
+                    elif RedditExtractor.is_unsupported_audio_url(href):
+                        logger.warning("Found unsupported audio link '%s' in "
+                                       "submission at '%s'", href, submission.shortlink)
+                        report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
+                        report.children.append(
+                                ExtractorReport(href, ExtractorErrorCode.NO_EXTRACTOR))
 
-                if len(ri.children) < len(links):
-                    logger.warning("There were unsupported URLs in submission: %s",
-                                   self.url)
+            if ri:
+                if not (any(c.is_audio for _, c in children_iter_dfs(
+                               ri.children, file_info_only=True))):
+                    if config.config.getboolean('Settings', 'skip_reddit_without_audio',
+                                                fallback=False):
+                        # no audio file to download -> don't download anything
+                        ri = None
+                        # NOTE: only use this code if there are no children
+                        report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
+                    logger.warning("No supported audio link in \"%s\"", submission.shortlink)
 
-            # didn't find any supported audio links; assume there is an unsupported audio
-            # link in there (otherwise the user wouldn't have supplied this link)
-            # and save url to disk
-            if not any(cast(FileInfo, c).is_audio for _, c in
-                       children_iter_dfs(ri.children, file_info_only=True)):
-                logger.info("No supported link in \"%s\"", submission.shortlink)
+                if not cast(RedditInfo, ri).children:
+                    report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
 
-                root_dir = config.get_root()
-                os.makedirs(os.path.join(root_dir, "_linkcol"), exist_ok=True)
+        else:
+            report.err_code = ExtractorErrorCode.BANNED_TAG
 
-                with open(os.path.join(root_dir, "_linkcol",
-                                       "reddit_nurl_" + time.strftime("%Y-%m-%d_%Hh.html")),
-                          'a', encoding="UTF-8") as w:
-                    w.write("<h3><a href=\"https://reddit.com{}\">{}"
-                            "</a><br/>by {}</h3>\n".format(
-                                submission.permalink, submission.title, submission.author))
-                # empty collection / no supported links
-                return None
-
-        return ri
+        return ri, report
 
 
 def check_submission_banned_tags(submission: Submission, keywordlist: List[str],

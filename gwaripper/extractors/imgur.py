@@ -4,13 +4,13 @@ import json
 
 from typing import (
         Optional, ClassVar, Match, Pattern, cast, Dict, Any, List,
-        Union
+        Union, Tuple
         )
 
 from ..config import config
-from ..exceptions import NoAPIResponseError, NoAuthenticationError, InfoExtractingError
+from ..exceptions import NoAPIResponseError, NoAuthenticationError
 
-from .base import BaseExtractor
+from .base import BaseExtractor, ExtractorReport, ExtractorErrorCode
 from ..info import FileInfo, FileCollection
 
 logger = logging.getLogger(__name__)
@@ -40,15 +40,19 @@ class ImgurImageExtractor(BaseExtractor):
         'Authorization': f'Client-ID {client_id}',
         }
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, imgur_img_dict: Optional[Dict[str, Any]] = None):
         super().__init__(url)
         if not client_id:
             raise NoAuthenticationError("In order to download imgur images a Client ID "
                                         "is needed!")
-        match = self.IMAGE_URL_RE.match(url)
-        self.direct_url: Optional[str] = None
-        self.ext: Optional[str] = None
-        self.is_direct: bool = False
+        if imgur_img_dict is None:
+            match = self.IMAGE_URL_RE.match(url)
+            self.direct_url: Optional[str] = None
+            self.ext: Optional[str] = None
+            self.is_direct: bool = False
+        else:
+            match = None
+
         if not match:
             # since one regex matched before in is_compatible
             match = cast(Match, self.IMAGE_FILE_URL_RE.match(url))
@@ -58,32 +62,34 @@ class ImgurImageExtractor(BaseExtractor):
             self.direct_url = url
         self.image_hash = match.group(1)
         self.api_url: str = f"https://api.imgur.com/3/image/{self.image_hash}"
-        self.api_response: Optional[Dict[str, Any]] = None
+        self.api_response: Optional[Dict[str, Any]] = imgur_img_dict
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.IMAGE_FILE_URL_RE.match(url) or cls.IMAGE_URL_RE.match(url))
 
-    def extract(self) -> Optional[FileInfo]:
+    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
         # TODO: get image title etc. (for direct link as well using hash)
         direct_url = self.direct_url
         if not self.is_direct:
-            resp = ImgurImageExtractor.get_html(self.api_url)
-            self.api_response = json.loads(resp) if resp else None
-            if self.api_response:
-                try:
-                    direct_url = self.api_response["data"]["link"]
-                except KeyError:
-                    raise InfoExtractingError(
-                            "Error occured while extracting ImgurImage info - imgur API "
-                            "probably changed! See if there are updates available!",
-                            self.url, None)
-                self.ext = direct_url.rsplit('.', 1)[1]  # type: ignore
-            else:
-                raise NoAPIResponseError("No Response recieved", self.api_url)
+            resp, http_code = ImgurImageExtractor.get_html(self.api_url)
 
-        return FileInfo(self.__class__, False, cast(str, self.ext), self.url,
-                        cast(str, direct_url), self.image_hash, self.image_hash, None, None)
+            if not resp:
+                if self.http_code_is_extractor_broken(http_code):
+                    raise NoAPIResponseError(
+                            "API endpoint did not return a response! Imgur.com"
+                            "probably changed their API!", self.api_url)
+                else:
+                    return None, ExtractorReport(self.url, ExtractorErrorCode.NO_RESPONSE)
+
+            self.api_response = json.loads(resp)
+            if self.api_response:
+                direct_url = self.api_response["data"]["link"]
+                self.ext = direct_url.rsplit('.', 1)[1]  # type: ignore
+
+        return (FileInfo(self.__class__, False, cast(str, self.ext), self.url,
+                         cast(str, direct_url), self.image_hash, self.image_hash, None, None),
+                ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS))
 
 
 class ImgurAlbumExtractor(BaseExtractor):
@@ -110,65 +116,53 @@ class ImgurAlbumExtractor(BaseExtractor):
         self.api_response: Optional[Dict[str, Any]] = None
         self.image_count: Optional[int] = None
         self.title: Optional[str] = None
-        self.images: List[ImgurImageExtractor] = []
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.ALBUM_URL_RE.match(url))
 
-    def get_album_title(self) -> str:
-        if self.title is None and self.api_response:
-            self.title = self.api_response["data"]["title"]
-        return cast(str, self.title)
+    def _extract(self) -> Tuple[Optional[FileCollection], ExtractorReport]:
+        api_response, http_code = ImgurAlbumExtractor.get_html(self.api_url)
 
-    def _get_single_images(self):
-        if self.api_response:
-            images: List[str] = self.api_response["data"]["images"]
-        else:
-            logger.warning("No data recieved when getting images for ImgurAlbum %s",
-                           self.album_hash)
-            return
+        if not api_response:
+            if self.http_code_is_extractor_broken(http_code):
+                raise NoAPIResponseError(
+                        "API endpoint did not return a response! Imgur.com"
+                        "probably changed their API!", self.api_url)
+            else:
+                return None, ExtractorReport(self.url, ExtractorErrorCode.NO_RESPONSE)
+
+        self.api_response = json.loads(api_response)
+        self.image_count = int(self.api_response["data"]["images_count"])  # type: ignore
+        self.title = self.api_response["data"]["title"]  # type: ignore
+
+        if not self.image_count:
+            logger.warning("No images in album: %s", self.album_hash)
+            return None, ExtractorReport(self.url, ExtractorErrorCode.EMPTY_COLLECTION)
+
+        fcol = FileCollection(self.__class__, self.url, self.album_hash,
+                              self.title if self.title else self.album_hash,
+                              None)
+
+        report = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
+
+        # contains image dicts directly so we don't need to use ImgurImageExtractor
+        images: List[Dict[str, Any]] = cast(Dict[str, Any], self.api_response)["data"]["images"]
+
         for img in images:
-            furl = None
+            furl: str
             if img["animated"]:
                 # TODO handle mp4_always being False
                 furl = img["mp4"]
             else:
                 furl = img["link"]
 
-            img_e = ImgurImageExtractor(furl)
-            self.images.append(img_e)
+            # using ImgurImageExtractor directly since we got the img dicts
+            # directly from the api and nothing should fail, if it does anyway
+            # extract marks us as broken - as it should
+            fi, extr_report = cast(Tuple[FileInfo, ExtractorReport],
+                                   ImgurImageExtractor.extract(
+                                       furl, parent=fcol, parent_report=report,
+                                       init_kwargs={'imgur_img_dict': img}))
 
-    def _fetch_api_response(self):
-        api_response = ImgurAlbumExtractor.get_html(self.api_url)
-        if not api_response:
-            raise NoAPIResponseError("No Response recieved", self.api_url)
-        self.api_response = json.loads(api_response)
-        self.image_count = int(self.api_response["data"]["images_count"])
-        self.get_album_title()
-
-    def extract(self) -> Optional[FileCollection]:
-        if not self.api_response:
-            self._fetch_api_response()
-
-        self._get_single_images()
-        if not self.images:
-            logger.warning("No images in album: %s", self.album_hash)
-            return None
-
-        fcol = FileCollection(self.__class__, self.url, self.album_hash,
-                              self.title if self.title else self.album_hash,
-                              None)
-
-        file_infos: List[Union[FileInfo, FileCollection]] = []
-        for img_e in self.images:
-            # try if ImgurImage is broken then so is probably ImgurAlbum
-            # so we don't except here
-            fi = img_e.extract()
-            if fi is None:
-                continue
-            fi.parent = fcol
-            file_infos.append(fi)
-        fcol.children = file_infos
-
-        return fcol
+        return fcol, report
