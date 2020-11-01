@@ -2,7 +2,7 @@ import re
 
 import bs4
 
-from typing import Optional, Union, cast, Match, ClassVar, Pattern, Tuple
+from typing import Optional, Union, cast, Match, ClassVar, Pattern, Tuple, Any
 
 from .base import BaseExtractor, ExtractorReport, ExtractorErrorCode
 from ..info import FileInfo, FileCollection
@@ -24,7 +24,8 @@ class SoundgasmExtractor(BaseExtractor):
 
     author: str
 
-    def __init__(self, url: str):
+    # NOTE: dont use init_from unless you change base class to BaseExtractor[type of init_from]
+    def __init__(self, url: str, init_from: Optional[Any] = None):
         super().__init__(url)
         self.is_user: bool = False
         try:

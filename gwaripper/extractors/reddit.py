@@ -3,7 +3,7 @@ import logging
 
 import bs4
 
-from typing import Optional, cast, Pattern, ClassVar, List, Tuple, Type
+from typing import Optional, cast, Pattern, ClassVar, List, Tuple, Type, TypeVar
 
 from praw.models import Submission
 
@@ -17,7 +17,10 @@ from ..reddit import reddit_praw, redirect_xpost
 logger = logging.getLogger(__name__)
 
 
-class RedditExtractor(BaseExtractor):
+# praw is not marked as a PEP 561 compatible package so praw.models.Submission
+# will just be typed as Any and mypy won't provide even the most basic
+# type-checking
+class RedditExtractor(BaseExtractor[Submission]):
 
     EXTRACTOR_NAME: ClassVar[str] = "Reddit"
     BASE_URL: ClassVar[str] = "reddit.com"
@@ -38,15 +41,20 @@ class RedditExtractor(BaseExtractor):
             re.compile(r"^(?:https?://)?(?:www\.)?sndup\.net/", re.IGNORECASE),
             ]
 
-    def __init__(self, url: str, praw_submission: Optional[Submission] = None):
+    def __init__(self, url: str, init_from: Optional[Submission] = None):
         super().__init__(url)
         self.praw = reddit_praw()
-        self.submission = praw_submission
+        # NOTE: since we don't have static type checking for this, check
+        # it dynamically; for more info see comment above class
+        if init_from is not None:
+            assert isinstance(init_from, Submission)
+        self.submission = init_from
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_REDDIT_URL_RE.match(url))
 
+    # TODO move to base or extractors
     @classmethod
     def is_unsupported_audio_url(cls, url: str) -> bool:
         return any(filtered_re.match(url) for filtered_re in

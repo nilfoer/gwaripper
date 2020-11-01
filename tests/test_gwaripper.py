@@ -8,9 +8,10 @@ import urllib.error
 
 import gwaripper.config as cfg
 
-from gwaripper.gwaripper import GWARipper
+from gwaripper.gwaripper import GWARipper, report_styles
 from gwaripper.db import load_or_create_sql_db
 from gwaripper.info import FileInfo, RedditInfo, FileCollection
+from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.reddit import RedditExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
@@ -779,9 +780,8 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
         gwa.download(fi5)
         assert gwa.download_index == 2  # _NEXT_ download idx
 
-    logs = "\n".join(rec.message for rec in caplog.records)
-    assert ("Extractor <class 'gwaripper.extractors.soundgasm.SoundgasmExtractor'> "
-            "is probably broken") in logs
+    assert ("Extractor gwaripper.extractors.soundgasm.SoundgasmExtractor is probably "
+            "broken! Please report this error on github!") in caplog.text
 
     assert fi5.downloaded is False
 
@@ -818,29 +818,43 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
                            'https://page.url/asjfgl3oi5j23/file.mp3', "sfkjl",  # id
                            "Title",  # title
                            None, "author")
-    monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor.extract',
-                        lambda x: soundgasmfi)
+    soundgasmrep = ExtractorReport(soundgasmfi.page_url, ExtractorErrorCode.NO_ERRORS)
+    monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor._extract',
+                        lambda x: (soundgasmfi, soundgasmrep))
+
     imgurmimgfi = FileInfo(ImgurImageExtractor, None, None, "url",
                            "direct url", None, None, None, None)
-    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurImageExtractor.extract',
-                        lambda x: imgurmimgfi)
+    imgurimgrep = ExtractorReport(imgurmimgfi.page_url, ExtractorErrorCode.NO_ERRORS)
+    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurImageExtractor._extract',
+                        lambda x: (imgurmimgfi, imgurimgrep))
+
     imguralbumfc = FileCollection(ImgurAlbumExtractor, "https://imgur.com/a/k23j4", "k23j4",
                                   "Test", "author", [imgurmimgfi, imgurmimgfi])
-    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurAlbumExtractor.extract',
-                        lambda x: imguralbumfc)
+    imguralbumrep = ExtractorReport(imguralbumfc.url, ExtractorErrorCode.NO_ERRORS)
+    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurAlbumExtractor._extract',
+                        lambda x: (imguralbumfc, imguralbumrep))
+
     redditinfo = RedditInfo(RedditExtractor, "url", "id", "title",
                             'author', 'subreddit', 'permalink', 12345.0,
                             [soundgasmfi, imguralbumfc])
-    monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor.extract',
-                        lambda x: redditinfo)
-    monkeypatch.setattr('gwaripper.extractors.chirbit.ChirbitExtractor.extract',
-                        lambda x: None)
+    redditinforep = ExtractorReport(redditinfo.url, ExtractorErrorCode.NO_ERRORS)
+    monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor._extract',
+                        lambda x: (redditinfo, redditinforep))
 
-    def raises_iee(self):
-        raise InfoExtractingError('msg', 'url', 'html')
+    # monkeypatch.setattr('gwaripper.extractors.chirbit.ChirbitExtractor._extract',
+    #                     lambda x: (None,
+    #                                ExtractorReport('https://chirb.it/hnz5aB',
+    #                                                ExtractorErrorCode.NO_RESPONSE)))
+    monkeypatch.setattr('gwaripper.extractors.chirbit.ChirbitExtractor.get_html',
+                        # return no html with 408 http code for timeout
+                        lambda url: (None, 408))
 
-    monkeypatch.setattr('gwaripper.extractors.eraudica.EraudicaExtractor.extract',
-                        raises_iee)
+    # parse links should not crash on any exception since it uses BaseExtractor.extract
+    def raises(self):
+        raise FileNotFoundError()
+
+    monkeypatch.setattr('gwaripper.extractors.eraudica.EraudicaExtractor._extract',
+                        raises)
 
     # expected = [
     #         redditinfo,
@@ -862,7 +876,17 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
         gwa.parse_links(urls)
 
     assert gwa.nr_downloads == 4
-    assert f"Skipping URL: {urls[2]}" in caplog.text
+    assert (f"ERROR - NO_RESPONSE - Request timed out or no response received! "
+            f"(URL was {urls[2]})") in caplog.text
+    # 1st time exc in eraudica extr
+    assert (f"Error occured while extracting information from '{urls[6]}' "
+            "- site structure or API probably changed! See if there are "
+            "updates available!") in caplog.text
+    # pytest fails to capture logging exception information the pytest logging hook
+    # crashed/raised instead
+    # assert ("Full exception info for unexpected extraction failure:") in caplog.text
+    # assert "in raises" in caplog.text
+    # assert "raise FileNotFoundError()" in caplog.text
     # no comparison operators defined currently can't sort and compare list
     assert len(gwa.downloads) == 2
     assert redditinfo in gwa.downloads
@@ -873,21 +897,110 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
     with GWARipper() as gwa:
         gwa.parse_links(urls_new)
     assert f"Found no extractor for URL: {urls_new[0]}" in caplog.text
-    # no comparison operators defined currently can't sort and compare list
+    # assert (f"ERROR - NO_EXTRACTOR - No compatible extractor could be found! "
+    #         f"(URL was {urls_new[0]})") in caplog.text
     assert len(gwa.downloads) == 0
 
     caplog.clear()
     urls_new = [urls[2]]
     with GWARipper() as gwa:
         gwa.parse_links(urls_new)
-    assert f"Skipping URL: {urls_new[0]}" in caplog.text
-    # no comparison operators defined currently can't sort and compare list
+    assert (f"ERROR - NO_RESPONSE - Request timed out or no response received! "
+            f"(URL was {urls_new[0]})") in caplog.text
     assert len(gwa.downloads) == 0
 
     caplog.clear()
     urls_new = [urls[6]]
     with GWARipper() as gwa:
         gwa.parse_links(urls_new)
-    assert f"Extraction failed! Skipping URL: {urls_new[0]}" in caplog.text
-    # no comparison operators defined currently can't sort and compare list
+    # 2nd time eraudica extr already marked as broken
+    assert f"Skipping URL '{urls_new[0]}' due to broken extractor: Eraudica" in caplog.text
     assert len(gwa.downloads) == 0
+
+
+def test_write_report(setup_tmpdir):
+    tmpdir = setup_tmpdir
+    cfg.config["Settings"]["root_path"] = tmpdir
+
+    ecode = ExtractorErrorCode
+    reports = [
+            ExtractorReport('url1', ecode.NO_ERRORS),
+            ExtractorReport('url2col', ecode.ERROR_IN_CHILDREN),
+            ExtractorReport('url3', ecode.BANNED_TAG),
+            ExtractorReport('url4col', ecode.NO_SUPPORTED_AUDIO_LINK)
+            ]
+
+    reports[1].children = [
+            ExtractorReport('url2colurl1', ecode.NO_RESPONSE),
+            ExtractorReport('url2colurl2', ecode.NO_EXTRACTOR),
+            ExtractorReport('url2colurl3col', ecode.ERROR_IN_CHILDREN),
+            ]
+
+    reports[1].children[2].children = [
+            ExtractorReport('url2colurl3colurl1', ecode.NO_AUTHENTICATION),
+            ExtractorReport('url2colurl3colurl2', ecode.NO_ERRORS),
+            ]
+
+    reports[3].children = [
+            ExtractorReport('url4colurl1', ecode.NO_ERRORS),
+            ExtractorReport('url4colurl2', ecode.BANNED_TAG),
+            ]
+
+    expected = [
+            report_styles,
+            "<h1>Parsing report</h1>",
+            "<div class=\"block success \">",
+            "<a href=\"url1\">url1</a>",
+            "<div class='info'><span>SUCCESS: </span>NO_ERRORS</div>",
+            "</div>",
+            "<div class=\"collection error \">",
+            "<span>Collection: </span><a href=\"url2col\">url2col</a>",
+            "<div class='info'><span>ERROR: </span>ERROR_IN_CHILDREN</div>",
+            "<div class=\"block error indent \">",
+            "<a href=\"url2colurl1\">url2colurl1</a>",
+            "<div class='info'><span>ERROR: </span>NO_RESPONSE</div>",
+            "</div>",
+            "<div class=\"block error indent \">",
+            "<a href=\"url2colurl2\">url2colurl2</a>",
+            "<div class='info'><span>ERROR: </span>NO_EXTRACTOR</div>",
+            "</div>",
+            "<div class=\"collection error indent \">",
+            "<span>Collection: </span><a href=\"url2colurl3col\">url2colurl3col</a>",
+            "<div class='info'><span>ERROR: </span>ERROR_IN_CHILDREN</div>",
+            "<div class=\"block error indent \">",
+            "<a href=\"url2colurl3colurl1\">url2colurl3colurl1</a>",
+            "<div class='info'><span>ERROR: </span>NO_AUTHENTICATION</div>",
+            "</div>",
+            "<div class=\"block success indent \">",
+            "<a href=\"url2colurl3colurl2\">url2colurl3colurl2</a>",
+            "<div class='info'><span>SUCCESS: </span>NO_ERRORS</div>",
+            "</div>",
+            "</div>",  # urlcol2url3col
+            "</div>",  # url2col
+            "<div class=\"block error \">",
+            "<a href=\"url3\">url3</a>",
+            "<div class='info'><span>ERROR: </span>BANNED_TAG</div>",
+            "</div>",
+            "<div class=\"collection error \">",
+            "<span>Collection: </span><a href=\"url4col\">url4col</a>",
+            "<div class='info'><span>ERROR: </span>NO_SUPPORTED_AUDIO_LINK</div>",
+            "<div class=\"block success indent \">",
+            "<a href=\"url4colurl1\">url4colurl1</a>",
+            "<div class='info'><span>SUCCESS: </span>NO_ERRORS</div>",
+            "</div>",
+            "<div class=\"block error indent \">",
+            "<a href=\"url4colurl2\">url4colurl2</a>",
+            "<div class='info'><span>ERROR: </span>BANNED_TAG</div>",
+            "</div>",
+            "</div>",  # url4col
+    ]
+
+    with GWARipper() as g:
+        g.write_report(reports)
+
+    expected_str = "\n".join(expected)
+    with open(
+            os.path.join(tmpdir, "_reports",
+                         f"parse_rprt_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html"),
+            "r") as f:
+        assert expected_str == f.read()

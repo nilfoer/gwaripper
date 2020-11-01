@@ -1,6 +1,6 @@
 import pytest
 
-from gwaripper.gwaripper import children_iter_bfs, children_iter_dfs
+from gwaripper.info import children_iter_bfs, children_iter_dfs
 
 
 class ParentDummy:

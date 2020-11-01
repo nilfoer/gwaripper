@@ -2,7 +2,9 @@ import urllib.request
 import urllib.error
 import logging
 
-from typing import Optional, Dict, Union, ClassVar, Tuple, List, Any, Type
+from typing import (
+        Optional, Dict, Union, ClassVar, Tuple, List, Any, TypeVar, Generic
+        )
 from enum import Enum, auto, unique
 
 from ..exceptions import (
@@ -44,9 +46,18 @@ class ExtractorReport:
         self.url = url
         self.err_code = err_code
         self.children = []
+        self.downloaded: bool = False
 
 
-class BaseExtractor:
+T = TypeVar('T')
+
+
+# make BaseExtractor a generic class so we can specify an optional kwarg that
+# the subclass extractrors can be initialized from and still keep type safety as
+# long as subclasses explicitly specify type T like so
+# BaseExtractor[praw.models.Submission] otherwise T will just be Any and there will
+# be no type checking done on it
+class BaseExtractor(Generic[T]):
     """
     Custom extractors for different sites should inherit from this class
     and implement the required methods
@@ -70,7 +81,33 @@ class BaseExtractor:
     # should be considered broken
     is_broken: ClassVar[bool] = False
 
-    def __init__(self, url: str):
+    # message for logging error codes
+    err_value_msg: Dict[int, str] = {
+        ExtractorErrorCode.BROKEN_EXTRACTOR.value: "",
+        ExtractorErrorCode.NO_RESPONSE.value: "Request timed out or no response received!",
+        ExtractorErrorCode.BANNED_TAG.value: "URL was skipped due to a banned tag!",
+        ExtractorErrorCode.NO_EXTRACTOR.value: "No compatible exctractor could be found!",
+        # TODO currently only used if no api key was found and raises an exception
+        # which will get reported in .extract
+        ExtractorErrorCode.NO_AUTHENTICATION.value: "",
+
+        # TODO do we even report this?
+        # ExtractorErrorCode.ERROR_IN_CHILDREN.value: "",
+        ExtractorErrorCode.EMPTY_COLLECTION.value: (
+            "Collection is empty! No supported and known unsupported links found!"),
+        ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK.value: (
+            "No supported audio could be extracted but there were known unsupported audio links!"),
+    }
+
+    # NOTE: workaround to get type checking to work with passing differently
+    # typed kwarg in BaseExtractor.__init__
+    # necessary since typing kwargs with different types doesn't work in mypy
+    # use a workaround of having a generic type to optionally initialize from
+    #
+    # NOTE: IMPORTANT extractors that want to use init_from to be able to be
+    # initialized with e.g. a dict need to inherit from
+    # BaseExtractor[T] while explicitly specifiyng T
+    def __init__(self, url: str, init_from: Optional[T] = None):
         # TODO: replace http with https by default?
         self.url = url
 
@@ -86,7 +123,8 @@ class BaseExtractor:
     # be considered broken (needed for exc_info): e.g. site changed their API
     # and should not raise for just a time-out, or a deleted resource
     # that could be expected
-    # NOTE: only exception is (so far) NoAuthenticationError
+    # NOTE: only exception is (so far) NoAuthenticationError (since we currently
+    # raise it in the __init__)
     #
     # returned string list are messages that go into the parsing report
     # since it's otherwise too easy to miss skipped urls, unsupported links,
@@ -100,8 +138,9 @@ class BaseExtractor:
     @classmethod
     def extract(cls, url: str, parent: Optional[FileCollection] = None,
                 parent_report: Optional[ExtractorReport] = None,
-                init_kwargs: Optional[Dict[str, Any]] = None) -> Tuple[
+                init_from: Optional[T] = None) -> Tuple[
             Optional[Union[FileInfo, FileCollection]], ExtractorReport]:
+
         # all reports here have code BROKEN_EXTRACTOR
         report = ExtractorReport(url, ExtractorErrorCode.BROKEN_EXTRACTOR)
         result: Optional[Union[FileInfo, FileCollection]] = None
@@ -111,8 +150,9 @@ class BaseExtractor:
                            url, cls.EXTRACTOR_NAME)
         else:
             try:
-                # TODO fix type error
-                result, report = cls(url, **init_kwargs)._extract()
+                extractor = cls(url, init_from=init_from)
+
+                result, report = extractor._extract()
             except NoAuthenticationError as err:
                 report.err_code = ExtractorErrorCode.NO_AUTHENTICATION
 
@@ -133,6 +173,9 @@ class BaseExtractor:
                              "updates available!", url)
                 logger.debug("Full exception info for unexpected extraction failure:",
                              cls.EXTRACTOR_NAME, url, exc_info=True)
+            else:
+                # only log/print if no exc was raised since exc already get logged above
+                cls.log_report(report)
 
         if result is not None and parent is not None:
             parent.children.append(result)
@@ -144,6 +187,14 @@ class BaseExtractor:
                     parent_report.err_code == ExtractorErrorCode.NO_ERRORS):
                 parent_report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
         return result, report
+
+    @classmethod
+    def log_report(cls, report: ExtractorReport):
+        if report.err_code not in (
+                ExtractorErrorCode.NO_ERRORS, ExtractorErrorCode.ERROR_IN_CHILDREN):
+            logger.warning("ERROR - %s - %s (URL was %s)", report.err_code.name,
+                           cls.err_value_msg[report.err_code.value],
+                           report.url)
 
     @staticmethod
     def http_code_is_extractor_broken(http_code: Optional[int]) -> bool:

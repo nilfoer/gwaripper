@@ -3,7 +3,7 @@ import base64
 
 import bs4
 
-from typing import Optional, ClassVar, Pattern, Match, cast, Tuple
+from typing import Optional, ClassVar, Pattern, Match, cast, Tuple, Any
 
 from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport
 from ..info import FileInfo
@@ -18,7 +18,8 @@ class ChirbitExtractor(BaseExtractor):
     VALID_CHIRBIT_URL_RE: ClassVar[Pattern] = re.compile(
             r"^(?:https?://)?(?:www\.)?chirb\.it/([A-Za-z0-9]+)/?$", re.IGNORECASE)
 
-    def __init__(self, url: str):
+    # NOTE: dont use init_from unless you change base class to BaseExtractor[type of init_from]
+    def __init__(self, url: str, init_from: Optional[Any] = None):
         super().__init__(url)
         # already matched in is_compatible
         self.id: str = cast(Match, ChirbitExtractor.VALID_CHIRBIT_URL_RE.match(url)).group(1)

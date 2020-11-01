@@ -2,7 +2,7 @@ import re
 
 import bs4
 
-from typing import Optional, Match, cast, Pattern, ClassVar, Tuple
+from typing import Optional, Match, cast, Pattern, ClassVar, Tuple, Any
 from urllib.parse import quote as url_quote
 
 from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport
@@ -19,7 +19,8 @@ class EraudicaExtractor(BaseExtractor):
             r"(?:https?://)?(?:www\.)?eraudica\.com/e/eve/"
             r"(?:\d+)/([A-Za-z0-9-]+)", re.IGNORECASE)
 
-    def __init__(self, url: str):
+    # NOTE: dont use init_from unless you change base class to BaseExtractor[type of init_from]
+    def __init__(self, url: str, init_from: Optional[Any] = None):
         super().__init__(url)
         # strip("/gwa") doesnt strip the exact string "/gwa" from the end but instead it strips all
         # the chars contained in that string from the end:

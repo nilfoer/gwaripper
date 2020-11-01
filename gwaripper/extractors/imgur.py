@@ -4,7 +4,7 @@ import json
 
 from typing import (
         Optional, ClassVar, Match, Pattern, cast, Dict, Any, List,
-        Union, Tuple
+        Tuple
         )
 
 from ..config import config
@@ -20,7 +20,7 @@ if client_id and client_id.startswith("to get a client id"):
     client_id = None
 
 
-class ImgurImageExtractor(BaseExtractor):
+class ImgurImageExtractor(BaseExtractor[Dict[str, Any]]):
     """Only using this as proxy for ImgurFile when url isnt a direct link to the
     image file but to the image page"""
 
@@ -40,12 +40,13 @@ class ImgurImageExtractor(BaseExtractor):
         'Authorization': f'Client-ID {client_id}',
         }
 
-    def __init__(self, url: str, imgur_img_dict: Optional[Dict[str, Any]] = None):
+    def __init__(self, url: str, init_from: Optional[Dict[str, Any]] = None):
         super().__init__(url)
         if not client_id:
             raise NoAuthenticationError("In order to download imgur images a Client ID "
                                         "is needed!")
-        if imgur_img_dict is None:
+        # NOTE: init_from is a imgur image dict retrieved from the imgur api
+        if init_from is None:
             match = self.IMAGE_URL_RE.match(url)
             self.direct_url: Optional[str] = None
             self.ext: Optional[str] = None
@@ -62,7 +63,7 @@ class ImgurImageExtractor(BaseExtractor):
             self.direct_url = url
         self.image_hash = match.group(1)
         self.api_url: str = f"https://api.imgur.com/3/image/{self.image_hash}"
-        self.api_response: Optional[Dict[str, Any]] = imgur_img_dict
+        self.api_response: Optional[Dict[str, Any]] = init_from
 
     @classmethod
     def is_compatible(cls, url: str) -> bool:
@@ -160,9 +161,7 @@ class ImgurAlbumExtractor(BaseExtractor):
             # using ImgurImageExtractor directly since we got the img dicts
             # directly from the api and nothing should fail, if it does anyway
             # extract marks us as broken - as it should
-            fi, extr_report = cast(Tuple[FileInfo, ExtractorReport],
-                                   ImgurImageExtractor.extract(
-                                       furl, parent=fcol, parent_report=report,
-                                       init_kwargs={'imgur_img_dict': img}))
+            fi, extr_report = ImgurImageExtractor.extract(
+                    furl, parent=fcol, parent_report=report, init_from=img)
 
         return fcol, report

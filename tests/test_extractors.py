@@ -7,7 +7,8 @@ import shutil
 import gwaripper.config as config
 
 from gwaripper.reddit import reddit_praw
-from gwaripper.extractors import find_extractor
+from gwaripper.extractors import find_extractor, AVAILABLE_EXTRACTORS
+from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode, BaseExtractor
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.eraudica import EraudicaExtractor
 from gwaripper.extractors.chirbit import ChirbitExtractor
@@ -109,9 +110,16 @@ def test_soundgasm_user_extractor(monkeypatch):
     ex = SoundgasmExtractor("https://soundgasm.net/u/DDCherryB")
     # otherwise _extract_user will extract all files from the ONLINE website
     monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor._extract_file',
-                        lambda x: FileInfo(x.__class__, True, None, x.url,
-                                           None, None, None, None, None))
-    fcol = ex.extract()
+                        lambda x: (FileInfo(x.__class__, True, None, x.url,
+                                            None, None, None, None, None),
+                                   ExtractorReport(x.url, ExtractorErrorCode.NO_ERRORS)))
+    fcol, report = ex._extract()
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == "https://soundgasm.net/u/DDCherryB"
+    assert sgasm_usr_audio_urls == (
+            [rep.url for rep in report.children][-len(sgasm_usr_audio_urls):])
+
     # sgasm_usr_audio_urls should be last urls on user page
     assert sgasm_usr_audio_urls == [c.page_url for c in fcol.children][-len(sgasm_usr_audio_urls):]
 
@@ -125,7 +133,11 @@ def test_extractor_soundgasm():
     ex = SoundgasmExtractor(url)
     assert not ex.is_user
     assert ex.author == "kinkyshibby"
-    fi = ex.extract()
+    fi, report = ex._extract()
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == url
+    assert not report.children
 
     assert fi.extractor is SoundgasmExtractor
     assert fi.is_audio is True
@@ -163,7 +175,11 @@ def test_extractor_eraudica():
 
     ex = EraudicaExtractor(url1)
     assert ex.url == url1
-    fi = ex.extract()
+    fi, report = ex._extract()
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == url1
+    assert not report.children
 
     assert fi.extractor is EraudicaExtractor
     assert fi.is_audio is True
@@ -202,7 +218,11 @@ def test_extractor_chirbit():
 
     ex = ChirbitExtractor(url)
     assert ex.url == url
-    fi = ex.extract()
+    fi, report = ex._extract()
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == url
+    assert not report.children
 
     assert fi.extractor is ChirbitExtractor
     assert fi.is_audio is True
@@ -232,7 +252,11 @@ def test_extractor_imgur_image():
     assert ex.ext == 'mp4'
     assert ex.is_direct is True
     assert ex.image_hash == "c0T9oSy"
-    fi = ex.extract()
+    fi, report = ex._extract()
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == "https://imgur.com/c0T9oSy"
+    assert not report.children
 
     assert fi.extractor is ImgurImageExtractor
     assert fi.is_audio is False
@@ -257,7 +281,11 @@ def test_extractor_imgur_image():
     assert ex.ext is None
     assert ex.is_direct is False
     assert ex.image_hash == "Ded3OiN"
-    fi = ex.extract()
+    fi, report = ex._extract()
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == url
+    assert not report.children
 
     assert fi.extractor is ImgurImageExtractor
     assert fi.is_audio is False
@@ -279,9 +307,13 @@ def test_extractor_imgur_album(monkeypatch):
 
     ex = ImgurAlbumExtractor(url)
     ex.album_hash = "OPqcLpw"
-    fcol = ex.extract()
+    fcol, report = ex._extract()
     ex.image_count = 3
     ex.title = "Testing album"
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == url
+    assert len(report.children) == 3
 
     assert fcol.url == url
     assert fcol.id == "OPqcLpw"
@@ -289,9 +321,10 @@ def test_extractor_imgur_album(monkeypatch):
 
     # NOTE: only check that we get the correct urls/hashes for the images
     # in the ablum the rest is already being tested by test_extractor_imgur_image
-    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurImageExtractor.extract',
-                        lambda x: FileInfo(x.__class__, None, None, x.url,
-                                           x.direct_url, None, None, None, None))
+    monkeypatch.setattr('gwaripper.extractors.imgur.ImgurImageExtractor._extract',
+                        lambda x: (FileInfo(x.__class__, None, None, x.url,
+                                            x.direct_url, None, None, None, None),
+                                   ExtractorReport(x.url, ExtractorErrorCode.NO_ERRORS)))
 
     img_urls = (
         ('https://imgur.com/hnDOLrH', 'https://i.imgur.com/hnDOLrH.jpg'),
@@ -303,14 +336,23 @@ def test_extractor_imgur_album(monkeypatch):
         assert img.page_url == img_urls[i][0]
         assert img.direct_url == img_urls[i][1]
 
+    for i, rep in enumerate(report.children):
+        assert rep.err_code == ExtractorErrorCode.NO_ERRORS
+        assert rep.url == img_urls[i][0]
+        assert not rep.children
+
     # NOTE: currently always getting mp4 for all animated sources
     url = 'https://imgur.com/a/tcl9AuW'  # gif, webm+sound, mp4
 
     ex = ImgurAlbumExtractor(url)
     ex.album_hash = "tcl9AuW"
-    fcol = ex.extract()
+    fcol, report = ex._extract()
     ex.image_count = 3
     ex.title = "Test album animated ?"
+
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.url == url
+    assert len(report.children) == 3
 
     assert fcol.url == url
     assert fcol.id == "tcl9AuW"
@@ -327,6 +369,11 @@ def test_extractor_imgur_album(monkeypatch):
         assert img.parent is fcol
         assert img.page_url == animated_urls[i][0]
         assert img.direct_url == animated_urls[i][1]
+
+    for i, rep in enumerate(report.children):
+        assert rep.err_code == ExtractorErrorCode.NO_ERRORS
+        assert rep.url == animated_urls[i][0]
+        assert not rep.children
 
 
 reddit_extractor_url_expected = [
@@ -457,16 +504,24 @@ reddit_extractor_url_expected = [
     ]
 
 
-class DummyExtractor():
+class DummyExtractor(BaseExtractor):
     EXTRACTOR_NAME = "Dummy"
     BASE_URL = "dummy.org"
 
-    def __init__(self, url):
+    supported = [ex for ex in AVAILABLE_EXTRACTORS if ex != RedditExtractor]
+
+    def __init__(self, url, init_from=None):
         self.url = url
 
-    def extract(self):
-        return FileInfo(self.__class__, True, None, self.url,
-                        None, None, None, None, None)
+    # only match supported urls
+    @classmethod
+    def is_compatible(cls, url):
+        return any(ex.is_compatible(url) for ex in cls.supported)
+
+    def _extract(self):
+        return (FileInfo(self.__class__, True, None, self.url,
+                         None, None, None, None, None),
+                ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS))
 
 
 def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
@@ -475,7 +530,8 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     # to avoid extracting forther reddit submissions
     backup_find = find_extractor  # save orig func
     mock_findex = lambda x: (RedditExtractor if RedditExtractor.is_compatible(x)
-                             else DummyExtractor)
+                             else DummyExtractor if DummyExtractor.is_compatible(x) else
+                             None)
     monkeypatch.setattr('gwaripper.extractors.find_extractor', mock_findex)
 
     # NOTE: IMPORTANT setup banned keywords and tag1_but_not_2
@@ -510,32 +566,48 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
         ex = RedditExtractor(url)
 
         caplog.clear()
-        ri = ex.extract()
+        ri, report = ex._extract()
 
         if attr_val_dict is not None:
+            assert report.url == url
+            assert report.err_code == ExtractorErrorCode.NO_ERRORS
+            print("\n".join(rep.url for rep in report.children))
+            assert len(report.children) == len(found_urls)
+
             for attr_name, value in attr_val_dict.items():
                 assert getattr(ri, attr_name) == value
 
             # IMPORTANT check that parent and reddit_info was set
             for child in ri.children:
                 assert child.parent is ri
+
+            sorted_urls = list(sorted(found_urls))
+            for i, rep in enumerate(sorted(report.children, key=lambda x: x.url)):
+                assert rep.url == sorted_urls[i]
+                assert rep.err_code == ExtractorErrorCode.NO_ERRORS
+                assert not rep.children
         elif type(found_urls) is str:
+            # no supported link
             assert ri is None
-            # shortlink written to html
-            fn = f"reddit_nurl_{time.strftime('%Y-%m-%d_%Hh.html')}"
-            fn = os.path.join(linkcoldir, fn)
-            with open(fn, 'r') as f:
-                contents = f.read()
-            assert ("/r/gonewildaudio/comments/69evvm/"
-                    "f4mcougarstrangers_a_new_neighbor_moves_in_next/") in contents
-            # make sure follow-up tests don't write to the same file
-            os.remove(fn)
+
+            assert report.url == url
+            assert report.err_code == ExtractorErrorCode.ERROR_IN_CHILDREN
+            assert len(report.children) == 1
+            assert report.children[0].err_code == ExtractorErrorCode.NO_EXTRACTOR
+            assert report.children[0].url == "https://www.literotica.com/s/cougar-tales-new-neighbor"
+            assert not report.children[0].children
+
+            assert ("Outgoing submission URL is not supported: "
+                    "https://www.literotica.com/s/cougar-tales-new-neighbor") in caplog.text
         else:
             msg = caplog.records[0].message
             assert "https://redd.it/4r33ek" in msg
             assert msg.startswith("Banned keyword: no '[script fill]' in title "
                                   "where '[script offer]' is in")
             assert ri is None
+            assert report.url == url
+            assert report.err_code == ExtractorErrorCode.BANNED_TAG
+            assert not report.children
 
         # restore patched version for other tests
         if attr_val_dict is None:
@@ -548,10 +620,14 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     sub = r.submission(id=reddit_extractor_url_expected[0][2]['id'])
 
     # pass in old.reddit.com... url and submission object
-    ex = RedditExtractor(reddit_extractor_url_expected[0][0], sub)
+    ex = RedditExtractor(reddit_extractor_url_expected[0][0], init_from=sub)
 
     caplog.clear()
-    ri = ex.extract()
+    ri, report = ex._extract()
+
+    assert report.url == reddit_extractor_url_expected[0][0]
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+    assert len(report.children) == 1  # static otherwise we need to change below
 
     for attr_name, value in reddit_extractor_url_expected[0][2].items():
         assert getattr(ri, attr_name) == value
@@ -559,3 +635,8 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     # IMPORTANT check that parent and reddit_info was set
     for child in ri.children:
         assert child.parent is ri
+    # only 1 child
+    rep = report.children[0]
+    assert rep.url == reddit_extractor_url_expected[0][1][0]
+    assert rep.err_code == ExtractorErrorCode.NO_ERRORS
+    assert not rep.children
