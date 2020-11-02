@@ -37,7 +37,6 @@ class ExtractorErrorCode(Enum):
     NO_SUPPORTED_AUDIO_LINK = auto()  # only use this if there are no child reports
 
 
-# TODO track download status and write after dl?
 class ExtractorReport:
 
     children: List['ExtractorReport']

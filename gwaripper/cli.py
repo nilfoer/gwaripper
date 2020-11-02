@@ -236,12 +236,11 @@ def main():
 
 def download_all_links(urls: List[str]) -> None:
     with GWARipper() as gw:
-        gw.parse_links(urls)
-        gw.mark_alrdy_downloaded()
+        gw.set_urls(urls)
         gw.download_all()
 
 
-def _cl_link(args):
+def _cl_link(args: argparse.Namespace) -> None:
     download_all_links(args.links)
 
 
@@ -262,9 +261,7 @@ def _cl_watch(args):
 
 def download_all_subs(sublist: List[praw.models.Submission]) -> None:
     with GWARipper() as gw:
-        gw.parse_submissions(sublist)
-        gw.mark_alrdy_downloaded()
-        gw.download_all()
+        gw.download_all(sublist)
 
 
 def _cl_redditor(args):
@@ -311,7 +308,7 @@ def _cl_search(args):
     download_all_subs(found_subs)
 
 
-def _cl_config(args):
+def _cl_config(args) -> None:
     changed = False
     if args.path:
         # normalize path, remove double \ and convert / to \ on windows

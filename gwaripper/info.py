@@ -379,6 +379,8 @@ class FileCollection:
         else:
             self.children = children
         self._parent: Optional[RedditInfo] = None
+        # NOTE: a collection only counts as downloaded if all of it's children are
+        self.downloaded: bool = False
 
     def __str__(self):
         return f"FileCollection<{self.url}, children: {len(self.children)}>"

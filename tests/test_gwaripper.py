@@ -313,7 +313,7 @@ def test_add_to_db(setup_tmpdir):
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
 
-def test_mark_alrdy_downloaded(setup_tmpdir):
+def test_already_downloaded(setup_tmpdir):
     tmpdir = setup_tmpdir
     cfg.config["Settings"]["set_missing_reddit"] = "False"
 
@@ -413,8 +413,23 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
 
     # nothing should happen
     with GWARipper() as gwa:
-        gwa.downloads = [ri1, ri2, fi6, ri3]
-        gwa.mark_alrdy_downloaded()
+        assert gwa.already_downloaded(fi1)
+        assert fi1.already_downloaded
+
+        assert gwa.already_downloaded(fi2)
+        assert fi2.already_downloaded
+
+        assert gwa.already_downloaded(fi3)
+        assert fi3.already_downloaded
+
+        assert not gwa.already_downloaded(fi4)
+        assert not fi4.already_downloaded
+
+        assert not gwa.already_downloaded(fi5)
+        assert not fi5.already_downloaded
+
+        assert not gwa.already_downloaded(fi6)
+        assert not fi6.already_downloaded
 
     #
     #
@@ -442,13 +457,6 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
 
     # db shouldn't change since set_missing_reddit is False
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    assert fi1.already_downloaded
-    assert fi2.already_downloaded
-    assert fi3.already_downloaded
-    assert not fi4.already_downloaded
-    assert not fi5.already_downloaded
-    assert not fi6.already_downloaded
 
     # reset them
     fi1.already_downloaded = False
@@ -480,18 +488,26 @@ def test_mark_alrdy_downloaded(setup_tmpdir):
     cfg.config["Settings"]["set_missing_reddit"] = "True"
 
     with GWARipper() as gwa:
-        gwa.downloads = [ri1, ri2, fi6, ri3]
-        gwa.mark_alrdy_downloaded()
+        assert gwa.already_downloaded(fi1)
+        assert fi1.already_downloaded
+
+        assert gwa.already_downloaded(fi2)
+        assert fi2.already_downloaded
+
+        assert gwa.already_downloaded(fi3)
+        assert fi3.already_downloaded
+
+        assert not gwa.already_downloaded(fi4)
+        assert not fi4.already_downloaded
+
+        assert not gwa.already_downloaded(fi5)
+        assert not fi5.already_downloaded
+
+        assert not gwa.already_downloaded(fi6)
+        assert not fi6.already_downloaded
 
     # set_missing_reddit called
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    assert fi1.already_downloaded
-    assert fi2.already_downloaded
-    assert fi3.already_downloaded
-    assert not fi4.already_downloaded
-    assert not fi5.already_downloaded
-    assert not fi6.already_downloaded
 
 
 def test_download(setup_tmpdir, monkeypatch, caplog):
@@ -579,9 +595,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
     # non audio file should not be added to db - only downloaded
     with GWARipper() as gwa:
-        gwa.nr_downloads = 3
         gwa.download(fi0)
-        assert gwa.download_index == 2  # _NEXT_ download idx
         assert fi0.downloaded is True
 
     with open(dont_overwrite_file, "r") as f:
@@ -592,22 +606,23 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
         assert f.read() == fi_file_contents[0]
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-    
+
     #
     #
     #
 
+    bu_already_dled = GWARipper.already_downloaded
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
+                        lambda x, fi: True)
     fi1 = FileInfo(object, True, "m4a", "https://page.url/al323asf4653",
                    build_file_url(os.path.join(testdl_files, "fi1")), None,  # id
                    rnd.random_string(20),  # title
                    rnd.random_string(50), "dummy_usr")
 
     # testing file has already_downloaded set
-    fi1.already_downloaded = True
+    assert fi1.downloaded is False
     with GWARipper() as gwa:
-        gwa.nr_downloads = 3
         gwa.download(fi1)
-        assert gwa.nr_downloads == 2
         assert fi1.downloaded is False
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
@@ -616,7 +631,8 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     #
     #
 
-    fi1.already_downloaded = False
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
+                        bu_already_dled)
     fi1_fn = f"{fi1.title}.{fi1.ext}"
     expected.append(
             [4, time.strftime("%Y-%m-%d"), fi1.descr, fi1_fn,
@@ -625,9 +641,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
             )
 
     with GWARipper() as gwa:
-        gwa.nr_downloads = 3
         gwa.download(fi1)
-        assert gwa.download_index == 2  # _NEXT_ download idx
         assert fi1.downloaded is True
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
@@ -681,10 +695,17 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     fi3.already_downloaded = True
     fi4.already_downloaded = True
 
+    def patched_alrdy_dled(self, fi):
+        if fi is fi2 or fi is fi3 or fi is fi4:
+            return True
+        else:
+            return False
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
+                        patched_alrdy_dled)
+
     with GWARipper() as gwa:
-        gwa.nr_downloads = 3
         gwa.download(ri1)
-        assert gwa.nr_downloads == 0
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
@@ -697,6 +718,9 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     #
     #
     #
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
+                        bu_already_dled)
 
     ri1.selftext = "this selftext should be written !!!!"
     # reset already downloaded
@@ -716,9 +740,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
             ])
 
     with GWARipper() as gwa:
-        gwa.nr_downloads = 3
         gwa.download(ri1)
-        assert gwa.download_index == 4  # _NEXT_ download idx
 
     assert fi2.downloaded
     assert fi3.downloaded
@@ -755,9 +777,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     assert fi4.reddit_info is None  # just to be sure
 
     with GWARipper() as gwa:
-        gwa.nr_downloads = 1
         gwa.download(fc2)
-        assert gwa.download_index == 2  # _NEXT_ download idx
 
     assert fi4.downloaded
 
@@ -776,9 +796,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     caplog.set_level(logging.WARNING)
 
     with GWARipper() as gwa:
-        gwa.nr_downloads = 1
         gwa.download(fi5)
-        assert gwa.download_index == 2  # _NEXT_ download idx
 
     assert ("Extractor gwaripper.extractors.soundgasm.SoundgasmExtractor is probably "
             "broken! Please report this error on github!") in caplog.text
@@ -796,9 +814,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     caplog.clear()
 
     with GWARipper() as gwa:
-        gwa.nr_downloads = 1
         gwa.download(fi5)
-        assert gwa.download_index == 2  # _NEXT_ download idx
 
     logs = "\n".join(rec.message for rec in caplog.records)
 
@@ -811,7 +827,35 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
 
-def test_parse_links(setup_tmpdir, monkeypatch, caplog):
+def test_set_urls(setup_tmpdir):
+    tmpdir = setup_tmpdir
+
+    urls = [
+            'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
+            'https://no-supported.found/id/243kwd/',
+            'https://chirb.it/hnz5aB',  # returns None
+            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
+            'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
+            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
+            'https://www.eraudica.com/e/eve/2015/Escaped-Audio-Title-Eraudica/gwa',
+            ]
+
+    expected = [
+            'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
+            'https://no-supported.found/id/243kwd/',
+            'https://chirb.it/hnz5aB',  # returns None
+            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
+            'https://www.eraudica.com/e/eve/2015/Escaped-Audio-Title-Eraudica/gwa',
+            ]
+
+    with GWARipper() as gwa:
+        gwa.set_urls(urls)
+        assert sorted(gwa.urls) == sorted(expected)
+        assert gwa.nr_urls == 5
+
+
+def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
+    # setup_tmpdir sets root_path in config
     tmpdir = setup_tmpdir
 
     soundgasmfi = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
@@ -849,73 +893,230 @@ def test_parse_links(setup_tmpdir, monkeypatch, caplog):
                         # return no html with 408 http code for timeout
                         lambda url: (None, 408))
 
-    # parse links should not crash on any exception since it uses BaseExtractor.extract
+    # extract_and_download should not crash on any exception since it uses BaseExtractor.extract
     def raises(self):
         raise FileNotFoundError()
 
     monkeypatch.setattr('gwaripper.extractors.eraudica.EraudicaExtractor._extract',
                         raises)
 
-    # expected = [
-    #         redditinfo,
-    #         soundgasmfi
-    #         ]
-
     # include duplictate urls
     urls = [
             'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
+            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
             'https://no-supported.found/id/243kwd/',
             'https://chirb.it/hnz5aB',  # returns None
-            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
-            'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
-            'https://soundgasm.net/user/UserName/Escaped-Audio-Title',
             'https://www.eraudica.com/e/eve/2015/Escaped-Audio-Title-Eraudica/gwa',
             ]
 
-    with GWARipper() as gwa:
-        gwa.parse_links(urls)
+    download_called_with = None
 
-    assert gwa.nr_downloads == 4
-    assert (f"ERROR - NO_RESPONSE - Request timed out or no response received! "
-            f"(URL was {urls[2]})") in caplog.text
-    # 1st time exc in eraudica extr
-    assert (f"Error occured while extracting information from '{urls[6]}' "
-            "- site structure or API probably changed! See if there are "
-            "updates available!") in caplog.text
-    # pytest fails to capture logging exception information the pytest logging hook
-    # crashed/raised instead
-    # assert ("Full exception info for unexpected extraction failure:") in caplog.text
-    # assert "in raises" in caplog.text
-    # assert "raise FileNotFoundError()" in caplog.text
-    # no comparison operators defined currently can't sort and compare list
-    assert len(gwa.downloads) == 2
-    assert redditinfo in gwa.downloads
-    assert soundgasmfi in gwa.downloads
+    def patched_dl(self, fi):
+        assert fi is not None
+        nonlocal download_called_with
+        download_called_with = fi
+        fi.downloaded = True
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
+
+    with GWARipper() as gwa:
+        gwa.extract_and_download(urls[0])
+        # extr report appended and downloaded set
+        assert gwa.extractor_reports[0] is redditinforep
+        assert gwa.extractor_reports[0].downloaded is True
+        assert len(gwa.extractor_reports) == 1
+    # download called
+    assert download_called_with is redditinfo
+    assert download_called_with.downloaded is True
+
+    def patched_dl(self, fi):
+        assert fi is not None
+        nonlocal download_called_with
+        download_called_with = fi
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
+
+    with GWARipper() as gwa:
+        gwa.extract_and_download(urls[1])
+        # extr report appended and downloaded set
+        assert gwa.extractor_reports[0] is soundgasmrep
+        assert gwa.extractor_reports[0].downloaded is False
+        assert len(gwa.extractor_reports) == 1
+    # download called
+    assert download_called_with is soundgasmfi
+    assert download_called_with.downloaded is False
+
+    #
+    # no supported extr found
+    #
+    caplog.clear()
+    caplog.set_level(logging.WARNING)
+    download_called_with = None
+    with GWARipper() as gwa:
+        gwa.extract_and_download(urls[2])
+        # extr report appended and downloaded set
+        assert len(gwa.extractor_reports) == 1
+        assert gwa.extractor_reports[0].err_code == ExtractorErrorCode.NO_EXTRACTOR
+        assert gwa.extractor_reports[0].url == urls[2]
+        assert gwa.extractor_reports[0].downloaded is False
+
+        # needs to be inside context otherwise db auto bu is run and logs msg
+        assert len(caplog.records) == 1
+        assert caplog.records[0].message == f'Found no extractor for URL: {urls[2]}'
+    # download not called
+    assert download_called_with is None
+
+    #
+    # extractor returns None due to timeout
+    #
+    caplog.clear()
+    caplog.set_level(logging.WARNING)
+    download_called_with = None
+    with GWARipper() as gwa:
+        gwa.extract_and_download(urls[3])
+        # extr report appended and downloaded set
+        assert len(gwa.extractor_reports) == 1
+        assert gwa.extractor_reports[0].err_code == ExtractorErrorCode.NO_RESPONSE
+        assert gwa.extractor_reports[0].url == urls[3]
+        assert gwa.extractor_reports[0].downloaded is False
+
+        # needs to be inside context otherwise db auto bu is run and logs msg
+        assert len(caplog.records) == 1
+        assert (f"ERROR - NO_RESPONSE - Request timed out or no response received! "
+                f"(URL was {urls[3]})") == caplog.records[0].message
+    # download not called
+    assert download_called_with is None
+
+    #
+    # broken extractor first and second run
+    #
 
     caplog.clear()
-    urls_new = [urls[1]]
+    caplog.set_level(logging.WARNING)
+    download_called_with = None
     with GWARipper() as gwa:
-        gwa.parse_links(urls_new)
-    assert f"Found no extractor for URL: {urls_new[0]}" in caplog.text
-    # assert (f"ERROR - NO_EXTRACTOR - No compatible extractor could be found! "
-    #         f"(URL was {urls_new[0]})") in caplog.text
-    assert len(gwa.downloads) == 0
+        # 1st time exc in eraudica extr
+        gwa.extract_and_download(urls[4])
+        # extr report appended and downloaded set
+        assert len(gwa.extractor_reports) == 1
+        assert gwa.extractor_reports[0].err_code == ExtractorErrorCode.BROKEN_EXTRACTOR
+        assert gwa.extractor_reports[0].url == urls[4]
+        assert gwa.extractor_reports[0].downloaded is False
+        # download not called
+        assert download_called_with is None
 
-    caplog.clear()
-    urls_new = [urls[2]]
-    with GWARipper() as gwa:
-        gwa.parse_links(urls_new)
-    assert (f"ERROR - NO_RESPONSE - Request timed out or no response received! "
-            f"(URL was {urls_new[0]})") in caplog.text
-    assert len(gwa.downloads) == 0
+        # needs to be inside context otherwise db auto bu is run and logs msg
+        assert len(caplog.records) == 2
+        assert (f"Error occured while extracting information from '{urls[4]}' "
+                "- site structure or API probably changed! See if there are "
+                "updates available!") == caplog.records[0].message
+        # pytest fails to capture logging exception information the pytest logging hook
+        # crashed/raised instead
+        # assert ("Full exception info for unexpected extraction failure:") in caplog.text
+        # assert "in raises" in caplog.text
+        # assert "raise FileNotFoundError()" in caplog.text
 
-    caplog.clear()
-    urls_new = [urls[6]]
+        # 2nd time eraudica extr already marked as broken
+        caplog.clear()
+        gwa.extract_and_download(urls[4])
+        # extr report appended and downloaded set
+        assert len(gwa.extractor_reports) == 2
+        assert gwa.extractor_reports[1].err_code == ExtractorErrorCode.BROKEN_EXTRACTOR
+        assert gwa.extractor_reports[1].url == urls[4]
+        assert gwa.extractor_reports[1].downloaded is False
+        # download not called
+        assert download_called_with is None
+
+        assert len(caplog.records) == 1
+        assert caplog.records[0].message == (
+                f"Skipping URL '{urls[4]}' due to broken extractor: Eraudica")
+
+
+class DummySub:
+    permalink = 'permalink'
+
+
+def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
+
+    download_called_with = None
+
+    def patched_dl(self, fi):
+        assert fi is not None
+        nonlocal download_called_with
+        download_called_with = fi
+        fi.downloaded = True
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
+
+    redditinfo = RedditInfo(RedditExtractor, "url", "id", "title",
+                            'author', 'subreddit', 'permalink', 12345.0)
+    redditinfo_permalink = redditinfo.permalink
+    redditinforep = ExtractorReport(redditinfo.url, ExtractorErrorCode.NO_ERRORS)
+    sub = DummySub()
+
+    def patched_extr(url, init_from=None):
+        assert init_from is sub
+        assert url == f"https://www.reddit.com{redditinfo_permalink}"
+        return redditinfo, redditinforep
+
+    monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor.extract',
+                        patched_extr)
+
     with GWARipper() as gwa:
-        gwa.parse_links(urls_new)
-    # 2nd time eraudica extr already marked as broken
-    assert f"Skipping URL '{urls_new[0]}' due to broken extractor: Eraudica" in caplog.text
-    assert len(gwa.downloads) == 0
+        gwa.parse_and_download_submission(sub)
+        assert download_called_with is redditinfo
+        assert redditinfo.downloaded is True
+
+        assert len(gwa.extractor_reports) == 1
+        assert gwa.extractor_reports[0] is redditinforep
+        assert gwa.extractor_reports[0].downloaded is redditinfo.downloaded
+
+    # TODO extr ret none
+    download_called_with = None
+
+    def patched_dl(self, fi):
+        assert fi is not None
+        nonlocal download_called_with
+        download_called_with = fi
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
+
+    redditinfo = None
+    redditinforep = ExtractorReport('banned_tag', ExtractorErrorCode.BANNED_TAG)
+
+    with GWARipper() as gwa:
+        gwa.parse_and_download_submission(sub)
+        # dl not called
+        assert download_called_with is None
+
+        assert len(gwa.extractor_reports) == 1
+        assert gwa.extractor_reports[0] is redditinforep
+        assert gwa.extractor_reports[0].downloaded is False
+
+
+def test_pad_filename(setup_tmpdir, caplog):
+    tmpdir = setup_tmpdir
+
+    # create some files
+    open(os.path.join(tmpdir, 'test.txt'), 'w').close()
+    open(os.path.join(tmpdir, 'test_01.txt'), 'w').close()
+    open(os.path.join(tmpdir, 'test_02.txt'), 'w').close()
+    open(os.path.join(tmpdir, 'test_04.txt'), 'w').close()
+
+    open(os.path.join(tmpdir, 'foo.bar.txt'), 'w').close()
+    open(os.path.join(tmpdir, 'foo.bar_02.txt'), 'w').close()
+
+    caplog.set_level(logging.INFO)
+    caplog.clear()
+    with GWARipper() as gwa:
+        assert gwa._pad_filename_if_exits(tmpdir, 'test', 'txt') == 'test_03'
+        assert caplog.records[0].message == 'FILE ALREADY EXISTS - ADDED: _03'
+
+        caplog.clear()
+        assert gwa._pad_filename_if_exits(tmpdir, 'foo', 'bar.txt') == 'foo_02'
+        assert caplog.records[0].message == 'FILE ALREADY EXISTS - ADDED: _02'
+
+        assert gwa._pad_filename_if_exits(tmpdir, 'baz', '.m4a') == 'baz'
 
 
 def test_write_report(setup_tmpdir):
