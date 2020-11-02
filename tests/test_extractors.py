@@ -14,6 +14,10 @@ from gwaripper.extractors.eraudica import EraudicaExtractor
 from gwaripper.extractors.chirbit import ChirbitExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from gwaripper.extractors.reddit import RedditExtractor, check_submission_banned_tags
+from gwaripper.exceptions import (
+        NoAuthenticationError, InfoExtractingError,
+        NoAPIResponseError, AuthenticationFailed
+        )
 from gwaripper.info import FileInfo
 from utils import setup_tmpdir
 
@@ -512,6 +516,7 @@ class DummyExtractor(BaseExtractor):
 
     def __init__(self, url, init_from=None):
         self.url = url
+        self.init_from = init_from
 
     # only match supported urls
     @classmethod
@@ -640,3 +645,302 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     assert rep.url == reddit_extractor_url_expected[0][1][0]
     assert rep.err_code == ExtractorErrorCode.NO_ERRORS
     assert not rep.children
+
+
+class DummyFileInfo:
+    def __init__(self):
+        self.parent = None
+
+
+class DummyFileCol:
+    def __init__(self):
+        self.parent = None
+        self.children = []
+
+
+def test_base_extract(monkeypatch, caplog):
+    exerr = ExtractorErrorCode
+    caplog.set_level(logging.WARNING)
+
+    #
+    # extractor class has is_broken set -> url should be skipped
+    #
+    BaseExtractor.is_broken = True
+    res, rep = BaseExtractor.extract('url')
+    assert res is None
+    assert rep.err_code == ExtractorErrorCode.BROKEN_EXTRACTOR
+    assert caplog.records[0].message == "Skipping URL 'url' due to broken extractor: Base"
+
+    caplog.clear()
+    # should not append to parent
+    parent = DummyFileCol()
+    # should change err_code to ERROR_IN_CHILDREN
+    parent_report = ExtractorReport('url', exerr.NO_ERRORS)
+    res, rep = BaseExtractor.extract('url', parent=parent, parent_report=parent_report)
+    assert res is None
+    assert rep.err_code == exerr.BROKEN_EXTRACTOR
+    # report appended to parent_report
+    assert parent_report.children[0] is rep
+    assert len(parent_report.children) == 1
+    # err set on parent_report
+    assert parent_report.err_code == exerr.ERROR_IN_CHILDREN
+    # parent not modified
+    assert not parent.children
+    assert caplog.records[0].message == "Skipping URL 'url' due to broken extractor: Base"
+
+    # reset
+    BaseExtractor.is_broken = False
+
+    #
+    # check that init_from correctly passed
+    #
+    # patch so we can inspect the extractor afterwards
+    DummyExtractor._extract = lambda x: (x, ExtractorReport('a', exerr.NO_ERRORS))
+    extr, _ = DummyExtractor.extract('url1234', init_from='foo34bar82')
+    assert extr.url == 'url1234'
+    assert extr.init_from == 'foo34bar82'
+
+    #
+    # successful with and without parent
+    #
+    dfi = DummyFileInfo()
+    drep = ExtractorReport('url354', exerr.NO_ERRORS)
+
+    monkeypatch.setattr("gwaripper.extractors.base.BaseExtractor._extract",
+                        lambda x: (dfi, drep))
+
+    res, rep = BaseExtractor.extract('url354')
+    assert res is dfi
+    assert res.parent is None
+
+    assert rep.url == 'url354'
+    assert rep.err_code == exerr.NO_ERRORS
+    assert not rep.children
+
+    # with parent and parent_report
+    dfi = DummyFileInfo()
+    drep = ExtractorReport('url354', exerr.NO_ERRORS)
+    parent = DummyFileCol()
+    parent_report = ExtractorReport('parurl354', exerr.NO_ERRORS)
+    res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
+    assert res is dfi
+    # parent set and appendend
+    assert res.parent is parent
+    assert parent.children[0] is res
+
+    assert rep.url == 'url354'
+    assert rep.err_code == exerr.NO_ERRORS
+    assert not rep.children
+
+    # report appended to parent_report
+    assert parent_report.children[0] is rep
+    assert len(parent_report.children) == 1
+    # err unchangend on parent_report
+    assert parent_report.err_code == exerr.NO_ERRORS
+
+    #
+    # child with error only modifies parent_report err if it still was at NO_ERRORS
+    #
+    dfi = DummyFileInfo()
+    drep = ExtractorReport('url3542', exerr.NO_RESPONSE)  # err on child
+    parent = DummyFileCol()
+    parent_report = ExtractorReport('parurl3542', exerr.NO_ERRORS)  # no err so far
+    res, rep = BaseExtractor.extract('url3542', parent=parent, parent_report=parent_report)
+    assert res is dfi
+    # parent set and appendend
+    assert res.parent is parent
+    assert parent.children[0] is res
+
+    assert rep.url == 'url3542'
+    assert rep.err_code == exerr.NO_RESPONSE
+    assert not rep.children
+
+    # report appended to parent_report
+    assert parent_report.children[0] is rep
+    assert len(parent_report.children) == 1
+    # err set on parent_report
+    assert parent_report.err_code == exerr.ERROR_IN_CHILDREN
+
+    # ----- parent already has different error ----
+    dfi = DummyFileInfo()
+    drep = ExtractorReport('url35426', exerr.NO_EXTRACTOR)  # err on child
+    parent = DummyFileCol()
+    parent_report = ExtractorReport('parurl35426', exerr.NO_SUPPORTED_AUDIO_LINK)  # has err
+    res, rep = BaseExtractor.extract('url35426', parent=parent, parent_report=parent_report)
+    assert res is dfi
+    # parent set and appendend
+    assert res.parent is parent
+    assert parent.children[0] is res
+
+    assert rep.url == 'url35426'
+    assert rep.err_code == exerr.NO_EXTRACTOR
+    assert not rep.children
+
+    # report appended to parent_report
+    assert parent_report.children[0] is rep
+    assert len(parent_report.children) == 1
+    # err set on parent_report
+    assert parent_report.err_code == exerr.NO_SUPPORTED_AUDIO_LINK
+
+    #
+    # extr returning broken err code without raising not is_broken set
+    #
+    dfi = None
+    drep = ExtractorReport('url354267', exerr.BROKEN_EXTRACTOR)
+    parent = DummyFileCol()
+    parent_report = ExtractorReport('parurl354267', exerr.NO_SUPPORTED_AUDIO_LINK)
+    res, rep = BaseExtractor.extract('url354267', parent=parent, parent_report=parent_report)
+    assert res is None
+    assert rep is drep
+    assert rep.err_code == exerr.BROKEN_EXTRACTOR
+    assert not BaseExtractor.is_broken
+
+    #
+    # extract excepts all exceptions
+    # returns BROKEN_EXTRACTOR report and sets on parent_report
+    #
+
+    caplog.set_level(logging.DEBUG)
+    caplog.clear()
+
+    class DummyException(Exception):
+        pass
+
+    def raises(x):
+        raise DummyException()
+
+    monkeypatch.setattr("gwaripper.extractors.base.BaseExtractor._extract", raises)
+
+    res, rep = BaseExtractor.extract('url354')
+    assert res is None
+
+    assert rep.url == 'url354'
+    assert rep.err_code == exerr.BROKEN_EXTRACTOR
+    assert not rep.children
+
+    assert BaseExtractor.is_broken is True
+    assert caplog.records[0].levelname == 'ERROR'
+    assert caplog.records[0].message == (
+            "Error occured while extracting information from 'url354' "
+            "- site structure or API probably changed! See if there are "
+            "updates available!")
+    assert caplog.records[1].levelname == 'DEBUG'
+    # pytest logcapture breaks when printing exc_info so message is not set here
+    # assert caplog.records[1].message == "Full exception info for unexpected extraction failure:"
+
+    BaseExtractor.is_broken = False
+    # with parent and parent_report
+    parent = DummyFileCol()
+    parent_report = ExtractorReport('parurl354', exerr.NO_ERRORS)
+    caplog.clear()
+    res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
+    assert res is None
+    assert not parent.children
+
+    assert rep.url == 'url354'
+    assert rep.err_code == exerr.BROKEN_EXTRACTOR
+    assert not rep.children
+
+    # report appended to parent_report
+    assert parent_report.children[0] is rep
+    assert len(parent_report.children) == 1
+    # parent err code changed
+    assert parent_report.err_code == exerr.ERROR_IN_CHILDREN
+
+    assert caplog.records[0].levelname == 'ERROR'
+    assert caplog.records[0].message == (
+            "Error occured while extracting information from 'url354' "
+            "- site structure or API probably changed! See if there are "
+            "updates available!")
+
+    # reset
+    BaseExtractor.is_broken = False
+
+    #
+    # NoAuthenticationError
+    #
+
+    def raises(x):
+        raise NoAuthenticationError('no auth')
+
+    monkeypatch.setattr("gwaripper.extractors.base.BaseExtractor._extract", raises)
+
+    parent = DummyFileCol()
+    parent_report = ExtractorReport('parurl354', exerr.NO_SUPPORTED_AUDIO_LINK)  # has err
+    caplog.clear()
+    res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
+    assert res is None
+    assert not parent.children
+
+    assert BaseExtractor.is_broken is True
+
+    assert rep.url == 'url354'
+    assert rep.err_code == exerr.NO_AUTHENTICATION
+    assert not rep.children
+
+    # report appended to parent_report
+    assert parent_report.children[0] is rep
+    assert len(parent_report.children) == 1
+    # parent err code _NOT_ changed
+    assert parent_report.err_code == exerr.NO_SUPPORTED_AUDIO_LINK
+
+    assert caplog.records[0].levelname == 'ERROR'
+    assert caplog.records[0].message == (
+            "NoAuthenticationError: no auth Extractor will be marked as broken so subsequent "
+            "downloads of the same type will be skipped!")
+
+    # reset
+    BaseExtractor.is_broken = False
+
+    #
+    # InfoExtractingError, NoAPIResponseError, AuthenticationFailed
+    #
+    caplog.set_level(logging.DEBUG)
+
+    for exc in (InfoExtractingError, NoAPIResponseError, AuthenticationFailed):
+        def raises(x):
+            raise exc('errtext', 'url354')
+
+        monkeypatch.setattr("gwaripper.extractors.base.BaseExtractor._extract", raises)
+
+        parent = DummyFileCol()
+        parent_report = ExtractorReport('parurl354', exerr.NO_ERRORS)
+        caplog.clear()
+        res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
+        assert res is None
+        assert not parent.children
+
+        assert BaseExtractor.is_broken is True
+
+        assert rep.url == 'url354'
+        assert rep.err_code == exerr.BROKEN_EXTRACTOR
+        assert not rep.children
+
+        # report appended to parent_report
+        assert parent_report.children[0] is rep
+        assert len(parent_report.children) == 1
+        # parent err code changed
+        assert parent_report.err_code == exerr.ERROR_IN_CHILDREN
+
+        assert caplog.records[0].levelname == 'ERROR'
+        assert caplog.records[0].message == f"{exc.__name__}: errtext (URL was: url354)"
+        assert caplog.records[1].levelname == 'DEBUG'
+        # pytest can't caputre log msg with exc_info
+
+        # reset
+        BaseExtractor.is_broken = False
+
+
+# only testing >=400
+@pytest.mark.parametrize(
+        'http_code, expected',
+        [(404, False), (408, False), (410, False), (range(400, 404), True),
+         (range(405, 408), True), (409, True), (range(411, 418), True),
+         (501, True), (505, True), (500, False), (range(502, 505), False,)]
+        )
+def test_extr_broken_http_code(http_code, expected):
+    try:
+        for htc in http_code:
+            assert BaseExtractor.http_code_is_extractor_broken(htc) is expected
+    except TypeError:
+        assert BaseExtractor.http_code_is_extractor_broken(http_code) is expected

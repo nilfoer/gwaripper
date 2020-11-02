@@ -154,6 +154,7 @@ class BaseExtractor(Generic[T]):
 
                 result, report = extractor._extract()
             except NoAuthenticationError as err:
+                cls.is_broken = True
                 report.err_code = ExtractorErrorCode.NO_AUTHENTICATION
 
                 logger.error("%s: %s Extractor will be marked as broken so subsequent "
