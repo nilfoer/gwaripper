@@ -106,7 +106,7 @@ class ImgurAlbumExtractor(BaseExtractor):
         'Authorization': f'Client-ID {client_id}',
         }
 
-    def __init__(self, url: str, mp4_always: bool = True):
+    def __init__(self, url: str, init_from: Optional[Any] = None, mp4_always: bool = True):
         super().__init__(url)
         if not client_id:
             raise NoAuthenticationError("In order to download imgur images a Client ID "

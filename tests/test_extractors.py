@@ -111,7 +111,9 @@ def test_banned_tags(title, keywordlist, tag1_but_not_2, expected):
 
 
 def test_soundgasm_user_extractor(monkeypatch):
-    ex = SoundgasmExtractor("https://soundgasm.net/u/DDCherryB")
+    # make sure extractor also accepts init_from even if it doesnt support
+    # intializing from it
+    ex = SoundgasmExtractor("https://soundgasm.net/u/DDCherryB", init_from=None)
     # otherwise _extract_user will extract all files from the ONLINE website
     monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor._extract_file',
                         lambda x: (FileInfo(x.__class__, True, None, x.url,
@@ -134,7 +136,9 @@ def test_extractor_soundgasm():
            "Coast-Pirate-Queen-Barbarian-Warrior-Seduction-Erotic-Dance-Sultry-Seriously-"
            "Extremely-Sultry-Exhibitionism-Mild-Fdom-Creampie-Script-Fill")
 
-    ex = SoundgasmExtractor(url)
+    # make sure extractor also accepts init_from even if it doesnt support
+    # intializing from it
+    ex = SoundgasmExtractor(url, init_from=None)
     assert not ex.is_user
     assert ex.author == "kinkyshibby"
     fi, report = ex._extract()
@@ -177,7 +181,9 @@ def test_extractor_eraudica():
     url1 = "https://www.eraudica.com/e/eve/2018/Sweeter-Nothings-Sexy-Time"
     url2 = "https://www.eraudica.com/e/eve/2018/Sweeter-Nothings-Sexy-Time/gwa"
 
-    ex = EraudicaExtractor(url1)
+    # make sure extractor also accepts init_from even if it doesnt support
+    # intializing from it
+    ex = EraudicaExtractor(url1, init_from=None)
     assert ex.url == url1
     fi, report = ex._extract()
 
@@ -220,7 +226,9 @@ def test_extractor_eraudica():
 def test_extractor_chirbit():
     url = "https://chirb.it/F5hInh"
 
-    ex = ChirbitExtractor(url)
+    # make sure extractor also accepts init_from even if it doesnt support
+    # intializing from it
+    ex = ChirbitExtractor(url, init_from=None)
     assert ex.url == url
     fi, report = ex._extract()
 
@@ -250,7 +258,9 @@ def test_extractor_chirbit():
 def test_extractor_imgur_image():
     url = 'https://i.imgur.com/c0T9oSy.mp4'  # mp4
 
-    ex = ImgurImageExtractor(url)
+    # make sure extractor also accepts init_from even if it doesnt support
+    # intializing from it
+    ex = ImgurImageExtractor(url, init_from=None)
     assert ex.direct_url == url
     assert ex.url == "https://imgur.com/c0T9oSy"
     assert ex.ext == 'mp4'
@@ -309,7 +319,9 @@ def test_extractor_imgur_image():
 def test_extractor_imgur_album(monkeypatch):
     url = 'https://imgur.com/a/OPqcLpw'  # 3 jpg images
 
-    ex = ImgurAlbumExtractor(url)
+    # make sure extractor also accepts init_from even if it doesnt support
+    # intializing from it
+    ex = ImgurAlbumExtractor(url, init_from=None)
     ex.album_hash = "OPqcLpw"
     fcol, report = ex._extract()
     ex.image_count = 3
@@ -568,7 +580,9 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
             except FileNotFoundError:
                 pass
 
-        ex = RedditExtractor(url)
+        # make sure extractor also accepts init_from even if it doesnt support
+        # intializing from it
+        ex = RedditExtractor(url, init_from=None)
 
         caplog.clear()
         ri, report = ex._extract()

@@ -232,7 +232,7 @@ class GWARipper:
 
         if sub_list is None:
             for idx, url in enumerate(self.urls):
-                logger.info("Processing URL %d of %d: %s", idx, self.nr_urls, url)
+                logger.info("Processing URL %d of %d: %s", idx + 1, self.nr_urls, url)
                 self.extract_and_download(url)
         else:
             nr_subs = len(sub_list)
