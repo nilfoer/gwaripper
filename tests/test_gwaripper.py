@@ -24,6 +24,65 @@ from utils import build_file_url, TESTS_DIR, setup_tmpdir, RandomHelper, get_all
 TESTS_FILES_DIR = os.path.join(TESTS_DIR, "test_dl")
 
 
+def test_exit_context(setup_tmpdir, monkeypatch):
+    tmpdir = setup_tmpdir
+
+    exp_csv_called = False
+
+    def patch_exp_csv(fn, con):
+        assert fn == os.path.join(tmpdir, 'gwarip_db_exp.csv')
+        assert con
+        nonlocal exp_csv_called
+        exp_csv_called = True
+
+    # gwaripper.py used from .. import .. so it's in it's own 'namespace'
+    # so we have to patch it there
+    monkeypatch.setattr('gwaripper.gwaripper.export_csv_from_sql', patch_exp_csv)
+
+    close_called = False
+
+    class DummyCon:
+        def close(self):
+            nonlocal close_called
+            close_called = True
+
+    write_report_called = False
+
+    reports = [ExtractorReport('url', ExtractorErrorCode.NO_EXTRACTOR)]
+
+    def patch_write_rep(self, reps):
+        assert reps is reports
+        nonlocal write_report_called
+        write_report_called = True
+
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.write_report', patch_write_rep)
+
+    backup_db_called = False
+
+    def patched_backup_db(fn_in, dir_out):
+        assert fn_in == os.path.join(tmpdir, 'gwarip_db.sqlite')
+        assert dir_out == os.path.join(tmpdir, '_db-autobu')
+        nonlocal backup_db_called
+        backup_db_called = True
+
+    monkeypatch.setattr('gwaripper.gwaripper.backup_db', patched_backup_db)
+
+    # exit should: call export to csv, write reports, auto bu db, close db con
+    with GWARipper() as gwa:
+        gwa.db_con = DummyCon()
+        gwa.extractor_reports = reports
+    assert exp_csv_called is True
+    assert close_called is True
+    assert write_report_called is True
+    assert backup_db_called is True
+
+    # dont call write reports if no reports
+    write_report_called = False
+    with GWARipper() as gwa:
+        gwa.db_con = DummyCon()
+    assert write_report_called is False
+
+
 def test_set_missing_reddit(setup_tmpdir):
     tmpdir = setup_tmpdir
 
@@ -664,7 +723,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                    build_file_url(os.path.join(testdl_files, "fi2")), None,  # id
                    rnd.random_string(20),  # title
                    rnd.random_string(50), "other-than_rddt-usr")
-    fi2_fn = f"Reddit_title _ as sub_path_01_{fi2.title}.{fi2.ext}"
+    fi2_fn = f"01_{fi2.title}.{fi2.ext}"
     fi3 = FileInfo(object, True, "mp3", "https://page.url/242lk2598242jrtn3l4",
                    build_file_url(os.path.join(testdl_files, "fi3")), None,  # id
                    "[Foo] Bar qux ❤",  # title
@@ -678,7 +737,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                    build_file_url(os.path.join(testdl_files, "fi4")), rnd.random_string(5),  # id
                    "non-audio_file",  # title
                    None, "other-than_rddt-usr3")
-    fi4_fn = f"Reddit_title _ as sub_path_02_{fi4.title}.{fi4.ext}"
+    fi4_fn = f"02_{fi4.title}.{fi4.ext}"
     ri1 = RedditInfo(object, "https://dont-use-this-url/in-db",
                      rnd.random_string(6), "Reddit:title / as sub\\path", "reddit_user",
                      rnd.random_string(15), "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
@@ -1220,8 +1279,9 @@ def test_write_report(setup_tmpdir):
             "</div>",  # url4col
     ]
 
-    with GWARipper() as g:
-        g.write_report(reports)
+    # context manager writes reports on exit so use without it here
+    g = GWARipper()
+    g.write_report(reports)
 
     expected_str = "\n".join(expected)
     with open(

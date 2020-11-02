@@ -311,14 +311,13 @@ class FileInfo:
                 # :PassSubpathSelftext
                 if self.reddit_info.subpath:
                     subpaths.append(self.reddit_info.subpath[:70])
-                    if parent_title:
-                        title.append(parent_title[:30])
                 else:
                     # other FileCollections can't be >=3 files since then we'd have
                     # a reddit subpath
                     title.append(self.reddit_info.title[:70])
-                    if parent_title:
-                        title.append(parent_title[:30])
+                # only append parent_title if it's not also the reddit_info
+                if parent_title and self.parent is not self.reddit_info:
+                    title.append(parent_title[:30])
             else:
                 # we might have nested FileCollections; currently not allowed!
                 p = self.parent
@@ -336,7 +335,7 @@ class FileInfo:
         # file index and file title are always last
         if file_index:
             title.append(f"{file_index:02d}")
-        title.append(self.title or self.id)
+        title.append(self.title or self.id or "unnamed")
         # mypy doesn't allow re-definition of variables by default
         # since in python re-using the same variable doesn't avoid the allocation
         # contrary to statically compiled it will not save an allocation

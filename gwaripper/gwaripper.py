@@ -103,7 +103,6 @@ class GWARipper:
                 os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.urls: List[str] = []
         self.nr_urls: int = 0
-        self.url_index: int = 1
         self.extractor_reports: List[ExtractorReport] = []
 
     # return type needed otherwise we don't get type checking if used in with..as
@@ -118,6 +117,11 @@ class GWARipper:
         # evaluates to False.
         export_csv_from_sql(os.path.join(config.get_root(), "gwarip_db_exp.csv"), self.db_con)
         self.db_con.close()
+
+        # so download report will always be written even on KeyboardInterrupt
+        if self.extractor_reports:
+            self.write_report(self.extractor_reports)
+            logger.info("Download report was written to folder _reports")
 
         # auto backup
         backup_db(os.path.join(config.get_root(), "gwarip_db.sqlite"),
@@ -227,9 +231,8 @@ class GWARipper:
                         "directly. You can disable this in the settings")
 
         if sub_list is None:
-            for url in self.urls:
-                logger.info("Processing URL %d of %d: %s", self.url_index,
-                            self.nr_urls, url)
+            for idx, url in enumerate(self.urls):
+                logger.info("Processing URL %d of %d: %s", idx, self.nr_urls, url)
                 self.extract_and_download(url)
         else:
             nr_subs = len(sub_list)
@@ -237,9 +240,6 @@ class GWARipper:
             for sub in sub_list:
                 logger.info("Processing submission %d of %d: %s", idx, nr_subs, sub.permalink)
                 self.parse_and_download_submission(sub)
-
-        self.write_report(self.extractor_reports)
-        logger.info("Download report was written to folder _reports")
 
     def download(self, info: Union[FileInfo, FileCollection]):
         if isinstance(info, FileInfo):

@@ -155,9 +155,14 @@ def test_generate_filename():
     fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
 
     #
-    # NO PARENT
+    # no title or id
     #
     fi_none = FileInfo(*([None]*9))
+    fi_none.generate_filename(0) == ('', 'unnamed', None)
+
+    #
+    # NO PARENT
+    #
     fi_none.title = ("[F4M] Déjà vu, but I'm blind [äö-.-üö] [🤳🎂👀] [ASMR] [Tag1] [Tag2]"
                      " [Re-post] [Extra Long Title] [Not Long Enough Yet] [Lorem ipsum dolor"
                      " sit amet] [soungasm.net] [💋🤔👌 #EmojisSoDank ❤👱🤴🥞] sdkfjslkjflks"
@@ -211,6 +216,44 @@ def test_generate_filename():
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
             "Imgur album TT 012345678901234_03_35HLlk54",
             "mp4")
+
+    ri.children = bu
+
+    #
+    # REDDIT SUBPATH direct parent is reddit -> parent_title does not get appended
+    #
+    assert fi1.generate_filename(0) == (
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "This is a test audio",
+            "m4a")
+    assert fi1.generate_filename(9) == (
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "09_This is a test audio",
+            "m4a")
+    bu = ri.title
+    ri.title = None
+    assert fi1.generate_filename(0) == (
+            "6ghk3",
+            "This is a test audio",
+            "m4a")
+
+    #
+    # REDDIT BUT NO SUBPATH but direct parent is reddit
+    # -> parent_title does not get appended
+    #
+    ri.title = bu
+    bu = ri.children
+    ri.children = []  # < 3 FileInfo children -> no subpath
+    assert fi2.generate_filename(0) == (
+            "",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
+            "This is an eraudica test audio",
+            "mp3")
+    assert fi2.generate_filename(4) == (
+            "",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
+            "04_This is an eraudica test audio",
+            "mp3")
 
     ri.children = bu
     #
