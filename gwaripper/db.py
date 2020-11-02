@@ -190,8 +190,8 @@ def backup_db(db_path: str, bu_dir: str,
     else:
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
-        logger.info("Der letzte Sicherungszeitpunkt liegt nocht nicht {} Tage zurück!"
-                    "Die nächste Sicherung ist in {: .2f} Tagen!".format(
+        logger.info("The last backup date is not yet {} days old!"
+                    "The next backup will be in {: .2f} days!".format(
                         config.getfloat("Settings", "db_bu_freq", fallback=5.0),
                         next_bu / 24 / 60 / 60))
 
