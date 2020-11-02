@@ -57,10 +57,10 @@ if not config.sections():
     init_cfg = {
         "Reddit": {
             "user_agent": "gwaRipper",
-            "client_id": "to get a client id visit: https://www.reddit.com/prefs/apps",
+            "client_id": "5hbWX8DNHN_kkQ",
         },
         "Imgur": {
-            "client_id": "to get a client id visit: https://api.imgur.com/oauth2/addclient",
+            "client_id": "97adaebade846f6",
         },
         "Settings": {
             "tag_filter": "[request]",
