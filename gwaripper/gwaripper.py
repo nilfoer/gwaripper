@@ -39,7 +39,7 @@ rqd = utils.RequestDelayer(0.25, 0.75)
 logger = logging.getLogger("gwaripper")
 logger.setLevel(logging.DEBUG)
 
-report_styles = r"""
+report_preamble = r"""
 <style>
     body {
         background-color: whitesmoke;
@@ -64,12 +64,14 @@ report_styles = r"""
         padding: 2px;
         margin-right: 5px;
     }
-    .success .info  span {
+    .success, .error {
         color: #fff;
+        font-weight: bold;
+    }
+    .success {
         background-color: #14600d;
     }
-    .error .info span {
-        color: #fff;
+    .error {
         background-color: #d70000;
     }
     .collection > span {
@@ -77,6 +79,10 @@ report_styles = r"""
         font-weight: bold;
     }
 </style>
+<h1>GWARipper report</h1>
+<p>Collections will count as downloaded if all their children have been downloaded
+   in this or any previous runs! Files on the other hand will only have the downloaded
+   flag if they were downloaded _this_ run!</p><br/>
 """
 
 
@@ -156,7 +162,7 @@ class GWARipper:
         # since information is easy to miss when looking at just the log output
         #
         # not outputting html that would be considered 'correct'
-        contents = [report_styles, "<h1>Parsing report</h1>"]
+        contents = [report_preamble]
 
         # dfs to traverse reports
         stack: List[Tuple[int, List[ExtractorReport]]] = []
@@ -177,18 +183,22 @@ class GWARipper:
 
             report = cur_list[idx]
             is_collection = bool(report.children)
+            success = True if report.err_code == ExtractorErrorCode.NO_ERRORS else False
 
             contents.append(
                 f"<div class=\"{'collection ' if is_collection else 'block '}"
-                f"{'success ' if report.err_code == ExtractorErrorCode.NO_ERRORS else 'error '}"
                 f"{'indent ' if level else ''}\">")
             contents.append(
                 f"{'<span>Collection: </span>' if is_collection else ''}<a href=\""
                 f"{report.url}\">{report.url}</a>")
             contents.append(
-                f"<div class='info'><span>"
-                f"{'SUCCESS: ' if report.err_code == ExtractorErrorCode.NO_ERRORS else 'ERROR: '}"
-                f"</span>{report.err_code.name}</div>")
+                f"<div class='info'><span class='"
+                f"{'success ' if success else 'error '}'>{report.err_code.name}"
+                f"</span></div>")
+            contents.append(
+                f"<div class='info'><span class='"
+                f"{'success ' if report.downloaded else 'error '}'>"
+                f"{'DOWNLOADED' if report.downloaded else 'NOT DOWNLOADED'}</span></div>")
             if not is_collection:
                 contents.append('</div>')
 
@@ -201,7 +211,7 @@ class GWARipper:
 
         root_dir = config.get_root()
         dirname = os.path.join(root_dir, "_reports")
-        fn = os.path.join(dirname, f"parse_rprt_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html")
+        fn = os.path.join(dirname, f"report_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html")
         while True:
             try:
                 with open(fn, 'w', encoding="UTF-8") as w:
@@ -229,6 +239,7 @@ class GWARipper:
                 self.parse_and_download_submission(sub)
 
         self.write_report(self.extractor_reports)
+        logger.info("Download report was written to folder _reports")
 
     def download(self, info: Union[FileInfo, FileCollection]):
         if isinstance(info, FileInfo):

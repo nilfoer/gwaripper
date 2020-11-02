@@ -8,7 +8,7 @@ import urllib.error
 
 import gwaripper.config as cfg
 
-from gwaripper.gwaripper import GWARipper, report_styles
+from gwaripper.gwaripper import GWARipper, report_preamble
 from gwaripper.db import load_or_create_sql_db
 from gwaripper.info import FileInfo, RedditInfo, FileCollection
 from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode
@@ -1121,7 +1121,6 @@ def test_pad_filename(setup_tmpdir, caplog):
 
 def test_write_report(setup_tmpdir):
     tmpdir = setup_tmpdir
-    cfg.config["Settings"]["root_path"] = tmpdir
 
     ecode = ExtractorErrorCode
     reports = [
@@ -1131,67 +1130,92 @@ def test_write_report(setup_tmpdir):
             ExtractorReport('url4col', ecode.NO_SUPPORTED_AUDIO_LINK)
             ]
 
+    reports[0].downloaded = True
+    reports[1].downloaded = False
+    reports[2].downloaded = False
+    reports[3].downloaded = False
+
     reports[1].children = [
             ExtractorReport('url2colurl1', ecode.NO_RESPONSE),
             ExtractorReport('url2colurl2', ecode.NO_EXTRACTOR),
             ExtractorReport('url2colurl3col', ecode.ERROR_IN_CHILDREN),
             ]
 
+    reports[1].children[0].downloaded = False
+    reports[1].children[1].downloaded = False
+    reports[1].children[2].downloaded = False
+
     reports[1].children[2].children = [
             ExtractorReport('url2colurl3colurl1', ecode.NO_AUTHENTICATION),
             ExtractorReport('url2colurl3colurl2', ecode.NO_ERRORS),
             ]
+
+    reports[1].children[2].children[0].downloaded = False
+    reports[1].children[2].children[1].downloaded = True
 
     reports[3].children = [
             ExtractorReport('url4colurl1', ecode.NO_ERRORS),
             ExtractorReport('url4colurl2', ecode.BANNED_TAG),
             ]
 
+    reports[3].children[0].downloaded = True
+    reports[3].children[1].downloaded = False
+
     expected = [
-            report_styles,
-            "<h1>Parsing report</h1>",
-            "<div class=\"block success \">",
+            report_preamble,
+            "<div class=\"block \">",
             "<a href=\"url1\">url1</a>",
-            "<div class='info'><span>SUCCESS: </span>NO_ERRORS</div>",
+            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
             "</div>",
-            "<div class=\"collection error \">",
+            "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url2col\">url2col</a>",
-            "<div class='info'><span>ERROR: </span>ERROR_IN_CHILDREN</div>",
-            "<div class=\"block error indent \">",
+            "<div class='info'><span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class=\"block indent \">",
             "<a href=\"url2colurl1\">url2colurl1</a>",
-            "<div class='info'><span>ERROR: </span>NO_RESPONSE</div>",
+            "<div class='info'><span class='error '>NO_RESPONSE</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
             "</div>",
-            "<div class=\"block error indent \">",
+            "<div class=\"block indent \">",
             "<a href=\"url2colurl2\">url2colurl2</a>",
-            "<div class='info'><span>ERROR: </span>NO_EXTRACTOR</div>",
+            "<div class='info'><span class='error '>NO_EXTRACTOR</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
             "</div>",
-            "<div class=\"collection error indent \">",
+            "<div class=\"collection indent \">",
             "<span>Collection: </span><a href=\"url2colurl3col\">url2colurl3col</a>",
-            "<div class='info'><span>ERROR: </span>ERROR_IN_CHILDREN</div>",
-            "<div class=\"block error indent \">",
+            "<div class='info'><span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl1\">url2colurl3colurl1</a>",
-            "<div class='info'><span>ERROR: </span>NO_AUTHENTICATION</div>",
+            "<div class='info'><span class='error '>NO_AUTHENTICATION</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
             "</div>",
-            "<div class=\"block success indent \">",
+            "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl2\">url2colurl3colurl2</a>",
-            "<div class='info'><span>SUCCESS: </span>NO_ERRORS</div>",
+            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # urlcol2url3col
             "</div>",  # url2col
-            "<div class=\"block error \">",
+            "<div class=\"block \">",
             "<a href=\"url3\">url3</a>",
-            "<div class='info'><span>ERROR: </span>BANNED_TAG</div>",
+            "<div class='info'><span class='error '>BANNED_TAG</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
             "</div>",
-            "<div class=\"collection error \">",
+            "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url4col\">url4col</a>",
-            "<div class='info'><span>ERROR: </span>NO_SUPPORTED_AUDIO_LINK</div>",
-            "<div class=\"block success indent \">",
+            "<div class='info'><span class='error '>NO_SUPPORTED_AUDIO_LINK</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class=\"block indent \">",
             "<a href=\"url4colurl1\">url4colurl1</a>",
-            "<div class='info'><span>SUCCESS: </span>NO_ERRORS</div>",
+            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
             "</div>",
-            "<div class=\"block error indent \">",
+            "<div class=\"block indent \">",
             "<a href=\"url4colurl2\">url4colurl2</a>",
-            "<div class='info'><span>ERROR: </span>BANNED_TAG</div>",
+            "<div class='info'><span class='error '>BANNED_TAG</span></div>",
+            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # url4col
     ]
@@ -1202,6 +1226,6 @@ def test_write_report(setup_tmpdir):
     expected_str = "\n".join(expected)
     with open(
             os.path.join(tmpdir, "_reports",
-                         f"parse_rprt_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html"),
+                         f"report_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html"),
             "r") as f:
         assert expected_str == f.read()
