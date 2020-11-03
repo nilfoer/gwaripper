@@ -36,7 +36,11 @@ New root dir is: C:\Users\nilfoer\gwaripper
 ```
 Using the `config` subcommand you can also specify other options like banned tags or set the frequency at which DB-backups are created. The config will be placed next to the executable or if you're using the source it will be inside the `gwaripper` directory.
 
-To be able to use GWARipper's reddit functionalities you have to specify a reddit client\_id. To get a client\_id you have to register an app at https://www.reddit.com/prefs/apps. The type should be *installed* or *script* (*installed* is enough, since we use read-only access).
+#### API client IDs
+
+GWARipper now comes pre-installed with a reddit and imgur client id but you can still get your own:
+
+To get a client\_id you have to register an app at https://www.reddit.com/prefs/apps. The type should be *installed* or *script* (*installed* is enough, since we use read-only access).
 
 If your app is of type *script* you also have to specify a client secret when setting the client id:
 ```
@@ -45,12 +49,11 @@ Successfully set Client ID
 Successfully set Client Secret
 ```
 
-To be able to automatically download found imgur images and albums you have to set the imgur client id. To get a client\_id you have to register an app at https://api.imgur.com/oauth2/addclient. And then set the client id using the `config` subcommand:
+To get an imgur client\_id you have to register an app at https://api.imgur.com/oauth2/addclient. And then set the client id using the `config` subcommand:
 ```
 > gwaripper.exe config -ici fas8593-25afda389
 Successfully set Imgur Client ID
 ```
-Now you're ready to use GWARipper!
 
 ### WebGUI
 For using the WebGUI run the other entry point executable:
