@@ -2,7 +2,10 @@ import os.path
 
 import pytest
 
-from gwaripper.info import FileInfo, FileCollection, RedditInfo, children_iter_dfs, DELETED_USR_FOLDER
+from gwaripper.info import (
+        FileInfo, FileCollection, RedditInfo, children_iter_dfs,
+        DELETED_USR_FOLDER, sanitize_filename
+        )
 # from gwaripper.extractors.base import BaseExtractor
 # doesn't work since it leads to circ dep
 from gwaripper.extractors import base
@@ -213,7 +216,7 @@ def test_update_downloaded():
     assert fc1.downloaded is True
 
 
-def test_generate_filename():
+def test_generate_filename(monkeypatch):
     fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
 
     #
@@ -247,12 +250,13 @@ def test_generate_filename():
     #
     # REDDIT SUBPATH
     #
+
     assert fi4.generate_filename(0) == (
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Imgur album TT 012345678901234_35HLlk54",
             "mp4")
     assert fi4.generate_filename(9) == (
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Imgur album TT 012345678901234_09_35HLlk54",
             "mp4")
     bu = ri.title
@@ -285,11 +289,11 @@ def test_generate_filename():
     # REDDIT SUBPATH direct parent is reddit -> parent_title does not get appended
     #
     assert fi1.generate_filename(0) == (
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "This is a test audio",
             "m4a")
     assert fi1.generate_filename(9) == (
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "09_This is a test audio",
             "m4a")
     bu = ri.title
@@ -322,44 +326,106 @@ def test_generate_filename():
     # LONG PARENT TITLE
     #
     assert fi3.generate_filename(0) == (
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This ",
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Bestest playlist around that s_This is a super test audio",
             "m4a")
 
     #
     # NESTED FILECOL (not allowed currently but it's in the function)
     #
-    # NOTE: commented out since it needs
-    # if not isinstance(parent, RedditInfo):
-    #     parent = None
-    # in FileCollection.parent setter to work but functionality was tested and worked
-    # fc1.parent = None
-    # fc1.children.append(fc2)
-    # fc2.parent = fc1
+    # NOTE: needs patched FileCollection.parent.setter to work
 
-    # # direct parent doesn't have subpath
-    # assert fi4.generate_filename(2) == (
-    #             os.path.join(
-    #                 "Bestest playlist around that somehow also has a ne", ""),
-    #         "Imgur album TT 0123456789012345 xtra xtr_02_35HLlk54",
-    #         "mp4")
-    # assert fi4.generate_filename(0) == (
-    #             os.path.join(
-    #                 "Bestest playlist around that somehow also has a ne", ""),
-    #         "Imgur album TT 0123456789012345 xtra xtr_35HLlk54",
-    #         "mp4")
+    def patched_parent_setter(self, parent):
+        self._parent = parent
 
-    # # +1 child -> now has subpath
-    # fc2.children.append(fi_none)
-    # assert fi4.generate_filename(0) == (
-    #             os.path.join(
-    #                 "Bestest playlist around that somehow also has a ne",
-    #                 "Imgur album TT 0123456789"),
-    #         "35HLlk54",
-    #         "mp4")
-    # assert fi4.generate_filename(1) == (
-    #             os.path.join(
-    #                 "Bestest playlist around that somehow also has a ne",
-    #                 "Imgur album TT 0123456789"),
-    #         "01_35HLlk54",
-    #         "mp4")
+        reddit_info = parent
+        if not isinstance(parent, RedditInfo):
+            reddit_info = None
+            p = parent
+            while p:
+                p = p.parent
+            # RedditInfo always root
+            if isinstance(p, RedditInfo):
+                reddit_info = p
+
+        for child in self.children:
+            child.reddit_info = reddit_info
+
+    # patch parent.setter which is read-only by replacing the whole property
+    # parent.setter(new setter func) returns property with new setter function
+    patched_prop = FileCollection.parent.setter(patched_parent_setter)
+    monkeypatch.setattr('gwaripper.info.FileCollection.parent', patched_prop)
+
+    fc1.parent = None
+    fc1.children.append(fc2)
+    fc2.parent = fc1
+
+    # for testing that no subpaths begin/end in spaces
+    # beginning space gets removed so space b4 e will be 50th
+    #                                                             v 50th char (incl ' ')
+    fc1.title = " Bestest playlist around that somehow also has a n e       "
+    #                                     v 26th char normally ends ther
+    fc2.title = " Imgur album TT 01234567  012345 xtra xtra "
+
+    # direct parent doesn't have subpath
+    assert fi4.generate_filename(2) == (
+                os.path.join(
+                    "Bestest playlist around that somehow also has a n", ""),
+            "Imgur album TT 01234567  012345 xtra xt_02_35HLlk54",
+            "mp4")
+    assert fi4.generate_filename(0) == (
+                os.path.join(
+                    "Bestest playlist around that somehow also has a n", ""),
+            "Imgur album TT 01234567  012345 xtra xt_35HLlk54",
+            "mp4")
+
+    # +1 child -> now has subpath
+    fc2.children.append(fi_none)
+    assert fi4.generate_filename(0) == (
+                os.path.join(
+                    "Bestest playlist around that somehow also has a n",
+                    "Imgur album TT 01234567"),
+            "35HLlk54",
+            "mp4")
+    assert fi4.generate_filename(1) == (
+                os.path.join(
+                    "Bestest playlist around that somehow also has a n",
+                    "Imgur album TT 01234567"),
+            "01_35HLlk54",
+            "mp4")
+
+
+@pytest.mark.parametrize(
+        'subpath, filename, expected',
+        [("", '         Starts and ends with spaces        ', 'Starts and ends with spaces'),
+         ("", r'Allowed chars -_.,[] end', r'Allowed chars -_.,[] end'),
+         ("", r'Disallowed chars ~:}{?/\`!@#$%^&*', r'Disallowed chars ________________'),
+         ("01234567890123456789012345678901234567890123456789012345678901234567890123456789"
+          "0123456789012345678901234567890123456789012345678901234567890123456789",  # 150c
+          "Truncate to 35 chars012345678901234", "Truncate to 35 chars012345678901234"),
+         ("01234567890123456789012345678901234567890123456789012345678901234567890123456789"
+          "0123456789012345678901234567890123456789012345678901234567890123456789",  # 150c
+          "Truncate to 35 chars0123456789012345678", "Truncate to 35 chars012345678901234"),
+         # test that we strip before truncation
+         ("01234567890123456789012345678901234567890123456789012345678901234567890123456789"
+          "0123456789012345678901234567890123456789012345678901234567890123456789",  # 150c
+          "      Truncate to 35 chars012345678901234    ", "Truncate to 35 chars012345678901234"),
+         # test that we also strip after truncation
+         ("01234567890123456789012345678901234567890123456789012345678901234567890123456789"
+          "0123456789012345678901234567890123456789012345678901234567890123456789",  # 150c
+          " Truncate to 35 chars01234567890123 5 ", "Truncate to 35 chars01234567890123"),
+         ])
+def test_sanitize_filename(subpath, filename, expected):
+    assert sanitize_filename(subpath, filename) == expected
+
+
+def test_sanitize_filename_asserts():
+    with pytest.raises(AssertionError):
+        sanitize_filename(" assert fires", "test")
+    with pytest.raises(AssertionError):
+        sanitize_filename("assert fires ", "test")
+    with pytest.raises(AssertionError):
+        sanitize_filename(
+            "assert fires assert fires assert fires assert fires assert fires "
+            "assert fires assert fires assert fires assert fires assert fires "
+            "assert fires assert fires assert fires assert fires ", "test")

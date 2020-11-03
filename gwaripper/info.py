@@ -34,12 +34,17 @@ UNKNOWN_USR_FOLDER = "_unknown_user_files"
 FILENAME_MAX_LEN = 185
 
 
-def sanitize_filename(subpath_len: int, filename: str):
+# python passes a _new_ reference to a function that points to the string obj
+# so the string is not copied but you also can't modify the reference at the
+# caller's location
+def sanitize_filename(subpath: str, filename: str):
+    # folder names must not start or end with spaces
+    assert subpath.strip() == subpath
     # [^\w\-_\.,\[\] ] -> match not(^) any of \w \- _  and whitepsace etc.,
     # replace any that isnt in the  [] with _
-    chars_remaining = FILENAME_MAX_LEN - subpath_len
+    chars_remaining = FILENAME_MAX_LEN - len(subpath)
     assert chars_remaining >= 30
-    return re.sub(r"[^\w\-_.,\[\] ]", "_", filename[:chars_remaining])
+    return re.sub(r"[^\w\-_.,\[\] ]", "_", filename.strip()[:chars_remaining].strip())
 
 
 # start_list: List[..] resulted in type error
@@ -290,6 +295,7 @@ class FileInfo:
 
         self.reddit_info = None
         while parent:
+            # RedditInfo won't have a parent
             if isinstance(parent, RedditInfo):
                 self.reddit_info = parent
             parent = parent.parent
@@ -321,7 +327,10 @@ class FileInfo:
                 # NOTE: IMPORTANT! if we change this behaviour also change
                 # :PassSubpathSelftext
                 if self.reddit_info.subpath:
-                    subpaths.append(self.reddit_info.subpath[:70])
+                    # NOTE: IMPORTANT folder names must not begin or end in spaces
+                    # so use strip or sanitize_filename; strip is enough here
+                    # since subpath uses sanitize_filename anyway
+                    subpaths.append(self.reddit_info.subpath[:70].strip())
                 else:
                     # other FileCollections can't be >=3 files since then we'd have
                     # a reddit subpath
@@ -334,7 +343,9 @@ class FileInfo:
                 p = self.parent
                 while p is not None:
                     # give topmost parent double the chars
-                    subpaths.append(p.subpath[:25] if p.parent else p.subpath[:50])
+                    # NOTE: IMPORTANT folder names must not begin or end in spaces
+                    subpaths.append(p.subpath[:25].strip() if p.parent else
+                                    p.subpath[:50].strip())
                     p = p.parent
                 subpaths.reverse()
 
@@ -364,7 +375,7 @@ class FileInfo:
 
         subpath = os.path.join(*subpaths) if subpaths else ""
 
-        filename = sanitize_filename(len(subpath), title_combined)
+        filename = sanitize_filename(subpath, title_combined)
         return (subpath, filename, self.ext)
 
 
@@ -429,7 +440,7 @@ class FileCollection:
     @property
     def subpath(self) -> str:
         if self.nr_files() >= 3:
-            return sanitize_filename(0, f"{self.title if self.title else self.id}")
+            return sanitize_filename("", f"{self.title if self.title else self.id}")
         else:
             return ""
 
@@ -533,7 +544,7 @@ class RedditInfo(FileCollection):
         if force_path:
             selftext_fn = os.path.join(root_dir, f"{subpath}.txt")
         else:
-            filename = sanitize_filename(len(subpath), self.title)
+            filename = sanitize_filename(subpath, self.title)
             # path.join works with joining empty strings
             filename = os.path.join(root_dir, subpath, filename)
             selftext_fn = f"{filename}.txt"
