@@ -147,7 +147,6 @@ class GWARipper:
             return None
 
         self.download(info)
-        extr_report.downloaded = info.downloaded
         self.extractor_reports.append(extr_report)
 
     def parse_and_download_submission(self, sub: praw.models.Submission,
@@ -158,7 +157,6 @@ class GWARipper:
         info, extr_report = RedditExtractor.extract(url, init_from=sub)
         if info is not None:
             self.download(info)
-            extr_report.downloaded = info.downloaded
         self.extractor_reports.append(extr_report)
 
     def write_report(self, reports: List[ExtractorReport]):
@@ -345,7 +343,6 @@ class GWARipper:
         author_name = info.get_preferred_author_name()
 
         any_downloads = False
-        all_downloaded = False
         files_in_collection = info.nr_files()
         with_file_idx = files_in_collection > 1
         dl_idx = 1
@@ -356,12 +353,10 @@ class GWARipper:
             self._download_file(fi, author_name, (rel_idx + 1) if with_file_idx else 0,
                                 dl_idx=dl_idx, dl_max=files_in_collection)
             any_downloads = any_downloads or fi.downloaded
-            # already_downloaded also counts as downloaded whereas it doesnt for ^
-            # TODO add status codes for downloads
-            all_downloaded = all_downloaded and (fi.downloaded or fi.already_downloaded)
             dl_idx += 1
 
-        info.downloaded = all_downloaded
+        # TODO add status codes for downloads
+        info.update_downloaded()
 
         if any_downloads:
             try:

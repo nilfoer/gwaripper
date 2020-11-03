@@ -651,11 +651,14 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                    build_file_url(os.path.join(testdl_files, "fi0")), None,  # id
                    "dont_overwrite",  # title
                    "This is the description fi0", "page_user")
+    fi0_rep = ExtractorReport(fi0.page_url, ExtractorErrorCode.NO_ERRORS)
+    fi0.report = fi0_rep
 
     # non audio file should not be added to db - only downloaded
     with GWARipper() as gwa:
         gwa.download(fi0)
         assert fi0.downloaded is True
+        assert fi0.report.downloaded is True
 
     with open(dont_overwrite_file, "r") as f:
         assert f.read() == "not overwritten"
@@ -677,12 +680,15 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                    build_file_url(os.path.join(testdl_files, "fi1")), None,  # id
                    rnd.random_string(20),  # title
                    rnd.random_string(50), "dummy_usr")
+    fi1_rep = ExtractorReport(fi1.page_url, ExtractorErrorCode.NO_ERRORS)
+    fi1.report = fi1_rep
 
     # testing file has already_downloaded set
     assert fi1.downloaded is False
     with GWARipper() as gwa:
         gwa.download(fi1)
         assert fi1.downloaded is False
+        assert fi1.report.downloaded is False
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
@@ -702,6 +708,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     with GWARipper() as gwa:
         gwa.download(fi1)
         assert fi1.downloaded is True
+        assert fi1.report.downloaded is True
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
@@ -723,20 +730,28 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                    build_file_url(os.path.join(testdl_files, "fi2")), None,  # id
                    rnd.random_string(20),  # title
                    rnd.random_string(50), "other-than_rddt-usr")
+    fi2_rep = ExtractorReport(fi2.page_url, ExtractorErrorCode.NO_ERRORS)
+    fi2.report = fi2_rep
     fi2_fn = f"01_{fi2.title}.{fi2.ext}"
     fi3 = FileInfo(object, True, "mp3", "https://page.url/242lk2598242jrtn3l4",
                    build_file_url(os.path.join(testdl_files, "fi3")), None,  # id
                    "[Foo] Bar qux ❤",  # title
                    rnd.random_string(50), "other-than_rddt-usr")
+    fi3_rep = ExtractorReport(fi3.page_url, ExtractorErrorCode.NO_ERRORS)
+    fi3.report = fi3_rep
     fi3_fn = f"Prepended title_01_[Foo] Bar qux _.{fi3.ext}"
     # extr, url, id
     fc1 = FileCollection(object, rnd.random_string(30), rnd.random_string(7),
                          "Prepended title", "other-than_rddt-usr2",
                          [fi3])
+    fc1_rep = ExtractorReport(fc1.url, ExtractorErrorCode.NO_ERRORS)
+    fc1.report = fc1_rep
     fi4 = FileInfo(object, False, "gif", "https://page.url/245j2l56t2098432",
                    build_file_url(os.path.join(testdl_files, "fi4")), rnd.random_string(5),  # id
                    "non-audio_file",  # title
                    None, "other-than_rddt-usr3")
+    fi4_rep = ExtractorReport(fi4.page_url, ExtractorErrorCode.NO_ERRORS)
+    fi4.report = fi4_rep
     fi4_fn = f"02_{fi4.title}.{fi4.ext}"
     ri1 = RedditInfo(object, "https://dont-use-this-url/in-db",
                      rnd.random_string(6), "Reddit:title / as sub\\path", "reddit_user",
@@ -744,6 +759,8 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                      1602557093.0, [fi2, fc1, fi4])
     ri1.selftext = "selftext_should not have been written"
     ri1.r_post_url = "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
+    ri1_rep = ExtractorReport(ri1.url, ExtractorErrorCode.NO_ERRORS)
+    ri1.report = ri1_rep
     # set parent
     fi2.parent = ri1
     fi3.parent = fc1
@@ -765,6 +782,12 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
     with GWARipper() as gwa:
         gwa.download(ri1)
+    # all downloaded or already_downloaded children means collection is also downloaded
+    assert ri1.downloaded is True
+    assert ri1.report.downloaded is True
+
+    # report.downloaded set on children
+    assert fc1.downloaded is True
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
@@ -782,6 +805,8 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                         bu_already_dled)
 
     ri1.selftext = "this selftext should be written !!!!"
+    ri1.downloaded = False
+    fc1.downloaded = False
     # reset already downloaded
     fi2.already_downloaded = False
     fi3.already_downloaded = False
@@ -800,6 +825,9 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
     with GWARipper() as gwa:
         gwa.download(ri1)
+    assert ri1.downloaded is True
+    # also set on children _collections_
+    assert fc1.downloaded is True
 
     assert fi2.downloaded
     assert fi3.downloaded
@@ -821,22 +849,34 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     fi4.downloaded = False
     fi4.is_audio = True
     fi4.ext = "wav"
-    fi4_fn = f"FC2 _ Prep_ended ti_tle_{fi4.title}.{fi4.ext}"
+    fi4_fn = f"FC2 _ Prep_ended ti_tle_01_{fi4.title}.{fi4.ext}"
     expected.append(
             [7, time.strftime("%Y-%m-%d"), fi4.descr, fi4_fn,
              fi4.title, fi4.direct_url, fi4.page_url, None, None,
              None, None, None,  None, fi4.author, None, None, 0]
             )
 
+    #
+    # fcol download with one failed dl
+    #
+    fi5 = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
+                   build_file_url(os.path.join(testdl_files, "fi5")), rnd.random_string(5),  # id
+                   "should raise",  # title
+                   None, "exceptional")
     # extr, url, id
     fc2 = FileCollection(object, rnd.random_string(30), rnd.random_string(7),
                          "FC2 ? Prep/ended ti:tle", "fcol_author",
-                         [fi4])
+                         [fi4, fi5])
     fi4.parent = fc2
+    fi5.parent = fc2
+
     assert fi4.reddit_info is None  # just to be sure
+    assert fi5.reddit_info is None  # just to be sure
 
     with GWARipper() as gwa:
         gwa.download(fc2)
+    # not all children could be downloaded
+    assert fc2.downloaded is False
 
     assert fi4.downloaded
 
@@ -846,10 +886,8 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     with open(os.path.join(fc2_dir, fi4_fn), "r") as f:
         assert f.read() == fi_file_contents[4]
 
-    fi5 = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
-                   build_file_url(os.path.join(testdl_files, "fi5")), rnd.random_string(5),  # id
-                   "should raise",  # title
-                   None, "exceptional")
+    # reset parent
+    fi5.parent = None
 
     caplog.clear()
     caplog.set_level(logging.WARNING)
@@ -1104,6 +1142,7 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
         nonlocal download_called_with
         download_called_with = fi
         fi.downloaded = True
+        fi.update_downloaded()  # normally called by _download_collection
 
     monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
 
@@ -1111,6 +1150,7 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
                             'author', 'subreddit', 'permalink', 12345.0)
     redditinfo_permalink = redditinfo.permalink
     redditinforep = ExtractorReport(redditinfo.url, ExtractorErrorCode.NO_ERRORS)
+    redditinfo.report = redditinforep  # so downloaded gets propagted to report
     sub = DummySub()
 
     def patched_extr(url, init_from=None):

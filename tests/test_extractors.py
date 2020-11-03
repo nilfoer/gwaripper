@@ -664,12 +664,14 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
 class DummyFileInfo:
     def __init__(self):
         self.parent = None
+        self.report = None
 
 
 class DummyFileCol:
     def __init__(self):
         self.parent = None
         self.children = []
+        self.report = None
 
 
 def test_base_extract(monkeypatch, caplog):
@@ -726,6 +728,8 @@ def test_base_extract(monkeypatch, caplog):
     res, rep = BaseExtractor.extract('url354')
     assert res is dfi
     assert res.parent is None
+    # set ref to report on info
+    assert res.report is rep
 
     assert rep.url == 'url354'
     assert rep.err_code == exerr.NO_ERRORS
@@ -738,6 +742,7 @@ def test_base_extract(monkeypatch, caplog):
     parent_report = ExtractorReport('parurl354', exerr.NO_ERRORS)
     res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
     assert res is dfi
+    assert res.report is rep
     # parent set and appendend
     assert res.parent is parent
     assert parent.children[0] is res
@@ -753,6 +758,22 @@ def test_base_extract(monkeypatch, caplog):
     assert parent_report.err_code == exerr.NO_ERRORS
 
     #
+    # successful _extract return fcol
+    #
+    dfi = DummyFileCol()
+    drep = ExtractorReport('urlcol354', exerr.NO_ERRORS)
+
+    res, rep = BaseExtractor.extract('urlcol354')
+    assert res is dfi
+    assert res.parent is None
+    # set ref to report on info
+    assert res.report is rep
+
+    assert rep.url == 'urlcol354'
+    assert rep.err_code == exerr.NO_ERRORS
+    assert not rep.children
+
+    #
     # child with error only modifies parent_report err if it still was at NO_ERRORS
     #
     dfi = DummyFileInfo()
@@ -761,6 +782,7 @@ def test_base_extract(monkeypatch, caplog):
     parent_report = ExtractorReport('parurl3542', exerr.NO_ERRORS)  # no err so far
     res, rep = BaseExtractor.extract('url3542', parent=parent, parent_report=parent_report)
     assert res is dfi
+    assert res.report is rep
     # parent set and appendend
     assert res.parent is parent
     assert parent.children[0] is res
@@ -782,6 +804,7 @@ def test_base_extract(monkeypatch, caplog):
     parent_report = ExtractorReport('parurl35426', exerr.NO_SUPPORTED_AUDIO_LINK)  # has err
     res, rep = BaseExtractor.extract('url35426', parent=parent, parent_report=parent_report)
     assert res is dfi
+    assert res.report is rep
     # parent set and appendend
     assert res.parent is parent
     assert parent.children[0] is res

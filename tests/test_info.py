@@ -151,6 +151,68 @@ def test_finfo_find_rinfo_on_parent_set():
     assert fi4.reddit_info is ri
 
 
+def test_downloaded_set_on_report():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree()
+    exerr = base.ExtractorErrorCode
+    rep = base.ExtractorReport('url', exerr.NO_ERRORS)
+    fi1.report = rep
+    fi1.downloaded = True
+    assert fi1.report.downloaded is True
+    fi1.downloaded = False
+    assert fi1.report.downloaded is False
+
+    rep = base.ExtractorReport('url', exerr.NO_ERRORS)
+    ri.report = rep
+    ri.downloaded = True
+    assert ri.report.downloaded is True
+    ri.downloaded = False
+    assert ri.report.downloaded is False
+
+
+def test_update_downloaded():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree()
+
+    # fc2 [fi4, fi5]
+    fi4.downloaded = True
+    fi5.downloaded = False
+    assert fc2.update_downloaded() is False
+    assert fc2.downloaded is False
+    assert fi4.downloaded is True
+    assert fi5.downloaded is False
+
+    fi5.downloaded = True
+    assert fc2.update_downloaded() is True
+    assert fc2.downloaded is True
+    assert fi4.downloaded is True
+    assert fi5.downloaded is True
+
+    # ri [fi1, fi2, fc1 [fi3], fc2 [fi4, fi5]]
+    # only one false children -> ri.downloaded also false
+    # but fc1 not sinc only child fi3 is True
+    fi1.downloaded = True
+    fi2.downloaded = True
+    fi3.downloaded = True
+    fi4.downloaded = True
+    fi5.downloaded = False
+
+    assert ri.update_downloaded() is False
+    assert ri.downloaded is False
+    assert fc2.downloaded is False
+    assert fc1.downloaded is True
+    # children file infos unchanged
+    assert fi1.downloaded is True
+    assert fi2.downloaded is True
+    assert fi3.downloaded is True
+    assert fi4.downloaded is True
+    assert fi5.downloaded is False
+
+    fi5.downloaded = True
+    assert ri.update_downloaded() is True
+    assert ri.downloaded is True
+    assert fc2.downloaded is True
+    assert fc1.downloaded is True
+
+
 def test_generate_filename():
     fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
 

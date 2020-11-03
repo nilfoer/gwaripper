@@ -22,7 +22,7 @@ from typing_extensions import Literal
 # NOTE: was said to work on a mypy github issue but it doesn't seem to work here
 # and still results in a cricular dependency
 if TYPE_CHECKING:
-    from .extractors.base import BaseExtractor
+    from .extractors.base import BaseExtractor, ExtractorReport
 from collections import deque
 
 
@@ -261,12 +261,23 @@ class FileInfo:
         self.parent = parent
         # NOTE: automatically set/reset when parent gets set
         self.reddit_info = reddit_info
-        self.downloaded: bool = False
-        # already downloaded and in db; gets set by mark_alrdy_downloaded
+        self._downloaded: bool = False
+        # already downloaded and in db; gets set by already_downloaded
         self.already_downloaded: bool = False
+        self.report: Optional[ExtractorReport] = None
 
     def __str__(self):
         return f"FileInfo<{self.page_url}>"
+
+    @property
+    def downloaded(self):
+        return self._downloaded
+
+    @downloaded.setter
+    def downloaded(self, value: bool):
+        self._downloaded = value
+        if self.report is not None:
+            self.report.downloaded = value
 
     @property
     def parent(self):
@@ -379,7 +390,8 @@ class FileCollection:
             self.children = children
         self._parent: Optional[RedditInfo] = None
         # NOTE: a collection only counts as downloaded if all of it's children are
-        self.downloaded: bool = False
+        self._downloaded: bool = False
+        self.report: Optional[ExtractorReport] = None
 
     def __str__(self):
         return f"FileCollection<{self.url}, children: {len(self.children)}>"
@@ -387,6 +399,32 @@ class FileCollection:
     # TODO: append etc. for children so we don't have to re-count them every time
     def nr_files(self) -> int:
         return sum(1 for _ in children_iter_dfs(self.children, file_info_only=True))
+
+    # recursive!
+    # traverses children and children's children to get downloaded
+    def update_downloaded(self) -> bool:
+        all_downloaded = True
+        for child in self.children:
+            if isinstance(child, FileCollection):
+                downloaded = child.update_downloaded()
+            else:
+                # already_downloaded also counts as downloaded for collections
+                downloaded = child.downloaded or child.already_downloaded
+
+            all_downloaded = all_downloaded and downloaded
+
+        self.downloaded = all_downloaded
+        return all_downloaded
+
+    @property
+    def downloaded(self):
+        return self._downloaded
+
+    @downloaded.setter
+    def downloaded(self, value: bool):
+        self._downloaded = value
+        if self.report is not None:
+            self.report.downloaded = value
 
     @property
     def subpath(self) -> str:

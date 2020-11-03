@@ -37,6 +37,7 @@ class ExtractorErrorCode(Enum):
     NO_SUPPORTED_AUDIO_LINK = auto()  # only use this if there are no child reports
 
 
+# TODO @CleanUp make this more general since it's not just extractor specific anymore
 class ExtractorReport:
 
     children: List['ExtractorReport']
@@ -177,9 +178,12 @@ class BaseExtractor(Generic[T]):
                 # only log/print if no exc was raised since exc already get logged above
                 cls.log_report(report)
 
-        if result is not None and parent is not None:
-            parent.children.append(result)
-            result.parent = parent
+        if result is not None:
+            if parent is not None:
+                parent.children.append(result)
+                result.parent = parent
+            # set ref to report on info
+            result.report = report
         if parent_report is not None:
             parent_report.children.append(report)
             # set error code for child errors on parent_report if it wasn't set before
