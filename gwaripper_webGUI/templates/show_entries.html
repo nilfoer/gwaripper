@@ -81,7 +81,7 @@
             </div> {# entry-expand-inner #}
             <div class="embeds-container row no-margin">
                 {# we don't have local_filename for older entries, so check for it's presence #}
-                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename) if entry.local_filename else '' }} data-online-src={{ entry.url_file }}>
+                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename) if entry.local_filename else '' }}>
                 </div>
                 <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
                 </div>
@@ -115,7 +115,7 @@
     {% endif %}
 {% endif %}
     <script>
-        // emebd local audio file or online src
+        // emebd local audio file
 		$(document).ready(function() {
 			$('.entry-container-title').click(function(event) {
                 $(event.currentTarget).parents(".entry-container").find(".entry-expand").toggle();
@@ -130,7 +130,7 @@
                         embed_container.html("<audio controls src='" + embed_url + "'></audio>");
                     }).fail(function() { 
                         // not exists code
-                        embed_container.html("Local file couldn&#39;t be found, online source was embedded instead:<br/><audio controls src='" + embed_container.data("onlineSrc") + "'></audio>");
+                        embed_container.text("Local file couldn't be found, use the link to the source page (world icon) instead!");
                     })
                 event.preventDefault();
 			});
@@ -168,8 +168,8 @@
 				})
 				.done(function(data) { // when prev function is done
                     let msg_cat = data.removed ? "info" : "warning";
-                    let msg = data.removed ? "Entry was successfully removed!" : "Failed to remove entry!";
-                    console.log(msg);
+                    let msg = data.removed ? "Entry was successfully removed from the DB! You have to delete the files manually!" : "Failed to remove entry!";
+                    alert(msg);
                     if(data.removed)
                         entry.remove();
                     // $(".flash-messages").html("<li class='" + msg_cat + "'>" + msg + "</li>");

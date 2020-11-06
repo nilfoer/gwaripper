@@ -8,7 +8,7 @@ import re
 from flask import (
         current_app, request, redirect, url_for, Blueprint,
         render_template, flash, send_from_directory,
-        jsonify, send_file, session, g
+        jsonify, send_file, session, g, Response, abort
 )
 
 from gwaripper.db import (
@@ -28,15 +28,107 @@ URL_RE = re.compile(r"(?:https?://)?(?:\w+\.)?(\w+\.\w+)/")
 
 
 def init_app(app):
+    # send that we accept byte ranges for sending partial content
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Accept-Ranges', 'bytes')
+        return response
+
     return None
 
+
+# BUG: the server gets "stuck" while sending an audio file and won't repsond to any requests
+# need to have multiple files that are playing or started playing and were then paused
+# sometimes seeking to a different place in the audio file on the client fixes it
+# flask still responds to a new request since reloading the page or opening
+# a new one works but when opening a new one in the debugger it crashes inside
+# the jinja code? in show_entries.html on the entry title div
+
+# not the cause for this ^ bug or at least both 'solutions' don't fix
+# flask send_from_directory just sends the whole file to the client, which can cause
+# freezes esp. in single threaded mode
+# to solve this either use multi-threaded mode (not tested if this acutally solves it)
+# the other solution is sending partial content as in send byte ranges of files
+# the client first has to know that the server supports it so the server can send
+# "Accept-Ranges": "bytes" as part of the header
+# the client can then send "Content-Range": bytes startbyte- or startbyte-endbyte
+# see: https://codeburst.io/the-taste-of-media-streaming-with-flask-cdce35908a50
+#      https://stackoverflow.com/questions/57314357/streaming-video-files-using-flask
+
+
+# this and part of artist_file from https://stackoverflow.com/a/57324447
+# by waynetech
+def get_chunk(filename, byte1=None, byte2=None):
+    file_size = os.stat(filename).st_size
+    start = 0
+    # roughly 6secs for a 128kBit/s mp3 file
+    chunk_size = 102400
+
+    if byte1 < file_size:
+        start = byte1
+    if byte2:
+        # byte-pos is 0-based
+        chunk_size = byte2 + 1 - byte1
+    else:
+        chunk_size = file_size - start
+
+    with open(filename, 'rb') as f:
+        f.seek(start)
+        chunk = f.read(chunk_size)
+    return chunk, start, chunk_size, file_size
+
+
+# browser sends open-ended request 0- but not the whole file is sent
+# https://stackoverflow.com/a/61755095
+# However, examples of ServiceWorkers responding to Range Requests (Safari
+# browser) suggests that the expected response to open-ended requests like 0-
+# is the entire byte range. Browsers then stream the response up to some
+# heuristic, and if the user seeks to a range outside of what has been streamed
+# the initiate a subsequent open-ended request.
+#
+# if there's a file with 1000 bytes: the first request is always Range:
+# bytes=0-. The browser decides to load 100 bytes. The user seeks toward the
+# end, and the browser sends another request Range: bytes=900-.
 
 # create route for artist files/static data that isnt in static, can be used in template with
 # /audio/artist/filename or with url_for(main.artist_file, artist='artist', filename='filename')
 # Custom static data
 @main_bp.route('/audio/<path:artist>/<path:filename>')
 def artist_file(artist, filename):
-    return send_from_directory(os.path.join(current_app.instance_path, artist), filename)
+    range_header = request.headers.get('Range', None)
+
+    first_byte, last_byte = 0, None
+    if range_header:
+        # https://tools.ietf.org/html/rfc7233#section-4.2
+        # * if complete-length unknown
+        # byte-pos is 0-based
+        # request: byte-range = first-byte-pos "-" last-byte-pos
+        # / without "" means alternative "/" is a literal /
+        # () forms a group
+        # response: byte-range "/" ( complete-length / "*" )
+        # or on 416 (Range Not Satisfiable): unsatisfied-range = "*/" complete-length
+
+        # starts with "bytes " or "bytes=" even though rfc7233 only specifies SP (space)
+        start_first_byte = next(i for i, c in enumerate(range_header) if c.isdigit())
+        first_byte_str, last_byte_str = range_header[start_first_byte:].split('-')
+        first_byte = int(first_byte_str)
+        if last_byte_str:
+            last_byte = int(last_byte)
+
+    full_path = os.path.join(current_app.instance_path, artist, filename)
+    try:
+        chunk, start, chunk_size, file_size = get_chunk(full_path, first_byte, last_byte)
+    except FileNotFoundError:
+        abort(404)
+
+    # mimetype should be type/subtype;parameter=value
+    resp = Response(chunk, 206, mimetype='audio',
+                    content_type='audio', direct_passthrough=True)
+    # byte-pos is 0-based
+    resp.headers.add('Content-Range', f"bytes {start}-{start + chunk_size - 1}/{file_size}")
+
+    # TODO send 416 with unsatisfied-range if we can't provide the range that was requested
+    return resp
 
 
 def get_entries(query=None):
@@ -212,5 +304,5 @@ def remove_entry():
     entry_id = request.form.get("entryId", None, type=int)
     if entry_id is None:
         return jsonify({"error": "Missing entry id from data!"})
-    success = gwa_remove_entry(get_db(), entry_id, current_app.instance_path)
-    return jsonify({"removed": success})
+    gwa_remove_entry(get_db(), entry_id, current_app.instance_path)
+    return jsonify({"removed": True})

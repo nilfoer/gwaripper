@@ -18,6 +18,6 @@ if __name__ == '__main__':
         else:
             # messes with flask restart and takes the else branch below del sys.argv[1]
             # del webgui arg
-            webgui_main()
+            webgui_main(sys.argv[1:])
     else:
         main()
