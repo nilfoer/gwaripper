@@ -462,8 +462,7 @@ class FileCollection:
 
         # bfs yields the names in level order level0 then level1 etc.
         for _, child in children_iter_bfs(self.children, file_info_only=False):
-            if child.author:
-                names.append(child.author)
+            names.append(child.author)
 
         # @Hack
         names.append(DELETED_USR_FOLDER if isinstance(self, RedditInfo) else None)

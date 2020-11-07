@@ -27,7 +27,8 @@
                     {{ entry.date }}
                 </div>
                 <div class="entry-container-artist">
-                    <a href={{ url_for('main.search_entries', q='sgasm_user:"' + entry.sgasm_user + '"') }} title={{ entry.reddit_user or entry.sgasm_user }}>{{ entry.reddit_user or entry.sgasm_user }}</a>
+                    {# TODO change this to search for both or at least for reddit_user if there is one #}
+                    <a href={{ url_for('main.search_entries', q='author_page:"' + entry.author_page + '"') }} title={{ entry.reddit_user or entry.author_page }}>{{ entry.reddit_user or entry.author_page }}</a>
                 </div>
             </div>
         </div>
@@ -81,9 +82,9 @@
             </div> {# entry-expand-inner #}
             <div class="embeds-container row no-margin">
                 {# we don't have local_filename for older entries, so check for it's presence #}
-                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename) if entry.local_filename else '' }}>
+                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=entry.local_filename) if entry.local_filename else '' }}>
                 </div>
-                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.sgasm_user, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
+                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
                 </div>
             </div>
         </div> {# entry-expand #}

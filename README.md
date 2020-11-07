@@ -72,7 +72,7 @@ Additionally you can search the following fields:
 | Field                                 | search keyword |
 | -------------------------------------:| --------------:|
 | (Title)                               | title          |
-| Host page (e.g. soundgasm) user       | sgasm\_user    |
+| Host page (e.g. soundgasm) user       | author\_page   |
 | Reddit user name                      | reddit\_user   |
 | Reddit id                             | reddit\_id     |
 | Reddit url                            | reddit\_url    |
@@ -95,7 +95,7 @@ Searching the title uses SQLite full-text-search:
 
 E.g. this string searches for audios by sassmastah77 with GFE in the title
 ```
-sgasm_user:sassmastah77 GFE
+author_page:sassmastah77 GFE
 ```
 
 Search for 'monster girl' or 'demon girl' being in the title:

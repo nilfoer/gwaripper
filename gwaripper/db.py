@@ -3,6 +3,7 @@ import os
 import time
 import shutil
 import sqlite3
+import datetime
 import csv
 import re
 import operator
@@ -11,6 +12,8 @@ from typing import Tuple, Optional, Set
 from functools import reduce
 
 from .config import config, write_config_module
+from . import migrate
+from .exceptions import GWARipperError
 
 logger = logging.getLogger(__name__)
 
@@ -26,59 +29,75 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
     :param filename: Filename string/path to file
     :return: connection to sqlite3 db and cursor instance
     """
+    create_new = not os.path.isfile(filename)
     conn: sqlite3.Connection = sqlite3.connect(filename,
                                                detect_types=sqlite3.PARSE_DECLTYPES)
 
-    # context mangaer auto-commits changes or does rollback on exception
-    with conn:
-        c = conn.executescript("""
-            PRAGMA foreign_keys=off;
+    if create_new:
+        # context mangaer auto-commits changes or does rollback on exception
+        with conn:
+            conn.executescript(f"""
+                PRAGMA foreign_keys=off;
 
-            CREATE TABLE IF NOT EXISTS Downloads(
-                id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT,
-                description TEXT, local_filename TEXT, title TEXT,
-                url_file TEXT, url TEXT, created_utc REAL,
-                r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,
-                reddit_url TEXT, reddit_user TEXT,
-                sgasm_user TEXT, subreddit_name TEXT, rating REAL,
-                favorite INTEGER NOT NULL DEFAULT 0);
+                CREATE TABLE IF NOT EXISTS Downloads(
+                    id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT,
+                    description TEXT, local_filename TEXT, title TEXT,
+                    url_file TEXT, url TEXT, created_utc REAL,
+                    r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,
+                    reddit_url TEXT, reddit_user TEXT,
+                    author_page TEXT, author_subdir TEXT NOT NULL, subreddit_name TEXT,
+                    rating REAL, favorite INTEGER NOT NULL DEFAULT 0);
 
-            -- full text-search virtual table
-            -- only stores the idx due to using parameter content='..'
-            -- -> external content table
-            -- but then we have to keep the content table and the idx up-to-date ourselves
-            CREATE VIRTUAL TABLE IF NOT EXISTS Downloads_fts_idx USING fts5(
-              title, reddit_title, content='Downloads', content_rowid='id');
+                -- full text-search virtual table
+                -- only stores the idx due to using parameter content='..'
+                -- -> external content table
+                -- but then we have to keep the content table and the idx up-to-date ourselves
+                CREATE VIRTUAL TABLE IF NOT EXISTS Downloads_fts_idx USING fts5(
+                  title, reddit_title, content='Downloads', content_rowid='id');
 
-            -- even as external content table creating the table is not  enough
-            -- it needs to be manually populated from the content/original table
-            INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
-                SELECT id, title, reddit_title FROM Downloads;
+                -- even as external content table creating the table is not  enough
+                -- it needs to be manually populated from the content/original table
+                INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+                    SELECT id, title, reddit_title FROM Downloads;
 
-            -- Triggers to keep the FTS index up to date.
-            CREATE TRIGGER IF NOT EXISTS Downloads_ai AFTER INSERT ON Downloads BEGIN
-              INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
-              VALUES (new.id, new.title, new.reddit_title);
-            END;
-            CREATE TRIGGER IF NOT EXISTS Downloads_ad AFTER DELETE ON Downloads BEGIN
-              INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
-              VALUES('delete', old.id, old.title, old.reddit_title);
-            END;
-            CREATE TRIGGER IF NOT EXISTS Downloads_au AFTER UPDATE ON Downloads BEGIN
-              INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
-              VALUES('delete', old.id, old.title, old.reddit_title);
-              INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
-              VALUES (new.id, new.title, new.reddit_title);
-            END;
+                -- Triggers to keep the FTS index up to date.
+                CREATE TRIGGER IF NOT EXISTS Downloads_ai AFTER INSERT ON Downloads BEGIN
+                  INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+                  VALUES (new.id, new.title, new.reddit_title);
+                END;
+                CREATE TRIGGER IF NOT EXISTS Downloads_ad AFTER DELETE ON Downloads BEGIN
+                  INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
+                  VALUES('delete', old.id, old.title, old.reddit_title);
+                END;
+                CREATE TRIGGER IF NOT EXISTS Downloads_au AFTER UPDATE ON Downloads BEGIN
+                  INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
+                  VALUES('delete', old.id, old.title, old.reddit_title);
+                  INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+                  VALUES (new.id, new.title, new.reddit_title);
+                END;
 
-            PRAGMA foreign_keys=on;
-        """)
+                CREATE TABLE IF NOT EXISTS {migrate.VERSION_TABLE} (
+                    version_id INTEGER PRIMARY KEY ASC,
+                    dirty INTEGER NOT NULL
+                );
+                INSERT INTO {migrate.VERSION_TABLE} VALUES ({migrate.LATEST_VERSION}, 0);
+
+                PRAGMA foreign_keys=on;
+            """)
+    else:
+        # NOTE: migrate DB; context manager automatically closes connection
+        with migrate.Database(filename) as migration:
+            migration_success = migration.upgrade_to_latest()
+        if not migration_success:
+            conn.close()
+            raise GWARipperError("Could not migrate DB! Open an issue at "
+                                 "github.com/nilfoer/gwaripper")
 
     # Row provides both index-based and case-insensitive name-based access
     # to columns with almost no memory overhead
     conn.row_factory = sqlite3.Row
 
-    return conn, c
+    return conn, conn.cursor()
 
 
 def export_csv_from_sql(filename: str, db_con: sqlite3.Connection):
@@ -108,6 +127,93 @@ def export_csv_from_sql(filename: str, db_con: sqlite3.Connection):
         csvwriter.writerow(col_names)  # header
         # write the all the rows to the file
         csvwriter.writerows(rows)
+
+
+def convert_or_escape_to_str(column_value):
+    if column_value is None:
+        return 'NULL'
+    elif isinstance(column_value, datetime.date):
+        # sqlite3 stores dates among others as TEXT as ISO8601 strings
+        # return f"'{column_value.strftime('%Y-%m-%d')}'"
+        return f"'{column_value.isoformat()}'"
+    elif isinstance(column_value, datetime.datetime):
+        # return f"'{column_value.strftime('%Y-%m-%dT%H:%M:%S')}'"
+        return f"'{column_value.isoformat()}'"
+    elif isinstance(column_value, str):
+        # escape single quotes using another one
+        column_value = column_value.replace("'", "''")
+        # enclose in single quotes
+        return f"'{column_value}'"
+    else:
+        return str(column_value)
+
+
+def export_to_sql(filename, db_con):
+    row_fac_bu = db_con.row_factory
+    db_con.row_factory = sqlite3.Row
+
+    c = db_con.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name")
+    sql_master = c.fetchall()
+
+    # store all full text search names here so we can later filter out
+    # shadow tables that automatically get created when creating the
+    # fts table
+    omit_shadow_tables = [r['name'] for r in sql_master
+                          if re.search(r'using fts\d\(', r['sql'], re.IGNORECASE)]
+
+    # sql statement is exactly the same as when table/index/trigger was
+    # created, including comments
+    index_creation_statements = []
+    table_names = []
+    trigger_creation_statements = []
+    result = ["PRAGMA foreign_keys=off;", "BEGIN TRANSACTION;"]
+    for row in sql_master:
+        if row['name'].startswith("sqlite_autoindex_"):
+            continue
+        type_name = row['type']
+        if type_name == 'trigger':
+            trigger_creation_statements.append((row['name'], row['sql']))
+        elif type_name == 'index':
+            index_creation_statements.append((row['name'], row['sql']))
+        elif type_name == 'table':
+            # fts shadow have name of the form: f'{fts_table_name}_{subtable}'
+            # where subtable can be data, config, docsize and more
+            # NOTE: maybe we omit some configuration by not copying values from _config?
+            prefix = row['name'].rsplit('_', 1)[0]
+            # compare length so we don't omit the fts table itself
+            if any(1 for tbl_name in omit_shadow_tables
+                   if len(row['name']) > len(tbl_name) and tbl_name == prefix):
+                continue
+
+            # filter shadow tables created automatically by fts tables
+            table_names.append(row['name'])
+            # create all tables first
+            result.append(f"{row['sql']};")
+        else:
+            assert 0
+
+    # insert all the values
+    for tbl_name in table_names:
+        result.append(f"INSERT INTO \"{tbl_name}\" VALUES")
+        table_rows = c.execute(f"SELECT * FROM {tbl_name}").fetchall()
+        for i, tr in enumerate(table_rows):
+            result.append(f"({','.join(convert_or_escape_to_str(c) for c in tr)})"
+                          f"{';' if i == len(table_rows)-1 else ','}")
+
+    for idx_name, idx_statement in index_creation_statements:
+        result.append(f"{idx_statement};")
+
+    for trigger_name, trigger_statement in trigger_creation_statements:
+        result.append(f"{trigger_statement};")
+
+    result.append("COMMIT;")
+    result.append("PRAGMA foreign_keys=on;")
+
+    with open(filename, 'w', encoding='UTF-8') as f:
+        f.write("\n".join(result))
+
+    db_con.row_factory = row_fac_bu
 
 
 def backup_db(db_path: str, bu_dir: str,
@@ -207,28 +313,8 @@ def set_rating(db_con: sqlite3.Connection, _id: int, rating: float):
 
 
 def remove_entry(db_con: sqlite3.Connection, _id: int, root_dir: str):
-    c = db_con.execute("SELECT * FROM Downloads WHERE id = ?", (_id,))
-    row = RowData(c.fetchone())
-    local_filename: str = row.local_filename
-    if not local_filename:
-        logger.error("Couldn't remove entry due to a missing local_filename entry! Title: %s",
-                     row.title)
-        return False
-    try:
-        os.remove(os.path.join(root_dir, row.sgasm_user, local_filename))
-    except FileNotFoundError:
-        logger.warning("Didn't find audio file: %s",
-                       os.path.join(root_dir, row.sgasm_user, local_filename))
-    try:
-        os.remove(os.path.join(root_dir, row.sgasm_user, local_filename + ".txt"))
-    except FileNotFoundError:
-        logger.warning("Didn't find selftext file: %s",
-                       os.path.join(root_dir, row.sgasm_user, local_filename + ".txt"))
-
     with db_con:
-        c.execute("DELETE FROM Downloads WHERE id = ?", (_id,))
-
-    return True
+        db_con.execute("DELETE FROM Downloads WHERE id = ?", (_id,))
 
 
 # helper class to turn attribute-based acces into dict-like acces on sqlite3.Row
@@ -293,7 +379,7 @@ def validate_order_by_str(order_by):
 WORD_RE = re.compile(r'([^"^\s]+)\s*|"([^"]+)"\s*')
 
 
-VALID_SEARCH_COLS: Set[str] = {"title", "rating", "sgasm_user", "reddit_user", "reddit_url"
+VALID_SEARCH_COLS: Set[str] = {"title", "rating", "author_page", "reddit_user", "reddit_url"
                                "r_post_url", "reddit_id", "url"}
 ASSOCIATED_COLUMNS: Set[str] = set()
 

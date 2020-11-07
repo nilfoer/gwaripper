@@ -300,7 +300,7 @@ class GWARipper:
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
                     # executes the SQL query but leaves commiting it to with db_con in line above
-                    self._add_to_db(info, filename)
+                    self._add_to_db(info, author_name, filename)
                     # func passed as kwarg reporthook gets called once on establishment
                     # of the network connection and once after each block read thereafter.
                     # The hook will be passed three arguments; a count of blocks transferred
@@ -369,7 +369,7 @@ class GWARipper:
             except AttributeError:
                 pass  # not redditinfo
 
-    def _add_to_db(self, info: FileInfo, filename: str) -> None:
+    def _add_to_db(self, info: FileInfo, author_subdir: str, filename: str) -> None:
         """
         Adds instance attributes and reddit_info values to the database using named SQL query
         parameters with a dictionary.
@@ -388,7 +388,11 @@ class GWARipper:
             "title": info.title,
             "url_file": info.direct_url,
             "url": info.page_url,
-            "sgasm_user": info.author,  # TODO rename this column
+            "author_page": info.author,
+            # represents the preferred author name of the topmost parent or the
+            # file's author and at the same time the subdirectory which the
+            # local_filename is relative to
+            "author_subdir": author_subdir,
             "created_utc": None,
             "r_post_url": None,
             "reddit_id": None,
@@ -412,11 +416,12 @@ class GWARipper:
 
         self.db_con.execute("INSERT INTO Downloads(date, time, description, local_filename, "
                             "title, url_file, url, created_utc, r_post_url, reddit_id, "
-                            "reddit_title, reddit_url, reddit_user, sgasm_user, subreddit_name) "
+                            "reddit_title, reddit_url, reddit_user, author_page, "
+                            " author_subdir, subreddit_name) "
                             " VALUES (:date, :time, :description, :local_filename, :title, "
                             ":url_file, :url, :created_utc, :r_post_url, :reddit_id, "
-                            ":reddit_title, :reddit_url, :reddit_user, :sgasm_user, "
-                            ":subreddit_name)", val_dict)
+                            ":reddit_title, :reddit_url, :reddit_user, :author_page, "
+                            ":author_subdir, :subreddit_name)", val_dict)
 
     def already_downloaded(self, info: FileInfo) -> bool:
         """
@@ -490,7 +495,7 @@ class GWARipper:
             return
 
         filename_local = row_cont['local_filename']
-        page_usr = row_cont['sgasm_user']
+        author_subdir = row_cont['author_subdir']
 
         # TODO due to my db having been used with older versions there are a lot of
         # rows where cols local_filename and url are empty -> gen a filename so we
@@ -501,6 +506,6 @@ class GWARipper:
                     row_cont['title'][0:110]) + ".m4a"
         # intentionally don't write into subpath that might get used
         # by RedditInfo since this file was downloaded without it
-        file_path = os.path.join(page_usr, filename_local)
+        file_path = os.path.join(author_subdir, filename_local)
         info.reddit_info.write_selftext_file(
                 config.get_root(), file_path, force_path=True)

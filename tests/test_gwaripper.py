@@ -96,26 +96,26 @@ def test_set_missing_reddit(setup_tmpdir):
 
     INSERT INTO Downloads(
         date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user,
-        subreddit_name
+        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
+        author_subdir, subreddit_name
         )
     VALUES
         ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
          "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
          "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", NULL),
+         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL),
 
         ("2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
          "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
          "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
          "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-         "26iw32o", NULL, NULL, NULL, "testy_user", NULL),
+         "26iw32o", NULL, NULL, NULL, "testy_user", "testy_user", NULL),
 
         ("2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", NULL,
          "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate elongate elongate elongate elongate elongate elongate",
          "https://no-page-url.com/324q523q.mp3", NULL, 1602557093.0,
          "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-         "2klj654", "don_t change this", NULL, NULL, "old_user", NULL);
+         "2klj654", "don_t change this", NULL, NULL, "old_user", "old_user", NULL);
 
     COMMIT;
     """)
@@ -140,18 +140,18 @@ def test_set_missing_reddit(setup_tmpdir):
             [1, "2020-01-23", "13:37", "This is a description", "audio_file.m4a",
              "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
              "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", None, None, 0],
+             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
             [2, "2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
              "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
              "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
              "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", None, None, None, "testy_user", None, None, 0],
+             "26iw32o", None, None, None, "testy_user", "testy_user", None, None, 0],
             [3, "2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", None,
              "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
              "elongate elongate elongate elongate elongate elongate",
              "https://no-page-url.com/324q523q.mp3", None, 1602557093.0,
              "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-             "2klj654", "don_t change this", None, None, "old_user", None, None, 0],
+             "2klj654", "don_t change this", None, None, "old_user", "old_user", None, None, 0],
             ]
 
     query_str = "SELECT * FROM Downloads"
@@ -166,8 +166,8 @@ def test_set_missing_reddit(setup_tmpdir):
     with GWARipper() as gwa:
         gwa.set_missing_reddit_db(fi)
 
-    expected[0][8:16] = [1254323.0, ri.r_post_url, ri.id, ri.title, ri.permalink,
-                         ri.author, "sassmastah77", ri.subreddit]
+    expected[0][8:17] = [1254323.0, ri.r_post_url, ri.id, ri.title, ri.permalink,
+                         ri.author, "sassmastah77", "sassmastah77", ri.subreddit]
     # selftext not written
     assert os.listdir(tmpdir) == ['gwarip_db.sqlite', 'gwarip_db_exp.csv', '_db-autobu']
 
@@ -211,10 +211,10 @@ def test_set_missing_reddit(setup_tmpdir):
     with GWARipper() as gwa:
         gwa.set_missing_reddit_db(fi)
 
-    expected[1][8:16] = [1602557093.0,
+    expected[1][8:17] = [1602557093.0,
                          "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
                          "26iw32o", ri.title, ri.permalink, ri.author,
-                         "testy_user", ri.subreddit]
+                         "testy_user", "testy_user", ri.subreddit]
 
     # selftext written
     with open(os.path.join(tmpdir, "testy_user", "subpath", "super_file.mp3.txt"), 'r') as f:
@@ -247,10 +247,10 @@ def test_set_missing_reddit(setup_tmpdir):
 
     # page url inserted
     expected[2][7] = "insertedPAGEURL"
-    expected[2][8:16] = [1602557093.0,
+    expected[2][8:17] = [1602557093.0,
                          "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
                          "2klj654", "don_t change this", ri.permalink, ri.author,
-                         "old_user", ri.subreddit]
+                         "old_user", "old_user", ri.subreddit]
 
     fn = ("No-filenäme_lo中al rem_veth_se_hehe ____ [let them stay] .this,too elongate "
           "elongate elongate elongate elongate.m4a.txt")
@@ -274,14 +274,14 @@ def test_add_to_db(setup_tmpdir):
 
     INSERT INTO Downloads(
         date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user,
-        subreddit_name
+        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
+        author_subdir, subreddit_name
         )
     VALUES
         ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
          "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
          "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", NULL);
+         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL);
 
     COMMIT;
     """)
@@ -289,8 +289,8 @@ def test_add_to_db(setup_tmpdir):
     # everything but time col
     query_str = """SELECT
         id, date, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user,
-        subreddit_name, rating, favorite FROM Downloads"""
+        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
+        author_subdir, subreddit_name, rating, favorite FROM Downloads"""
 
     test_con.close()
 
@@ -308,13 +308,13 @@ def test_add_to_db(setup_tmpdir):
 
     # _add_to_db should NOT commit
     with GWARipper() as gwa:
-        gwa._add_to_db(fi, "subpath\\generated [file] [name].mp3")
+        gwa._add_to_db(fi, ri.author, "subpath\\generated [file] [name].mp3")
 
     expected = [
             [1, "2020-01-23", "This is a description", "audio_file.m4a",
              "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
              "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", None, None, 0],
+             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
             ]
 
     # UNCHANGED!
@@ -332,11 +332,12 @@ def test_add_to_db(setup_tmpdir):
              "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
              "26iw32o", "Best title on reddit [SFW]",
              "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz", "testy_ruser",
-             "testy_user", "pillowtalkaudio", None, 0]
+             "testy_user", "testy_ruser", "pillowtalkaudio", None, 0]
             )
 
     with GWARipper() as gwa:
-        gwa._add_to_db(fi, "subpath\\generated [file] [name].mp3")
+        # file_author uses ruser
+        gwa._add_to_db(fi, ri.author, "subpath\\generated [file] [name].mp3")
         gwa.db_con.commit()  # force commit
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
@@ -353,7 +354,7 @@ def test_add_to_db(setup_tmpdir):
              "filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
              "elongate elongate elongate elongate elongate elongate",
              "https://no-page-url.com/324q523q.mp3", "https://chirb.it/23sf32", None,
-             None, None, None, None, None, "old_user", None, None, 0]
+             None, None, None, None, None, "old_user", "diff_author_than_fi", None, None, 0]
             )
 
     fi = FileInfo(object, True, "mp3", "https://chirb.it/23sf32",
@@ -366,7 +367,7 @@ def test_add_to_db(setup_tmpdir):
           "elongate elongate elongate elongate 123.m4a.txt")
 
     with GWARipper() as gwa:
-        gwa._add_to_db(fi, fn)
+        gwa._add_to_db(fi, "diff_author_than_fi", fn)
         gwa.db_con.commit()  # force commit
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
@@ -384,26 +385,26 @@ def test_already_downloaded(setup_tmpdir):
 
     INSERT INTO Downloads(
         date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user,
-        subreddit_name
+        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
+        author_subdir, subreddit_name
         )
     VALUES
         ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
          "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
          "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", NULL),
+         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL),
 
         ("2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
          "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
          "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
          "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-         "26iw32o", NULL, NULL, NULL, "testy_user", NULL),
+         "26iw32o", NULL, NULL, NULL, "testy_user", "testy_user", NULL),
 
         ("2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", NULL,
          "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate elongate elongate elongate elongate elongate elongate",
          "https://no-page-url.com/324q523q.mp3", NULL, 1602557093.0,
          "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-         "2klj654", "don_t change this", NULL, NULL, "old_user", NULL);
+         "2klj654", "don_t change this", NULL, NULL, "old_user", "old_user", NULL);
 
     COMMIT;
     """)
@@ -498,18 +499,18 @@ def test_already_downloaded(setup_tmpdir):
             [1, "2020-01-23", "13:37", "This is a description", "audio_file.m4a",
              "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
              "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", None, None, 0],
+             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
             [2, "2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
              "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
              "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
              "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", None, None, None, "testy_user", None, None, 0],
+             "26iw32o", None, None, None, "testy_user", "testy_user", None, None, 0],
             [3, "2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", None,
              "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
              "elongate elongate elongate elongate elongate elongate",
              "https://no-page-url.com/324q523q.mp3", None, 1602557093.0,
              "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-             "2klj654", "don_t change this", None, None, "old_user", None, None, 0],
+             "2klj654", "don_t change this", None, None, "old_user", "old_user", None, None, 0],
             ]
 
     query_str = "SELECT * FROM Downloads"
@@ -529,20 +530,20 @@ def test_already_downloaded(setup_tmpdir):
     #
     #
 
-    expected[0][8:16] = [1254323.0, ri1.r_post_url, ri1.id, ri1.title, ri1.permalink,
-                         ri1.author, "sassmastah77", ri1.subreddit]
+    expected[0][8:17] = [1254323.0, ri1.r_post_url, ri1.id, ri1.title, ri1.permalink,
+                         ri1.author, "sassmastah77", "sassmastah77", ri1.subreddit]
 
-    expected[1][8:16] = [1602557093.0,
+    expected[1][8:17] = [1602557093.0,
                          "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
                          "26iw32o", ri2.title, ri2.permalink, ri2.author,
-                         "testy_user", ri2.subreddit]
+                         "testy_user", "testy_user", ri2.subreddit]
 
     # page url inserted
     expected[2][7] = "insertedPAGEURL"
-    expected[2][8:16] = [1602557093.0,
+    expected[2][8:17] = [1602557093.0,
                          "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
                          "2klj654", "don_t change this", ri3.permalink, ri3.author,
-                         "old_user", ri3.subreddit]
+                         "old_user", "old_user", ri3.subreddit]
 
     cfg.config["Settings"]["set_missing_reddit"] = "True"
 
@@ -585,26 +586,26 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
     INSERT INTO Downloads(
         date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user,
-        subreddit_name
+        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
+        author_subdir, subreddit_name
         )
     VALUES
         ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
          "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
          "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", NULL),
+         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL),
 
         ("2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
          "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
          "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
          "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-         "26iw32o", NULL, NULL, NULL, "testy_user", NULL),
+         "26iw32o", NULL, NULL, NULL, "testy_user", "testy_user", NULL),
 
         ("2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", NULL,
          "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate elongate elongate elongate elongate elongate elongate",
          "https://no-page-url.com/324q523q.mp3", NULL, 1602557093.0,
          "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-         "2klj654", "don_t change this", NULL, NULL, "old_user", NULL);
+         "2klj654", "don_t change this", NULL, NULL, "old_user", "old_user", NULL);
 
     COMMIT;
     """)
@@ -613,25 +614,25 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
             [1, "2020-01-23", "This is a description", "audio_file.m4a",
              "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
              "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", None, None, 0],
+             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
             [2, "2020-12-13", "This is another description", "subpath\\super_file.mp3",
              "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
              "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
              "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", None, None, None, "testy_user", None, None, 0],
+             "26iw32o", None, None, None, "testy_user", "testy_user", None, None, 0],
             [3, "2020-12-15", "asdlkgjadslkg lkfdgjdslkgjslkd", None,
              "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
              "elongate elongate elongate elongate elongate elongate",
              "https://no-page-url.com/324q523q.mp3", None, 1602557093.0,
              "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-             "2klj654", "don_t change this", None, None, "old_user", None, None, 0],
+             "2klj654", "don_t change this", None, None, "old_user", "old_user", None, None, 0],
             ]
 
     # everything but time col
     query_str = """SELECT
         id, date, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, sgasm_user,
-        subreddit_name, rating, favorite FROM Downloads"""
+        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
+        author_subdir, subreddit_name, rating, favorite FROM Downloads"""
 
     test_con.close()
 
@@ -702,7 +703,7 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     expected.append(
             [4, time.strftime("%Y-%m-%d"), fi1.descr, fi1_fn,
              fi1.title, fi1.direct_url, fi1.page_url, None, None, None, None,
-             None, None, fi1.author, None, None, 0]
+             None, None, fi1.author, fi1.author, None, None, 0]
             )
 
     with GWARipper() as gwa:
@@ -815,12 +816,12 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     expected.extend([
             [5, time.strftime("%Y-%m-%d"), fi2.descr, fi2_fn,
              fi2.title, fi2.direct_url, fi2.page_url, ri1.created_utc, ri1.r_post_url,
-             ri1.id, ri1.title, ri1.permalink,  ri1.author, fi2.author, ri1.subreddit,
-             None, 0],
+             ri1.id, ri1.title, ri1.permalink,  ri1.author, fi2.author, ri1.author,
+             ri1.subreddit, None, 0],
             [6, time.strftime("%Y-%m-%d"), fi3.descr, fi3_fn,
              fi3.title, fi3.direct_url, fi3.page_url, ri1.created_utc, ri1.r_post_url,
-             ri1.id, ri1.title, ri1.permalink,  ri1.author, fi3.author, ri1.subreddit,
-             None, 0],
+             ri1.id, ri1.title, ri1.permalink,  ri1.author, fi3.author, ri1.author,
+             ri1.subreddit, None, 0],
             ])
 
     with GWARipper() as gwa:
@@ -845,20 +846,15 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
         with open(os.path.join(ri1_dir, fns[i]), "r") as f:
             assert f.read() == fi_file_contents[i]
 
+    #
+    # fcol download with one failed dl
+    #
     # reuse fi4 since it wasn't added to db but with diff parent
     fi4.downloaded = False
     fi4.is_audio = True
     fi4.ext = "wav"
     fi4_fn = f"FC2 _ Prep_ended ti_tle_01_{fi4.title}.{fi4.ext}"
-    expected.append(
-            [7, time.strftime("%Y-%m-%d"), fi4.descr, fi4_fn,
-             fi4.title, fi4.direct_url, fi4.page_url, None, None,
-             None, None, None,  None, fi4.author, None, None, 0]
-            )
 
-    #
-    # fcol download with one failed dl
-    #
     fi5 = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
                    build_file_url(os.path.join(testdl_files, "fi5")), rnd.random_string(5),  # id
                    "should raise",  # title
@@ -869,6 +865,12 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
                          [fi4, fi5])
     fi4.parent = fc2
     fi5.parent = fc2
+
+    expected.append(
+            [7, time.strftime("%Y-%m-%d"), fi4.descr, fi4_fn,
+             fi4.title, fi4.direct_url, fi4.page_url, None, None,
+             None, None, None,  None, fi4.author, fc2.author, None, None, 0]
+            )
 
     assert fi4.reddit_info is None  # just to be sure
     assert fi5.reddit_info is None  # just to be sure

@@ -116,3 +116,24 @@ def get_all_rowtuples_db(filename, query_str):
     rows = c.fetchall()
     conn.close()
     return rows
+
+
+def db_from_sql(sql, db_path, row_fac=False):
+    db_con = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
+    if row_fac:
+        db_con.row_factory = sqlite3.Row
+    db_con.executescript(sql)  # sql script commits changes
+    return db_con
+
+
+def load_db_from_sql_file(sql_fn, db_path, row_fac=False):
+    with open(sql_fn, "r", encoding="UTF-8") as f:
+        sql = f.read()
+    return db_from_sql(sql, db_path, row_fac=row_fac)
+
+
+def load_db(db_fn, row_fac=False):
+    db_con = sqlite3.connect(db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
+    if row_fac:
+        db_con.row_factory = sqlite3.Row
+    return db_con
