@@ -13,6 +13,7 @@ def main(args: Optional[List[str]] = None):
     app = create_app()
 
     port = 7568
+    dash_p: Optional[int]
     try:
         dash_p = args.index('-p')
     except ValueError:

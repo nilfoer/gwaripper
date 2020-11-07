@@ -42,6 +42,7 @@ setuptools.setup(
     # copied into the package
     package_data={
         'gwaripper_webGUI': webgui_data,
+        'gwaripper': 'migrations/*.py',
         },
     entry_points={
         'console_scripts': [

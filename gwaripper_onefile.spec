@@ -2,6 +2,7 @@
 
 block_cipher = None
 
+
 a = Analysis(['gwaripper-runner.py'],
              # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see
              # https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows   
@@ -31,20 +32,14 @@ pyz = PYZ(a.pure, a.zipped_data,
              cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts,
+          a.binaries,
+          a.zipfiles,
+          a.datas,
           [],
-          exclude_binaries=True,
-          # name of exe
           name='gwaripper',
           debug=False,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
+          runtime_tmpdir=None,
           console=True )
-coll = COLLECT(exe,
-               a.binaries,
-               a.zipfiles,
-               a.datas,
-               strip=False,
-               upx=True,
-               # name of folder
-               name='gwaripper')
