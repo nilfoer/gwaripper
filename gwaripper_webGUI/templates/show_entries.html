@@ -36,7 +36,7 @@
             <div class="entry-expand-inner">
                 <div class="description">
                     Audio page title: {{ entry.title }}<br/>
-                    Local filename: {{ entry.local_filename if entry.local_filename else 'Missing!' }}<br/><br/>
+                    Local filename: {{ entry.author_subdir + '/' + entry.local_filename if entry.local_filename else 'Missing!' }}<br/><br/>
                     {% if entry.description %}
                         <h2>Description:</h2>
                         {% for ln in entry.description.splitlines() %}
@@ -84,7 +84,7 @@
                 {# we don't have local_filename for older entries, so check for it's presence #}
                 <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=entry.local_filename) if entry.local_filename else '' }}>
                 </div>
-                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=entry.local_filename + '.txt') if entry.local_filename else '' }}>
+                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=selftext_fns[loop.index0]) if selftext_fns[loop.index0] else '' }}>
                 </div>
             </div>
         </div> {# entry-expand #}
@@ -138,18 +138,23 @@
 			$('.load-selftxt-embed').click(function(event) {
                 let embed_container = $(event.currentTarget).parents(".entry-expand").find(".selftxt-embed");
                 let embed_url = embed_container.data("localSrc");
-                // load txt from txt file and put it into our embed_container if load was successful
-                $.get(embed_url)
-                    .done(function(content) { 
-                        // exists code 
-                        let lines = content.split('\n');
-                        embed_container.html('<h2>Selftext:</h2>' + lines.join("<br/>"));
-                        // need to split </scr ipt> tag otherwise browser parses it as end of script
-                    }).fail(function() { 
-                        // not exists code
-                        // add HTMLString to end of element
-                        embed_container.html("<br/>Error: Local selftext file couldn&#39;t be found!<br/>");
-                    })
+
+                if (embed_url) {
+                    // load txt from txt file and put it into our embed_container if load was successful
+                    $.get(embed_url)
+                        .done(function(content) { 
+                            // exists code 
+                            let lines = content.split('\n');
+                            embed_container.html('<h2>Selftext:</h2>' + lines.join("<br/>"));
+                            // need to split </scr ipt> tag otherwise browser parses it as end of script
+                        }).fail(function() { 
+                            // not exists code
+                            // add HTMLString to end of element
+                            embed_container.html("<br/>Error: Local selftext file couldn&#39;t be found!<br/>");
+                        })
+                } else {
+                    embed_container.text("No selftext file has been saved!");
+                }
                 event.preventDefault();
 			});
 			$('.remove-entry-btn').click(function(event) {

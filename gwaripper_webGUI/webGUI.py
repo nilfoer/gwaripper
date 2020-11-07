@@ -5,6 +5,10 @@ Description: Creates webGUI for GWARipper using flask
 
 import os.path
 import re
+import datetime
+
+from typing import Optional, List, Tuple, Dict, Any
+
 from flask import (
         current_app, request, redirect, url_for, Blueprint,
         render_template, flash, send_from_directory,
@@ -14,8 +18,9 @@ from flask import (
 from gwaripper.db import (
         get_x_entries, validate_order_by_str, search,
         remove_entry as gwa_remove_entry, set_favorite_entry,
-        set_rating
+        set_rating, RowData
 )
+from gwaripper.info import sanitize_filename
 
 from .gwaripper_db import get_db
 
@@ -131,7 +136,9 @@ def artist_file(artist, filename):
     return resp
 
 
-def get_entries(query=None):
+def get_entries(query: Optional[str] = None) -> Tuple[
+        List[RowData], List[Optional[str]], str, str, Optional[Any], Optional[Any],
+        Optional[Dict[str, bool]]]:
     order_by_col = request.args.get('sort_col', "id", type=str)
     # validate our sorting col otherwise were vulnerable to sql injection
     if not validate_order_by_str(order_by_col):
@@ -151,6 +158,7 @@ def get_entries(query=None):
     elif before is not None and len(before) == 1 and order_by_col != "id":
         before = (None, before[0])
 
+    entries: List[RowData]
     if query:
         # get 1 entry more than ENTRIES_PER_PAGE so we know if we need btn in that direction
         entries = search(get_db(), query, order_by=order_by,
@@ -160,16 +168,45 @@ def get_entries(query=None):
                                 order_by=order_by)
     first, last, more = first_last_more(entries, order_by_col, after, before)
 
-    return entries, order_by_col, asc_desc, first, last, more
+    selftext_fns: List[Optional[str]] = []
+    if entries:
+        # account for older selftext filenames
+        # <0.3 audio file name + '.txt'
+        # ==0.3: subpath + sanitized reddit title + '.txt'
+        for entry in entries:
+            if entry.date is None or entry.reddit_id is None or entry.local_filename is None:
+                selftext_fns.append(None)
+                continue
+
+            date: Optional[datetime.datetime]
+            try:
+                date = datetime.datetime.strptime(entry.date, '%Y-%m-%d')
+            except ValueError:
+                date = None
+
+            if date is not None and date > datetime.datetime(year=2020, month=10, day=10):
+                # @Hack basically same code as in ReddInfo.write_selftext_file
+                subpath = os.path.dirname(entry.local_filename)
+                # needs author_subdir to get correct length
+                filename = sanitize_filename(os.path.join(entry.author_subdir, subpath),
+                                             entry.reddit_title)
+                filename = os.path.join(subpath, filename)
+                selftext_fns.append(f"{filename}.txt")
+            else:
+                selftext_fns.append(f"{entry.local_filename}.txt")
+
+    return entries, selftext_fns, order_by_col, asc_desc, first, last, more
 
 
 @main_bp.route('/', methods=["GET"])
 def show_entries():
-    entries, order_by_col, asc_desc, first, last, more = get_entries()
+    entries, selftext_fns, order_by_col, asc_desc, first, last, more = get_entries()
+
     return render_template(
         'show_entries.html',
         display_search_err_msg=True if entries is None else False,
         entries=entries,
+        selftext_fns=selftext_fns,
         more=more,
         first=first,
         last=last,
@@ -177,11 +214,13 @@ def show_entries():
         asc_desc=asc_desc)
 
 
-def first_last_more(entries, order_by_col="id", after=None, before=None):
+def first_last_more(entries: List[RowData], order_by_col: str = "id",
+                    after: Optional[int] = None, before: Optional[int] = None) -> Tuple[
+                            Optional[Any], Optional[Any], Optional[Dict[str, bool]]]:
     if not entries:
         return None, None, None
 
-    more = {"next": None, "prev": None}
+    more: Dict[str, bool] = {"next": False, "prev": False}
 
     # we alway get one row more to know if there are more results after our current last_id
     # in the direction we moved in
@@ -233,12 +272,13 @@ def search_entries():
     if URL_RE.match(searchstr):
         return redirect(url_for("main.jump_to_book_by_url", ext_url=searchstr))
 
-    entries, order_by_col, asc_desc, first, last, more = get_entries(searchstr)
+    entries, selftext_fns, order_by_col, asc_desc, first, last, more = get_entries(searchstr)
 
     return render_template(
         'show_entries.html',
         display_search_err_msg=True if entries is None else False,
         entries=entries,
+        selftext_fns=selftext_fns,
         more=more,
         first=first,
         last=last,
