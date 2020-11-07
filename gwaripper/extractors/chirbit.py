@@ -5,7 +5,7 @@ import bs4
 
 from typing import Optional, ClassVar, Pattern, Match, cast, Tuple, Any
 
-from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport
+from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport, title_has_banned_tag
 from ..info import FileInfo
 from ..exceptions import InfoExtractingError
 
@@ -47,6 +47,10 @@ class ChirbitExtractor(BaseExtractor):
 
         soup = bs4.BeautifulSoup(html, "html.parser")
 
+        title = soup.select_one('div.chirbit-title').text
+        if title_has_banned_tag(title):
+            return None, ExtractorReport(self.url, ExtractorErrorCode.BANNED_TAG)
+
         # selects ONE i tag with set data-fd attribute beneath tag with class .wavholder
         # beneath div with id main then get attribute data-fd
         # TypeError when trying to subscript soup.select_one but its None
@@ -59,7 +63,6 @@ class ChirbitExtractor(BaseExtractor):
         # this link EXPIRES so get it right b4 downloading
         direct_url = base64.b64decode(str_b64_rev).decode("utf-8")
         ext = direct_url.split("?")[0].rsplit(".", 1)[1]
-        title = soup.select_one('div.chirbit-title').text
         author = soup.select_one('#chirbit-username').text
 
         return (FileInfo(self.__class__, True, ext, self.url,

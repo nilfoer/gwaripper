@@ -11,6 +11,7 @@ from ..exceptions import (
         InfoExtractingError, NoAPIResponseError,
         NoAuthenticationError, AuthenticationFailed
         )
+from .. import config
 from ..info import FileInfo, FileCollection
 
 logger = logging.getLogger(__name__)
@@ -257,3 +258,39 @@ class BaseExtractor(Generic[T]):
             logger.debug("Getting html done!")
 
         return res, http_code
+
+
+def title_has_banned_tag(
+        title: str, keywordlist: List[str] = config.KEYWORDLIST,
+        tag1_but_not_2: Optional[
+            List[Tuple[str, str]]] = config.TAG1_BUT_NOT_TAG2) -> bool:
+    """
+    Checks title for banned tags (case-insensitive) from keywordlist
+    returns True if a banned tag is found.
+    Also returns True if one of the first tags in the tag-combos
+    in tag1_but_not_2 is contained but the second isnt.
+
+    Example:    tag1:"[f4f" tag2:"4m]"
+                title: "[F4F][F4M] For both male and female listeners.." -> return False
+                title: "[F4F] For female listeners.." -> return True
+
+    :param title: title string
+    :param keywordlist: banned keywords/tags
+    :param tag1_but_not_2: List of 2-tuples, first tag(str) is only banned if
+                           second isn't contained
+    :return: True if title contains banned tag
+    """
+    title = title.lower()
+    for keyword in keywordlist:
+        if keyword in title:
+            logger.warning(f"Banned keyword '{keyword}' in: {title}")
+            return True
+
+    if tag1_but_not_2:
+        for tag_b, tag_in in tag1_but_not_2:
+            # tag_b is only banned if tag_in isnt found in subtitle
+            if (tag_b in title) and not (tag_in in title):
+                logger.warning(
+                        f"Banned keyword: no '{tag_in}' in title where '{tag_b}' is in: {title}")
+                return True
+    return False

@@ -4,16 +4,19 @@ import os
 import time
 import shutil
 
+import prawcore
+
 import gwaripper.config as config
 
 from gwaripper.reddit import reddit_praw
 from gwaripper.extractors import find_extractor, AVAILABLE_EXTRACTORS
-from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode, BaseExtractor
+from gwaripper.extractors.base import (
+        ExtractorReport, ExtractorErrorCode, BaseExtractor, title_has_banned_tag)
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.eraudica import EraudicaExtractor
 from gwaripper.extractors.chirbit import ChirbitExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
-from gwaripper.extractors.reddit import RedditExtractor, check_submission_banned_tags
+from gwaripper.extractors.reddit import RedditExtractor
 from gwaripper.exceptions import (
         NoAuthenticationError, InfoExtractingError,
         NoAPIResponseError, AuthenticationFailed
@@ -90,12 +93,6 @@ sgasm_usr_audio_urls = [
     "https://soundgasm.net/u/DDCherryB/Verification-and-Script-Fill"]
 
 
-class Submission:
-    def __init__(self, title):
-        self.title = title
-        self.shortlink = "testing"
-
-
 @pytest.mark.parametrize("title, keywordlist, tag1_but_not_2, expected", [
     ("[M4F] This should be banned", ["[m4", "[cuck"], None, True),
     ("[M4F] This shouldnt be banned", ["[cuck", "cei"], None, False),
@@ -104,10 +101,8 @@ class Submission:
     ("[F4F][F4M] This shouldnt be banned", ["[m4", "[cuck"], [("[f4f]", "4m]")], False)
 ])
 def test_banned_tags(title, keywordlist, tag1_but_not_2, expected):
-    # simulate reddit sub
-    sub = Submission(title)
-    result = check_submission_banned_tags(sub, keywordlist, tag1_but_not_2)
-    assert result == expected
+    result = title_has_banned_tag(title, keywordlist, tag1_but_not_2)
+    assert result is expected
 
 
 def test_soundgasm_user_extractor(monkeypatch):
@@ -175,6 +170,28 @@ Sword Fight 1.MP3 - FunWithSound - https://freesound.org/people/FunWithSound/sou
     assert fi.reddit_info is None
     assert fi.downloaded is False
     assert fi.already_downloaded is False
+
+
+def test_extractor_soundgasm_banned_tag(monkeypatch):
+    #
+    # banned keyword in title
+    #
+    def patched_banned_tag(title, keywordlist=['cheating]'], t12=[]):
+        return title_has_banned_tag(title, keywordlist, t12)
+
+    # patch imported name in reddit module instead of definition in base module
+    monkeypatch.setattr('gwaripper.extractors.soundgasm.title_has_banned_tag', patched_banned_tag)
+    url = ("https://soundgasm.net/u/belle_in_the_woods/F4M-Using-the-Ass-For-Evil"
+           "-Part-1-JOEJOIcheatingteasingbitchystrippingspankingmasturbationperv-on-my-ass")
+
+    ex = SoundgasmExtractor(url, init_from=None)
+    assert not ex.is_user
+    assert ex.author == "belle_in_the_woods"
+    fi, report = ex._extract()
+    assert fi is None
+    assert report.url == url
+    assert report.err_code == ExtractorErrorCode.BANNED_TAG
+    assert not report.children
 
 
 def test_extractor_eraudica():
@@ -253,6 +270,26 @@ def test_extractor_chirbit():
     assert fi.reddit_info is None
     assert fi.downloaded is False
     assert fi.already_downloaded is False
+
+
+def test_extractor_chirbit_banned_tag(monkeypatch):
+    #
+    # banned keyword in title
+    #
+    def patched_banned_tag(title, keywordlist=['mommy'], t12=[]):
+        return title_has_banned_tag(title, keywordlist, t12)
+
+    # patch imported name in reddit module instead of definition in base module
+    monkeypatch.setattr('gwaripper.extractors.chirbit.title_has_banned_tag', patched_banned_tag)
+    url = "https://chirb.it/vcP8ah"
+    ex = ChirbitExtractor(url, init_from=None)
+    assert ex.url == url
+    fi, report = ex._extract()
+    assert fi is None
+
+    assert report.err_code == ExtractorErrorCode.BANNED_TAG
+    assert report.url == url
+    assert not report.children
 
 
 def test_extractor_imgur_image():
@@ -564,8 +601,47 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     config.KEYWORDLIST = ['request']
     config.TAG1_BUT_NOT_TAG2 = [("[script offer]", "[script fill]")]
 
-    tmpdir = setup_tmpdir
-    linkcoldir = os.path.join(tmpdir, "_linkcol")
+    #
+    # no response from reddit
+    #
+    class DummyResponse:
+        def __init__(self, status_code):
+            self.status_code = status_code
+
+    def patched_post(*args, **kwargs):
+        raise prawcore.exceptions.ResponseException(DummyResponse(503))
+
+    bu_post = prawcore.auth.BaseAuthenticator._post
+    monkeypatch.setattr('prawcore.auth.BaseAuthenticator._post', patched_post)
+    ex = RedditExtractor(reddit_extractor_url_expected[0][0])
+
+    caplog.clear()
+    ri, report = ex._extract()
+
+    assert ri is None
+    assert report.url == reddit_extractor_url_expected[0][0]
+    assert report.err_code == ExtractorErrorCode.NO_RESPONSE
+    assert len(report.children) == 0
+
+    # err on client side
+    def patched_post(*args, **kwargs):
+        raise prawcore.exceptions.ResponseException(DummyResponse(403))
+
+    monkeypatch.setattr('prawcore.auth.BaseAuthenticator._post', patched_post)
+
+    ex = RedditExtractor(reddit_extractor_url_expected[0][0])
+
+    caplog.clear()
+    with pytest.raises(InfoExtractingError) as err:
+        ri, report = ex._extract()
+    assert err.value.msg.startswith("The Reddit API returned an HTTP status code")
+
+    # reset
+    monkeypatch.setattr('prawcore.auth.BaseAuthenticator._post', bu_post)
+
+    #
+    #
+    #
 
     caplog.set_level(logging.INFO)
     for url, found_urls, attr_val_dict in reddit_extractor_url_expected:
@@ -574,11 +650,6 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
         # for banned keywords or not finding supported AUDIO urls
         if attr_val_dict is None:
             monkeypatch.setattr('gwaripper.extractors.find_extractor', backup_find)
-
-            try:
-                shutil.rmtree(linkcoldir)
-            except FileNotFoundError:
-                pass
 
         # make sure extractor also accepts init_from even if it doesnt support
         # intializing from it
@@ -620,7 +691,6 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
                     "https://www.literotica.com/s/cougar-tales-new-neighbor") in caplog.text
         else:
             msg = caplog.records[0].message
-            assert "https://redd.it/4r33ek" in msg
             assert msg.startswith("Banned keyword: no '[script fill]' in title "
                                   "where '[script offer]' is in")
             assert ri is None
@@ -659,6 +729,41 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
     assert rep.url == reddit_extractor_url_expected[0][1][0]
     assert rep.err_code == ExtractorErrorCode.NO_ERRORS
     assert not rep.children
+
+
+def test_extractor_reddit_banned_tag_linktext(monkeypatch, caplog):
+    #
+    # one banned keyword in linktext
+    #
+    bu_banned_tag = title_has_banned_tag
+
+    def patched_banned_tag(title, keywordlist=[], t12=[]):
+        return bu_banned_tag(title, keywordlist, [('4f', '4m')])
+
+    # patch imported name in reddit module instead of definition in base module
+    monkeypatch.setattr('gwaripper.extractors.reddit.title_has_banned_tag', patched_banned_tag)
+    url = ("https://www.reddit.com/r/gonewildaudio/comments/h85o4x/f4m_and_f4f_tomboy"
+           "_friend_helps_you_save_money_on/")
+    ex = RedditExtractor(url)
+
+    caplog.clear()
+    ri, report = ex._extract()
+    assert ri.author == 'AuralCandy'
+    assert ri.id == 'h85o4x'
+    assert "Banned keyword: no '4m' in title where '4f' is in: 4f link here" in caplog.text
+
+    assert report.url == url
+    assert report.err_code == ExtractorErrorCode.ERROR_IN_CHILDREN
+    assert len(report.children) == 2
+
+    assert report.children[0].url == (
+            "https://soundgasm.net/u/auralcandy/Tomboy-Friend-Helps"
+            "-You-Save-Money-on-Strippers-4M")
+    assert report.children[0].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[1].url == (
+            "https://soundgasm.net/u/auralcandy/Tomboy-Friend-Helps"
+            "-You-Save-Money-on-Strippers-4F")
+    assert report.children[1].err_code == ExtractorErrorCode.BANNED_TAG
 
 
 class DummyFileInfo:

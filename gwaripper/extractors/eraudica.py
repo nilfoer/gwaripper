@@ -84,6 +84,7 @@ class EraudicaExtractor(BaseExtractor):
         # encode to bytes escaping unicode code points
         # already escaped sequences get esacped as \\\\u.. -> remove extra \\
         # and unescape back to unicode
+        # NOTE: eraudica doesn't really use tags in the title so don't check for banned ones
         title = title.encode("unicode-escape").replace(
                     b'\\\\u', b'\\u').decode('unicode-escape')
         ext = fname.rsplit(".", 1)[1]

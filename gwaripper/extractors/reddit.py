@@ -2,17 +2,19 @@ import re
 import logging
 
 import bs4
+import prawcore
 
 from typing import Optional, cast, Pattern, ClassVar, List, Tuple, Type, TypeVar
 
 from praw.models import Submission
 
-from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport
+from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport, title_has_banned_tag
 # NOTE: IMPORTANT need to be imported as "import foo" rather than "from foo import bar"
 # see :GlobalConfigImport
 from .. import config
 from ..info import RedditInfo, children_iter_dfs
 from ..reddit import reddit_praw, redirect_xpost
+from ..exceptions import InfoExtractingError
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +62,16 @@ class RedditExtractor(BaseExtractor[Submission]):
         return any(filtered_re.match(url) for filtered_re in
                    RedditExtractor.FILTER_URLS_RE)
 
+    def _handle_praw_exc(self, exc: prawcore.exceptions.ResponseException) -> None:
+        if BaseExtractor.http_code_is_extractor_broken(exc.response.status_code):
+            raise InfoExtractingError(
+                    "The Reddit API returned an HTTP status code that "
+                    "implies an error on our side! Either we matched an "
+                    "erroneous URL or the third-party library PRAW is "
+                    "broken!", self.url)
+        else:
+            return None, ExtractorReport(self.url, ExtractorErrorCode.NO_RESPONSE)
+
     def _extract(self) -> Tuple[Optional[RedditInfo], ExtractorReport]:
         """
         Searches .url and .selftext_html of a reddit submission for supported urls.
@@ -81,10 +93,18 @@ class RedditExtractor(BaseExtractor[Submission]):
             self.submission = self.praw.submission(url=self.url)
         submission: Submission = self.submission
 
-        if not check_submission_banned_tags(submission,
-                                            config.KEYWORDLIST, config.TAG1_BUT_NOT_TAG2):
+        # trigger praw lazy object here so we can except ResponseException
+        try:
+            sub_title = submission.title
+        except prawcore.exceptions.ResponseException as err:
+            return self._handle_praw_exc(err)
+
+        if not title_has_banned_tag(sub_title):
             # NOTE: IMPORTANT make sure to only use redirected submission from here on!
-            submission = redirect_xpost(submission)
+            try:
+                submission = redirect_xpost(submission)
+            except prawcore.exceptions.ResponseException as err:
+                return self._handle_praw_exc(err)
             sub_url: str = submission.url
 
             # rebuild subs url to account for redirection
@@ -141,6 +161,12 @@ class RedditExtractor(BaseExtractor[Submission]):
                     if extractor is not None:
                         logger.info("%s link found in selftext of: %s",
                                     extractor.EXTRACTOR_NAME, submission.permalink)
+                        if title_has_banned_tag(link.text):
+                            report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
+                            report.children.append(
+                                    ExtractorReport(href, ExtractorErrorCode.BANNED_TAG))
+                            continue
+
                         fi, extr_msgs = extractor.extract(href, parent=ri,
                                                           parent_report=report)
                     elif RedditExtractor.is_unsupported_audio_url(href):
@@ -168,44 +194,6 @@ class RedditExtractor(BaseExtractor[Submission]):
             report.err_code = ExtractorErrorCode.BANNED_TAG
 
         return ri, report
-
-
-def check_submission_banned_tags(submission: Submission, keywordlist: List[str],
-                                 tag1_but_not_2: Optional[List[Tuple[str, str]]] = None) -> bool:
-    """
-    Checks praw Submission obj for banned tags (case-insensitive) from keywordlist in title
-    returns True if tag is contained. Also returns True if one of the first tags in the tag-combos
-    in tag1_but_not_2 is contained but the second isnt.
-
-    Example:    tag1:"[f4f" tag2:"4m]"
-                title: "[F4F][F4M] For both male and female listeners.." -> return False
-                title: "[F4F] For female listeners.." -> return True
-
-    :param submission: praw Submission obj to scan for banned tags in title
-    :param keywordlist: banned keywords/tags
-    :param tag1_but_not_2: List of 2-tuples, first tag(str) is only banned if
-                           second isn't contained
-    :return: True if submission is banned from downloading else False
-    """
-    # checks submissions title for banned words contained in keywordlist
-    # returns True if it finds a match
-    subtitle = submission.title.lower()
-
-    for keyword in keywordlist:
-        if keyword in subtitle:
-            logger.warning(
-                    "Banned keyword '{}' in: {}\n\t slink: {}".format(
-                        keyword, subtitle, submission.shortlink))
-            return True
-
-    if tag1_but_not_2:
-        for tag_b, tag_in in tag1_but_not_2:
-            # tag_b is only banned if tag_in isnt found in subtitle
-            if (tag_b in subtitle) and not (tag_in in subtitle):
-                logger.warning("Banned keyword: no '{}' in title where '{}' is in: {}\n\t "
-                               "slink: {}".format(tag_in, tag_b, subtitle, submission.shortlink))
-                return True
-    return False
 
 
 def check_submission_time(submission: Submission, lastdltime: float) -> bool:

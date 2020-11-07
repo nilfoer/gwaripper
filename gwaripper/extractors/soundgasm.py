@@ -4,7 +4,7 @@ import bs4
 
 from typing import Optional, Union, cast, Match, ClassVar, Pattern, Tuple, Any
 
-from .base import BaseExtractor, ExtractorReport, ExtractorErrorCode
+from .base import BaseExtractor, ExtractorReport, ExtractorErrorCode, title_has_banned_tag
 from ..info import FileInfo, FileCollection
 from ..exceptions import InfoExtractingError
 
@@ -68,6 +68,9 @@ class SoundgasmExtractor(BaseExtractor):
         soup = bs4.BeautifulSoup(html, "html.parser")
 
         title = soup.select_one("div.jp-title").text
+        if title_has_banned_tag(title):
+            return None, ExtractorReport(self.url, ExtractorErrorCode.BANNED_TAG)
+
         direct_url = cast(Match, re.search("m4a: \"(.+)\"", html)).group(1)
         ext = direct_url.rsplit('.', 1)[1]
         descr = soup.select_one("div.jp-description > p").text
