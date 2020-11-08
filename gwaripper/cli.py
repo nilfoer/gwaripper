@@ -33,6 +33,10 @@ def main():
     parser = argparse.ArgumentParser(
             description="Script to download gonewildaudio/pta posts from either reddit "
                         "or soundgasm.net directly.")
+
+    parser.add_argument('--ignore-banned', action='store_true',
+                        help="Ignores banned tags in titles and in link text!")
+
     # support sub-commands like svn checkout which require different kinds of
     # command-line arguments
     subparsers = parser.add_subparsers(
@@ -219,6 +223,11 @@ def main():
         args = parser.parse_args()
 
     if root_dir:
+
+        # set selected ignore-banned option in config
+        if args.ignore_banned:
+            config.config['Settings']['check_banned_tags'] = 'False'
+
         if args.test:
             # test code
             pass

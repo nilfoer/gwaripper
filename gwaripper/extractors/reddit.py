@@ -62,7 +62,8 @@ class RedditExtractor(BaseExtractor[Submission]):
         return any(filtered_re.match(url) for filtered_re in
                    RedditExtractor.FILTER_URLS_RE)
 
-    def _handle_praw_exc(self, exc: prawcore.exceptions.ResponseException) -> None:
+    def _handle_praw_exc(self, exc: prawcore.exceptions.ResponseException) -> Tuple[
+            None, ExtractorReport]:
         if BaseExtractor.http_code_is_extractor_broken(exc.response.status_code):
             raise InfoExtractingError(
                     "The Reddit API returned an HTTP status code that "

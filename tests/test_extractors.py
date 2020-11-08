@@ -105,6 +105,20 @@ def test_banned_tags(title, keywordlist, tag1_but_not_2, expected):
     assert result is expected
 
 
+def test_banned_tags_deactivated():
+    config.config['Settings']['check_banned_tags'] = 'False'
+    assert title_has_banned_tag(
+            "[M4F] This should be banned", ["[m4", "[cuck"], None) is False
+    assert title_has_banned_tag(
+            "[F4F] This should be banned", ["[m4", "[cuck"], [("[f4f]", "4m]")]) is False
+
+    config.config['Settings']['check_banned_tags'] = 'True'
+    assert title_has_banned_tag(
+            "[M4F] This should be banned", ["[m4", "[cuck"], None) is True
+    assert title_has_banned_tag(
+            "[F4F] This should be banned", ["[m4", "[cuck"], [("[f4f]", "4m]")]) is True
+
+
 def test_soundgasm_user_extractor(monkeypatch):
     # make sure extractor also accepts init_from even if it doesnt support
     # intializing from it

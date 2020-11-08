@@ -63,6 +63,7 @@ if not config.sections():
             "client_id": "97adaebade846f6",
         },
         "Settings": {
+            "check_banned_tags": "True",
             "tag_filter": "[request]",
             "tag1_in_but_not_tag2": "[script offer];[script fill]",
             "db_bu_freq": "5",

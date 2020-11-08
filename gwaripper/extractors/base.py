@@ -280,6 +280,9 @@ def title_has_banned_tag(
                            second isn't contained
     :return: True if title contains banned tag
     """
+    if not config.config.getboolean('Settings', 'check_banned_tags', fallback=True):
+        return False
+
     title = title.lower()
     for keyword in keywordlist:
         if keyword in title:
