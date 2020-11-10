@@ -300,7 +300,7 @@ class GWARipper:
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
                     # executes the SQL query but leaves commiting it to with db_con in line above
-                    self._add_to_db(info, author_name, filename)
+                    self._add_to_db(info, author_name, os.path.join(subpath, filename))
                     # func passed as kwarg reporthook gets called once on establishment
                     # of the network connection and once after each block read thereafter.
                     # The hook will be passed three arguments; a count of blocks transferred

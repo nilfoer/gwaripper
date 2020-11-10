@@ -813,12 +813,13 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
     fi3.already_downloaded = False
     fi4.already_downloaded = False
 
+    ri1_dirname = os.path.join("Reddit_title _ as sub_path")
     expected.extend([
-            [5, time.strftime("%Y-%m-%d"), fi2.descr, fi2_fn,
+            [5, time.strftime("%Y-%m-%d"), fi2.descr, os.path.join(ri1_dirname, fi2_fn),
              fi2.title, fi2.direct_url, fi2.page_url, ri1.created_utc, ri1.r_post_url,
              ri1.id, ri1.title, ri1.permalink,  ri1.author, fi2.author, ri1.author,
              ri1.subreddit, None, 0],
-            [6, time.strftime("%Y-%m-%d"), fi3.descr, fi3_fn,
+            [6, time.strftime("%Y-%m-%d"), fi3.descr, os.path.join(ri1_dirname, fi3_fn),
              fi3.title, fi3.direct_url, fi3.page_url, ri1.created_utc, ri1.r_post_url,
              ri1.id, ri1.title, ri1.permalink,  ri1.author, fi3.author, ri1.author,
              ri1.subreddit, None, 0],
@@ -836,14 +837,14 @@ def test_download(setup_tmpdir, monkeypatch, caplog):
 
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
-    ri1_dir = os.path.join(tmpdir, ri1.author, "Reddit_title _ as sub_path")
     # selftext
-    with open(os.path.join(ri1_dir, "Reddit_title _ as sub_path.txt"), "r") as f:
+    ri1_dir_abs = os.path.join(tmpdir, ri1.author, ri1_dirname)
+    with open(os.path.join(ri1_dir_abs, "Reddit_title _ as sub_path.txt"), "r") as f:
         assert f.read() == (
                 f"Title: {ri1.title}\nPermalink: {ri1.permalink}\nSelftext:\n\n{ri1.selftext}")
     fns = [None, fi1_fn, fi2_fn, fi3_fn, fi4_fn]
     for i in range(2, 5):
-        with open(os.path.join(ri1_dir, fns[i]), "r") as f:
+        with open(os.path.join(ri1_dir_abs, fns[i]), "r") as f:
             assert f.read() == fi_file_contents[i]
 
     #
