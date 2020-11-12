@@ -404,6 +404,8 @@ def test_db_migration(setup_tmpdir, monkeypatch, caplog):
         assert m.is_versionized is True
         assert m.is_dirty is False
         assert m.version == 1
+        # db vacuumed
+        assert "Optimizing DB after migration" in caplog.text
 
     #
     # new version

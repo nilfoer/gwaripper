@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # so we don't have to read all migration scripts every time
-LATEST_VERSION = 0
+LATEST_VERSION = 1
 VERSION_TABLE = 'GWAR_Version'
 MIGRATIONS_DIRNAME = 'migrations'
 # migrations dir has to be a sub-folder of the MODULE_DIR
@@ -217,6 +217,18 @@ class Database:
             if not self._upgrade_to_version(new_version):
                 return False
         else:
+            # trigger manual VACUUM so db gets optimized after migrating it
+            # The VACUUM command does not change the content of the database
+            # except the rowid values. If you use INTEGER PRIMARY KEY column,
+            # the VACUUM does not change the values of that column
+            # good practice to run manually after deleting alot etc. -> so good
+            # after migration
+            # SQLite first copies data within a database file to a temporary
+            # database. This operation defragments the database objects,
+            # ignores the free spaces, and repacks individual pages.
+            # then the result is copied back overwriting the original DB
+            logger.info("Optimizing DB after migration!")
+            self.db_con.execute("VACUUM")
             return True
 
 
