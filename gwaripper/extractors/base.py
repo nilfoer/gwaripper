@@ -181,8 +181,10 @@ class BaseExtractor(Generic[T]):
 
         if result is not None:
             if parent is not None:
-                parent.children.append(result)
-                result.parent = parent
+                if isinstance(result, FileCollection):
+                    parent.add_collection(result)
+                else:
+                    parent.add_file(result)
             # set ref to report on info
             result.report = report
         if parent_report is not None:

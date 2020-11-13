@@ -300,6 +300,14 @@ class FileInfo:
                 self.reddit_info = parent
             parent = parent.parent
 
+    def get_topmost_parent(self) -> Optional['FileCollection']:
+        p = self.parent
+        while True:
+            if not p.parent:
+                break
+            p = p.parent
+        return p
+
     def generate_filename(self, file_index: int = 0) -> Tuple[str, str, str]:
         """
         Generates filename to save file locally by replacing chars in the title that are not:
@@ -314,23 +322,20 @@ class FileInfo:
         """
 
         title = []
-        # NOTE: subpath inside gwaripper root -> usr name folder
-        subpaths = []
+        # NOTE: relative to gwaripper_root/author/
+        subpath: str = ""
         if self.parent:
             # reddit_title can only be a RedditInfo.title
             # but parent_title can also be a RedditInfo.title
             parent_title = self.parent.title if self.parent.title else self.parent.id
 
+            # always save everything in at most one sub-directory
+            # even if further FileCollections would have a subpath
+            # NOTE: IMPORTANT! if we change this behaviour also change
+            # :PassSubpathSelftext
             if self.reddit_info is not None:
-                # reddit_info.subpath -> save everything in that folder
-                # even if further FileCollections would have a subpath
-                # NOTE: IMPORTANT! if we change this behaviour also change
-                # :PassSubpathSelftext
                 if self.reddit_info.subpath:
-                    # NOTE: IMPORTANT folder names must not begin or end in spaces
-                    # so use strip or sanitize_filename; strip is enough here
-                    # since subpath uses sanitize_filename anyway
-                    subpaths.append(self.reddit_info.subpath[:70].strip())
+                    subpath = self.reddit_info.subpath
                 else:
                     # other FileCollections can't be >=3 files since then we'd have
                     # a reddit subpath
@@ -339,19 +344,14 @@ class FileInfo:
                 if parent_title and self.parent is not self.reddit_info:
                     title.append(parent_title[:30])
             else:
-                # we might have nested FileCollections; currently not allowed!
-                p = self.parent
-                while p is not None:
-                    # give topmost parent double the chars
-                    # NOTE: IMPORTANT folder names must not begin or end in spaces
-                    subpaths.append(p.subpath[:25].strip() if p.parent else
-                                    p.subpath[:50].strip())
-                    p = p.parent
-                subpaths.reverse()
+                # we might have nested FileCollections; but currently not allowed!
+                topmost_parent = self.get_topmost_parent()
+                if topmost_parent:
+                    subpath = topmost_parent.subpath
 
-                # don't need to include parent_title if we're in our direct
-                # parents subpath anyway
-                if not self.parent.subpath:
+                # include parent_title if we're not in a parent's subpath
+                # or if the subpath we're in is not the one of our direct parent
+                if not subpath or topmost_parent is not self.parent:
                     title.append(parent_title[:40])
 
         # file index and file title are always last
@@ -373,19 +373,11 @@ class FileInfo:
         #   will have to create new objects anyway
         title_combined: str = "_".join(title)
 
-        subpath = os.path.join(*subpaths) if subpaths else ""
-
         filename = sanitize_filename(subpath, title_combined)
         return (subpath, filename, self.ext)
 
 
 class FileCollection:
-
-    # TODO: we only want to allow RedditInfo to contain other FileCollections
-    # since we can't do it by re-defining children's type in the derived class
-    # we'd have to split them up unless we're okay with just having the
-    # parent property only allow RedditInfo as a parent
-    children: List[Union[FileInfo, 'FileCollection']]
 
     def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: Optional[str],
                  title: Optional[str], author: Optional[str],
@@ -395,21 +387,62 @@ class FileCollection:
         self.id = _id
         self.title = title
         self.author = author
+
         if children is None:
-            self.children = []
+            self._children = []
         else:
-            self.children = children
+            self._children = children
+
+        # handled by property: returns empty string when there are not enough files to
+        # have a subpath
+        # NOTE: IMPORTANT folder names must not begin or end in spaces
+        # so use strip or sanitize_filename; strip is enough here
+        # since subpath uses sanitize_filename anyway
+        self._subpath: str = self._update_subpath()
+        self._nr_files: int = sum(1 for _, _ in
+                                  children_iter_dfs(self._children, file_info_only=True))
+
         self._parent: Optional[RedditInfo] = None
         # NOTE: a collection only counts as downloaded if all of it's children are
         self._downloaded: bool = False
         self.report: Optional[ExtractorReport] = None
 
     def __str__(self):
-        return f"FileCollection<{self.url}, children: {len(self.children)}>"
+        return f"FileCollection<{self.url}, children: {self.nr_files}>"
 
-    # TODO: append etc. for children so we don't have to re-count them every time
+    def _update_subpath(self) -> str:
+        subpath = sanitize_filename(
+                "", f"{self.title if self.title else self.id}")[:70].strip()
+        self._subpath = subpath
+        return subpath
+
+    @property
+    def children(self) -> List[Union[FileInfo, 'FileCollection']]:
+        return self._children
+
+    @property
     def nr_files(self) -> int:
-        return sum(1 for _ in children_iter_dfs(self.children, file_info_only=True))
+        return self._nr_files
+
+    @nr_files.setter
+    def nr_files(self, value: int):
+        delta = value - self.nr_files
+        self._nr_files = value
+        if self.parent:
+            self.parent.nr_files += delta
+
+    def add_file(self, info: FileInfo) -> None:
+        self._children.append(info)
+        info.parent = self
+
+        self.nr_files += 1
+
+        # TODO handle downloaded and already_downloaded here and in add_collection?
+
+    def add_collection(self, collection: 'FileCollection'):
+        self._children.append(collection)
+        collection.parent = self
+        self.nr_files += collection.nr_files
 
     # recursive!
     # traverses children and children's children to get downloaded
@@ -428,6 +461,13 @@ class FileCollection:
         return all_downloaded
 
     @property
+    def subpath(self) -> str:
+        if self.nr_files >= 3:
+            return self._subpath
+        else:
+            return ""
+
+    @property
     def downloaded(self):
         return self._downloaded
 
@@ -436,13 +476,6 @@ class FileCollection:
         self._downloaded = value
         if self.report is not None:
             self.report.downloaded = value
-
-    @property
-    def subpath(self) -> str:
-        if self.nr_files() >= 3:
-            return sanitize_filename("", f"{self.title if self.title else self.id}")
-        else:
-            return ""
 
     @property
     def parent(self):
@@ -502,11 +535,8 @@ class RedditInfo(FileCollection):
                  title: str, author: Optional[str], subreddit: str, permalink: str,
                  created_utc: float,
                  children: Optional[List[Union[FileInfo, 'FileCollection']]] = None):
-        super().__init__(extractor, url, _id, title, author)
-        if children is None:
-            self.children = []
-        else:
-            self.children = children
+        super().__init__(extractor, url, _id, title, author, children)
+
         self.permalink = permalink
         self.created_utc = created_utc
         self.subreddit: str = subreddit

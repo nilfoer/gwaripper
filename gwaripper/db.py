@@ -6,13 +6,13 @@ import sqlite3
 import datetime
 import csv
 import re
-import operator
+import enum
 
-from typing import Tuple, Optional, Set
-from functools import reduce
+from typing import Tuple, Optional, Set, Dict, Sequence, List
 
 from .config import config, write_config_module
 from . import migrate
+from .info import DELETED_USR_FOLDER, UNKNOWN_USR_FOLDER
 from .exceptions import GWARipperError
 
 logger = logging.getLogger(__name__)
@@ -37,45 +37,204 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
         # context mangaer auto-commits changes or does rollback on exception
         with conn:
             conn.executescript(f"""
+                BEGIN IMMEDIATE TRANSACTION;
                 PRAGMA foreign_keys=off;
 
-                CREATE TABLE IF NOT EXISTS Downloads(
-                    id INTEGER PRIMARY KEY ASC, date TEXT, time TEXT,
-                    description TEXT, local_filename TEXT, title TEXT,
-                    url_file TEXT, url TEXT, created_utc REAL,
-                    r_post_url TEXT, reddit_id TEXT, reddit_title TEXT,
-                    reddit_url TEXT, reddit_user TEXT,
-                    author_page TEXT, author_subdir TEXT NOT NULL, subreddit_name TEXT,
-                    rating REAL, favorite INTEGER NOT NULL DEFAULT 0);
+                CREATE TABLE AudioFile(
+                    id INTEGER PRIMARY KEY ASC,
+                    collection_id INTEGER,
+                    -- whether the collection_id was present at the time
+                    -- of downloading the file (to figure out if to use collection's path)
+                    downloaded_with_collection INTEGER NOT NULL DEFAULT 0,
+                    date DATE NOT NULL,
+                    description TEXT,
+                    filename TEXT NOT NULL,
+                    title TEXT,
+                    url TEXT UNIQUE NOT NULL,
+                    alias_id INTEGER NOT NULL,
+                    rating REAL,
+                    favorite INTEGER NOT NULL DEFAULT 0,
+                    FOREIGN KEY (collection_id) REFERENCES FileCollection(id)
+                      -- can't delete a FileCollection if there are still rows with
+                      -- it's id as collection_id here
+                      ON DELETE RESTRICT,
+                    FOREIGN KEY (alias_id) REFERENCES Alias(id)
+                      ON DELETE RESTRICT
+                );
+
+                -- Indexes are implicitly created only in the case of PRIMARY KEY
+                -- and UNIQUE statements
+                CREATE INDEX audio_file_collection_id_idx ON AudioFile(collection_id);
+                CREATE INDEX audio_file_alias_id_idx ON AudioFile(alias_id);
+
+                -- so we can match aliases to an artist and use the artist name for displaying
+                -- all the files of it's aliases
+                -- files will still be stored under the alias name though since if we don't have
+                -- reddit information we can't match an audio host user name (alias) to an artist
+                -- without user interaction and we also can't match on similarity
+                -- matching later when we have reddit info that links an alias an artist is also
+                -- not an option since we'd have to move the files which might not be present
+                -- anymore (e.g. backed up somewhere else)
+                CREATE TABLE Artist(
+                    id INTEGER PRIMARY KEY ASC,
+                    name TEXT UNIQUE NOT NULL
+                );
+
+                CREATE TABLE Alias(
+                    id INTEGER PRIMARY KEY ASC,
+                    artist_id INTEGER,
+                    name TEXT UNIQUE NOT NULL,
+                    FOREIGN KEY (artist_id) REFERENCES Artist(id)
+                        ON DELETE RESTRICT
+                );
+
+                CREATE INDEX alias_artist_id_idx ON Alias(artist_id);
+
+                INSERT OR IGNORE INTO Alias(name) VALUES ('{DELETED_USR_FOLDER}');
+                INSERT OR IGNORE INTO Alias(name) VALUES ('{UNKNOWN_USR_FOLDER}');
+
+                CREATE TABLE FileCollection(
+                    id INTEGER PRIMARY KEY ASC,
+                    url TEXT UNIQUE NOT NULL,
+                    id_on_page TEXT,
+                    title TEXT,
+                    subpath TEXT NOT NULL,
+                    reddit_info_id INTEGER,
+                    parent_id INTEGER,
+                    alias_id INTEGER NOT NULL,
+                    FOREIGN KEY (reddit_info_id) REFERENCES RedditInfo(id)
+                      ON DELETE RESTRICT,
+                    FOREIGN KEY (parent_id) REFERENCES FileCollection(id)
+                      ON DELETE RESTRICT,
+                    FOREIGN KEY (alias_id) REFERENCES Alias(id)
+                      ON DELETE RESTRICT
+                );
+
+                -- we only need created_utc here (if at all) but put the structure in place anyway
+                -- since we might expand it later
+                CREATE TABLE RedditInfo(
+                    id INTEGER PRIMARY KEY ASC,
+                    created_utc REAL
+                    -- should we safe the selftext in the db?
+                    -- selftext TEXT
+                );
+
+                CREATE VIEW v_audio_and_collection_combined
+                AS
+                SELECT
+                    AudioFile.id,
+                    AudioFile.collection_id,
+                    AudioFile.downloaded_with_collection,
+                    AudioFile.date,
+                    AudioFile.description,
+                    AudioFile.filename,
+                    AudioFile.title,
+                    AudioFile.url,
+                    AudioFile.alias_id,
+                    AudioFile.rating,
+                    AudioFile.favorite,
+                    Alias.name as alias_name,
+                    Artist.name as artist_name,
+                    FileCollection.id as fcol_id,
+                    FileCollection.url as fcol_url,
+                    FileCollection.id_on_page as fcol_id_on_page,
+                    FileCollection.title as fcol_title,
+                    FileCollection.subpath as fcol_subpath,
+                    FileCollection.reddit_info_id as fcol_reddit_info_id,
+                    FileCollection.parent_id as fcol_parent_id,
+                    FileCollection.alias_id as fcol_alias_id,
+                    -- get alias name for FileCollection
+                    -- artist_id of fcol and audiofile will be the same so we don't
+                    -- have to query for that
+                    (SELECT
+                            Alias.name
+                     FROM Alias WHERE Alias.id = FileCollection.alias_id) as fcol_alias_name,
+                    RedditInfo.created_utc as reddit_created_utc
+                FROM AudioFile
+                LEFT JOIN FileCollection ON AudioFile.collection_id = FileCollection.id
+                LEFT JOIN RedditInfo ON FileCollection.reddit_info_id = RedditInfo.id
+                JOIN Alias ON Alias.id = AudioFile.alias_id
+                LEFT JOIN Artist ON Artist.id = Alias.artist_id;
+
+                CREATE VIEW v_audio_and_collection_titles
+                AS
+                SELECT
+                    AudioFile.id as audio_id,
+                    FileCollection.title as collection_title,
+                    AudioFile.title as audio_title
+                FROM AudioFile
+                LEFT JOIN FileCollection ON AudioFile.collection_id = FileCollection.id;
 
                 -- full text-search virtual table
                 -- only stores the idx due to using parameter content='..'
-                -- -> external content table
+                -- -> external content table (here using a view)
                 -- but then we have to keep the content table and the idx up-to-date ourselves
-                CREATE VIRTUAL TABLE IF NOT EXISTS Downloads_fts_idx USING fts5(
-                  title, reddit_title, content='Downloads', content_rowid='id');
+                CREATE VIRTUAL TABLE IF NOT EXISTS Titles_fts_idx USING fts5(
+                  title, collection_title,
+                  content='v_audio_and_collection_titles',
+                  content_rowid='audio_id');
 
-                -- even as external content table creating the table is not  enough
-                -- it needs to be manually populated from the content/original table
-                INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
-                    SELECT id, title, reddit_title FROM Downloads;
-
-                -- Triggers to keep the FTS index up to date.
-                CREATE TRIGGER IF NOT EXISTS Downloads_ai AFTER INSERT ON Downloads BEGIN
-                  INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
-                  VALUES (new.id, new.title, new.reddit_title);
-                END;
-                CREATE TRIGGER IF NOT EXISTS Downloads_ad AFTER DELETE ON Downloads BEGIN
-                  INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
-                  VALUES('delete', old.id, old.title, old.reddit_title);
-                END;
-                CREATE TRIGGER IF NOT EXISTS Downloads_au AFTER UPDATE ON Downloads BEGIN
-                  INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
-                  VALUES('delete', old.id, old.title, old.reddit_title);
-                  INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
-                  VALUES (new.id, new.title, new.reddit_title);
+                -- in this case also possible using one trigger with case/when since we're
+                -- inserting into the same table etc.
+                -- WHEN NULL does not work it just appeared to work since the subquery
+                -- with WHERE FileCollection.id = NULL returned no rows which means NULL will
+                -- be inserted (which we could use but then the subquery would be run every time)
+                -- use WHEN new.collection_id IS NULL instead
+                CREATE TRIGGER AudioFile_ai AFTER INSERT ON AudioFile
+                BEGIN
+                    INSERT INTO Titles_fts_idx(rowid, title, collection_title)
+                    VALUES (
+                        new.id,
+                        new.title,
+                        (CASE
+                         WHEN new.collection_id IS NULL THEN NULL
+                         ELSE (SELECT title FROM FileCollection WHERE id = new.collection_id)
+                         END)
+                    );
                 END;
 
+                -- the values inserted into the other columns must match the values
+                -- currently stored in the table otherwise the results may be unpredictable
+                CREATE TRIGGER AudioFile_ad AFTER DELETE ON AudioFile
+                BEGIN
+                    INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, title, collection_title)
+                    VALUES(
+                        'delete',
+                        old.id,
+                        old.title,
+                        (CASE
+                         WHEN old.collection_id IS NULL THEN NULL
+                         ELSE (SELECT title FROM FileCollection WHERE id = old.collection_id)
+                         END)
+                    );
+                END;
+
+                CREATE TRIGGER AudioFile_au AFTER UPDATE ON AudioFile
+                BEGIN
+                    -- delete old entry
+                    INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, title, collection_title)
+                    VALUES(
+                        'delete',
+                        old.id,
+                        old.title,
+                        (CASE
+                         WHEN old.collection_id IS NULL THEN NULL
+                         ELSE (SELECT title FROM FileCollection WHERE id = old.collection_id)
+                         END)
+                    );
+                    -- insert new one
+                    INSERT INTO Titles_fts_idx(rowid, title, collection_title)
+                    VALUES (
+                        new.id,
+                        new.title,
+                        (CASE
+                         WHEN new.collection_id IS NULL THEN NULL
+                         ELSE (SELECT title FROM FileCollection WHERE id = new.collection_id)
+                         END)
+                    );
+                END;
+
+                -- VERSION TABLE
                 CREATE TABLE IF NOT EXISTS {migrate.VERSION_TABLE} (
                     version_id INTEGER PRIMARY KEY ASC,
                     dirty INTEGER NOT NULL
@@ -83,6 +242,7 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 INSERT INTO {migrate.VERSION_TABLE} VALUES ({migrate.LATEST_VERSION}, 0);
 
                 PRAGMA foreign_keys=on;
+                COMMIT;
             """)
     else:
         # NOTE: migrate DB; context manager automatically closes connection
@@ -97,10 +257,16 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
     # to columns with almost no memory overhead
     conn.row_factory = sqlite3.Row
 
-    return conn, conn.cursor()
+    # make sure foreign key support is activated
+    # NOTE: even though i was setting PRAGMA foreign_keys=on in the db creation
+    # script it still had the foreign_keys turned off somehow
+    with conn:
+        c = conn.execute("PRAGMA foreign_keys=on")
+
+    return conn, c
 
 
-def export_csv_from_sql(filename: str, db_con: sqlite3.Connection):
+def export_table_to_csv(db_con: sqlite3.Connection, filename: str, table_name: str) -> None:
     """
     Fetches and writes all rows (with all cols) in db_con's database to the file filename using
     writerows() from the csv module
@@ -118,7 +284,7 @@ def export_csv_from_sql(filename: str, db_con: sqlite3.Connection):
         csvwriter = csv.writer(csvfile, dialect="excel", delimiter=";")
 
         # get rows from db
-        c = db_con.execute("SELECT * FROM Downloads")
+        c = db_con.execute(f"SELECT * FROM {table_name}")
         rows = c.fetchall()
 
         # cursor.description -> sequence of 7-item sequences each containing
@@ -304,17 +470,33 @@ def backup_db(db_path: str, bu_dir: str,
 
 def set_favorite_entry(db_con: sqlite3.Connection, _id: int, fav_intbool: int) -> None:
     with db_con:
-        db_con.execute("UPDATE Downloads SET favorite = ? WHERE id = ?", (fav_intbool, _id))
+        db_con.execute("UPDATE AudioFile SET favorite = ? WHERE id = ?", (fav_intbool, _id))
 
 
 def set_rating(db_con: sqlite3.Connection, _id: int, rating: float):
     with db_con:
-        db_con.execute("UPDATE Downloads SET rating = ? WHERE id = ?", (rating, _id))
+        db_con.execute("UPDATE AudioFile SET rating = ? WHERE id = ?", (rating, _id))
 
 
 def remove_entry(db_con: sqlite3.Connection, _id: int, root_dir: str):
+    c = db_con.execute("SELECT collection_id FROM AudioFile WHERE id = ?", (_id,))
+    collection_id_row = c.fetchone()
+
     with db_con:
-        db_con.execute("DELETE FROM Downloads WHERE id = ?", (_id,))
+        c.execute("DELETE FROM AudioFile WHERE id = ?", (_id,))
+
+        # NOTE: should we try to del collection and except if it still has children
+        # due to FOREIGN KEY ON DELETE RESTRICT
+        # or should we check for children and delete if there are none?
+        # -> do the former for now
+        if collection_id_row is not None:
+            collection_id = collection_id_row[0]
+            try:
+                c.execute("DELETE FROM FileCollection WHERE id = ?", (collection_id,))
+            except sqlite3.IntegrityError:
+                # raises IntegrityError when we try to delete a FileCollection
+                # that still has an AudioFile
+                pass
 
 
 # helper class to turn attribute-based acces into dict-like acces on sqlite3.Row
@@ -328,10 +510,12 @@ class RowData:
 
 def get_x_entries(con: sqlite3.Connection, x: int,
                   after: Optional[int] = None, before: Optional[int] = None,
-                  order_by: str = "Downloads.id DESC"):
+                  order_by: str = "AudioFile.id DESC"):
     # order by has to come b4 limit/offset
+    # alias the view v_.. as AudioFile so we can use regular order_by
+    # with the actual table name
     query = f"""
-            SELECT * FROM Downloads
+            SELECT * FROM v_audio_and_collection_combined AudioFile
             ORDER BY {order_by}
             LIMIT ?"""
     query, vals_in_order = keyset_pagination_statment(
@@ -362,7 +546,7 @@ def search_assoc_col_string_parse(valuestring, delimiter=";"):
     return vals_and, vals_ex
 
 
-VALID_ORDER_BY = {"ASC", "DESC", "Downloads.id", "Downloads.rating", "id", "rating"}
+VALID_ORDER_BY = {"ASC", "DESC", "AudioFile.id", "AudioFile.rating", "id", "rating"}
 
 
 def validate_order_by_str(order_by):
@@ -374,28 +558,93 @@ def validate_order_by_str(order_by):
 
 # part of lexical analysis
 # This expression states that a "word" is either (1) non-quote, non-whitespace text
-# surrounded by whitespace, or (2) non-quote text surrounded by quotes (followed by some
-# whitespace).
+# surrounded by whitespace, or (2) non-quote text surrounded by quotes (optionally
+# followed by some whitespace).
 WORD_RE = re.compile(r'([^"^\s]+)\s*|"([^"]+)"\s*')
 
 
-VALID_SEARCH_COLS: Set[str] = {"title", "rating", "author_page", "reddit_user", "reddit_url"
-                               "r_post_url", "reddit_id", "url"}
-ASSOCIATED_COLUMNS: Set[str] = set()
+VALID_SEARCH_COLS: Set[str] = {
+        "title", "rating", "favorite", "artist", "url", "reddit_id"
+}
 
 
-def search_sytnax_parser(search_str,
-                         delimiter=";",
-                         **kwargs):
-    normal_col_values = {}
-    assoc_col_values_incl = {}
-    assoc_col_values_excl = {}
+# searching AudioFile and FileCollection tables directly and just retrieving
+# the ids and then getting the fully joined result from the view
+# is just as fast querying against the view directly since the query gets
+# flattened (just make sure that it does!)
+# only true since we need the join anyway populating an object for the collection
+# once and then storing that reference for the children would speed it up
+#
+# search in view
+# SELECT * FROM v_audio_and_collection_combined WHERE alias_id = 3 OR url = '...'
+# vs. search in tables directly
+# SELECT * FROM v_audio_and_collection_combined WHERE id IN (
+#   SELECT id FROM AudioFile WHERE alias_id = 3 OR url = '...'
+# )
+# also tested:
+# SELECT * FROM v_audio_and_collection_combined WHERE fcol_url = '...'
+# vs.
+# below also tested with inner join instead of subquery
+# SELECT * FROM v_audio_and_collection_combined WHERE id IN (
+#   SELECT id FROM AudioFile WHERE collection_id = (SELECT FileCollection.id FROM FileCollection
+#                                                   WHERE url = '...')
+# )
+
+# NOTE: WARNING enum members all evaluate to True
+# so explicitly test "op != ConditionalOp.NONE" instead of "if not op"
+class ConditionalOp(enum.Enum):
+    # guaranteed to need no conditional op but others might not need one
+    NONE = 0
+    OR = 1
+    AND = 2
+
+
+# these should later probably emit the search expression string themselves
+class SearchColumnExpression:
+    __slots__ = ('conditional_op', 'column_name', 'search_value')
+
+    def __init__(self, conditional_op: ConditionalOp,
+                 column_name: str, search_value: Optional[str] = None):
+        self.conditional_op = conditional_op
+        self.column_name = column_name
+        self.search_value = search_value
+
+
+class SearchExpression:
+    __slots__ = ('conditional_op', 'column_expressions')
+
+    def __init__(self, conditional_op: ConditionalOp,
+                 column_expressions: List[SearchColumnExpression]):
+        self.conditional_op = conditional_op
+        self.column_expressions = column_expressions
+
+
+# for turning a search keyword into multiple columns or an actual column name
+# now including conditional operator
+SEARCH_COL_TRANSFORM: Dict[str, SearchExpression] = {
+    "artist": SearchExpression(ConditionalOp.AND, [
+        SearchColumnExpression(ConditionalOp.NONE, "artist_name"),
+        SearchColumnExpression(ConditionalOp.OR, "alias_name"),
+        SearchColumnExpression(ConditionalOp.OR, "fcol_alias_name")]),
+    "url": SearchExpression(ConditionalOp.AND, [
+        SearchColumnExpression(ConditionalOp.NONE, "url"),
+        SearchColumnExpression(ConditionalOp.OR, "fcol_url")]),
+    "reddit_id": SearchExpression(ConditionalOp.AND,
+                                  [SearchColumnExpression(ConditionalOp.NONE, "fcol_id_on_page")])
+}
+
+
+def search_sytnax_parser(search_str: str,
+                         delimiter: str = ";",
+                         **kwargs) -> Tuple[List[SearchExpression], str]:
+    search_expressions: List[SearchExpression] = []
     # Return all non-overlapping matches of pattern in string, as a list of strings.
     # The string is scanned left-to-right, and matches are returned in the order found.
     # If one or more groups are present in the pattern, return a list of groups; this will
     # be a list of tuples if the pattern has more than one group. Empty matches are included
     # in the result.
     search_col = None
+    title_search: List[str] = []
     for match in WORD_RE.findall(search_str):
         single, multi_word = match
         part = None
@@ -419,10 +668,7 @@ def search_sytnax_parser(search_str,
                 # with normal syntax col is always in single word and no col if
                 # search_col isnt set so we can append all single words till we find a single
                 # word with :
-                try:
-                    normal_col_values["title"] = f"{normal_col_values['title']} {single}"
-                except KeyError:
-                    normal_col_values["title"] = single
+                title_search.append(single)
                 continue
 
         # search_col is None if search_col isnt supported
@@ -434,32 +680,32 @@ def search_sytnax_parser(search_str,
         # first one
         part = part or multi_word
 
-        if search_col in ASSOCIATED_COLUMNS:
-            incl, excl = search_assoc_col_string_parse(part, delimiter=delimiter)
-            # make sure not to add an empty list otherwise we wont get an empty dic
-            # that evaluates to false for testing in search_normal_mult_assoc
-            if incl:
-                assoc_col_values_incl[search_col] = incl
-            if excl:
-                assoc_col_values_excl[search_col] = excl
+        if search_col in SEARCH_COL_TRANSFORM:
+            search_expr = SEARCH_COL_TRANSFORM[search_col]
+            for column_expr in search_expr.column_expressions:
+                column_expr.search_value = part
+            search_expressions.append(search_expr)
         else:
-            normal_col_values[search_col] = part
+            search_expressions.append(
+                    # assume AND
+                    SearchExpression(ConditionalOp.AND, [
+                        SearchColumnExpression(ConditionalOp.NONE, search_col, part)])
+            )
 
-    return normal_col_values, assoc_col_values_incl, assoc_col_values_excl
+    return search_expressions, " ".join(title_search)
 
 
-def search(db_con, query, order_by="Downloads.id DESC", **kwargs):
+def search(db_con, query, order_by="AudioFile.id DESC", **kwargs):
     # validate order_by from user input
     if not validate_order_by_str(order_by):
         logger.warning("Sorting %s is not supported", order_by)
-        order_by = "Downloads.id DESC"
+        order_by = "AudioFile.id DESC"
 
-    normal_col_values, assoc_col_values_incl, assoc_col_values_excl = search_sytnax_parser(query, **kwargs)
+    search_expressions, title_search_str = search_sytnax_parser(query, **kwargs)
 
-    if normal_col_values or assoc_col_values_incl or assoc_col_values_excl:
-        rows = search_normal_mult_assoc(
-                db_con, normal_col_values,
-                assoc_col_values_incl, assoc_col_values_excl,
+    if search_expressions or title_search_str:
+        rows = search_normal_columns(
+                db_con, search_expressions, title_search_str,
                 order_by=order_by, **kwargs)
         if rows is None:
             return None
@@ -469,85 +715,52 @@ def search(db_con, query, order_by="Downloads.id DESC", **kwargs):
         return get_x_entries(kwargs.pop("limit", 60), order_by=order_by, **kwargs)
 
 
-def joined_col_name_to_query_names(col_name):
-    # TODO mb to Book cls and validate col name
-    # have to be careful not to use user input e.g. col_name in SQL query
-    # without passing them as params to execute etc.
-    table_name = col_name.capitalize()
-    bridge_col_name = f"{col_name}_id"
-    return table_name, bridge_col_name
-
-
-def prod(iterable):
-    return reduce(operator.mul, iterable, 1)
-
-
-def search_normal_mult_assoc(
-        db_con, normal_col_values, int_col_values_dict, ex_col_values_dict,
-        order_by="Downloads.id DESC", limit=-1,  # no row limit when limit is neg. nr
+def search_normal_columns(
+        db_con: sqlite3.Connection, search_expressions: List[SearchExpression],
+        title_search_str: str,
+        order_by="AudioFile.id DESC", limit=-1,  # no row limit when limit is neg. nr
         after=None, before=None):
     """Can search in normal columns as well as multiple associated columns
     (connected via bridge table) and both include and exclude them"""
     # @Cleanup mb split into multiple funcs that just return the conditional string
     # like: WHERE title LIKE ? and the value, from_table_names etc.?
 
-    if int_col_values_dict:
-        # nr of items in values multiplied is nr of rows returned needed to match
-        # all conditions !! only include intersection vals
-        mul_values = prod((len(vals) for vals in int_col_values_dict.values()))
-        assoc_incl_cond = f"GROUP BY Downloads.id HAVING COUNT(Downloads.id) = {mul_values}"
-    else:
-        assoc_incl_cond = ""
-
-    # containing table names for FROM .. stmt
-    table_bridge_names = []
     # conditionals
-    cond_statements = []
+    cond_statements: List[str] = []
     # vals in order the stmts where inserted for sql param sub
     vals_in_order = []
     # build conditionals for select string
-    for col, vals in int_col_values_dict.items():
-        table_name, bridge_col_name = joined_col_name_to_query_names(col)
-        table_bridge_names.append(table_name)
-        table_bridge_names.append(f"Download{table_name}")
 
-        cond_statements.append(f"{'AND' if cond_statements else 'WHERE'} "
-                               f"Downloads.id = Download{table_name}.download_id")
-        cond_statements.append(f"AND {table_name}.id = Download{table_name}.{bridge_col_name}")
-        cond_statements.append(f"AND {table_name}.name IN ({','.join(['?']*len(vals))})")
-        vals_in_order.extend(vals)
-    for col, vals in ex_col_values_dict.items():
-        table_name, bridge_col_name = joined_col_name_to_query_names(col)
-        cond_statements.append(f"""
-                 {'AND' if cond_statements else 'WHERE'} Downloads.id NOT IN (
-                          SELECT Downloads.id
-                          FROM Download{table_name} bx, Downloads, {table_name}
-                          WHERE Downloads.id = bx.download_id
-                          AND bx.{bridge_col_name} = {table_name}.id
-                          AND {table_name}.name IN ({', '.join(['?']*len(vals))})
-                )""")
-        vals_in_order.extend(vals)
-
-    # normal col conditions
-    for col, val in normal_col_values.items():
+    if title_search_str:
         # use full-text-search for titles
-        if "title" in col:
-            cond_statements.append(
-                    f"{'AND' if cond_statements else 'WHERE'} Downloads.id IN "
-                     "(SELECT rowid FROM Downloads_fts_idx WHERE Downloads_fts_idx MATCH ?)")
-            vals_in_order.append(val)
-        else:
-            cond_statements.append(f"{'AND' if cond_statements else 'WHERE'} Downloads.{col} = ?")
-            vals_in_order.append(val)
+        cond_statements.append(
+                f"{'AND' if cond_statements else 'WHERE'} AudioFile.id IN "
+                 "(SELECT rowid FROM Titles_fts_idx WHERE Titles_fts_idx MATCH ?)")
+        vals_in_order.append(title_search_str)
 
-    table_bridge_names = ", ".join(table_bridge_names)
-    cond_statements = "\n".join(cond_statements)
+    for search_expr in search_expressions:
+        sub_expression = []
+        for search_column_expr in search_expr.column_expressions:
+            if not search_column_expr.search_value:
+                continue
+            # NOTE: enum members all evaluate to True
+            cond_op = search_column_expr.conditional_op
+            if cond_op != ConditionalOp.NONE:
+                sub_expression.append('AND' if cond_op == ConditionalOp.AND else 'OR')
+            sub_expression.append(f"AudioFile.{search_column_expr.column_name} = ?")
+            vals_in_order.append(search_column_expr.search_value)
 
+        cond_statements.append(
+                f"{'AND' if cond_statements else 'WHERE'} ({' '.join(sub_expression)})")
+
+    cond_statements_str = "\n".join(cond_statements)
+
+    # NOTE: alias view as AudioFile so we can keep other parts of this function
+    # unchanged
     query = f"""
-            SELECT Downloads.*
-            FROM Downloads{',' if table_bridge_names else ''} {table_bridge_names}
-            {cond_statements}
-            {assoc_incl_cond}
+            SELECT AudioFile.*
+            FROM v_audio_and_collection_combined AudioFile
+            {cond_statements_str}
             ORDER BY {order_by}
             LIMIT ?"""
     # important to do this last and limit mustnt be in vals_in_order (since its after
@@ -579,10 +792,10 @@ def search_normal_mult_assoc(
     return rows
 
 
-def insert_order_by_id(query, order_by="Downloads.id DESC"):
+def insert_order_by_id(query, order_by="AudioFile.id DESC"):
     # !! Assumes SQL statements are written in UPPER CASE !!
     # also sort by id secondly so order by is unique (unless were already using id)
-    if "downloads.id" not in order_by.lower():
+    if "audiofile.id" not in order_by.lower():
         query = query.splitlines()
         # if we have subqueries take last order by to insert; strip line of whitespace since
         # we might have indentation
@@ -594,7 +807,7 @@ def insert_order_by_id(query, order_by="Downloads.id DESC"):
 
 
 def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
-                               order_by="Downloads.id DESC", first_cond=False):
+                               order_by="AudioFile.id DESC", first_cond=False):
     """Finalizes query by inserting keyset pagination statement
     Must be added/called last!
     !! Assumes SQL statements are written in UPPER CASE !!
@@ -622,7 +835,7 @@ def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
     lines = [l.strip() for l in query.splitlines()]
     insert_before = [i for i, l in enumerate(lines) if l.startswith("GROUP BY") or
                      l.startswith("ORDER BY")][0]
-    un_unique_sort_col = "downloads.id" not in order_by.lower()
+    un_unique_sort_col = "audiofile.id" not in order_by.lower()
     if un_unique_sort_col:
         order_by_col = order_by.split(' ')[0]
         # 2-tuple of (primary, secondary)
@@ -677,13 +890,13 @@ def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
         # parentheses around the whole statement important otherwise rows fullfilling the OR
         # statement will get included when searching even if they dont fullfill the rest
         keyset_pagination = (f"{'WHERE' if first_cond else 'AND'} ({order_by_col} {comp} ? "
-                             f"OR ({order_by_col} {equal_comp} AND Downloads.id {comp} ?) "
+                             f"OR ({order_by_col} {equal_comp} AND AudioFile.id {comp} ?) "
                              f"{null_clause})")
         # we only need primare 2 times if we compare by a value with ==
         vals_in_order.extend((primary, primary, secondary) if equal_comp.startswith("==")
                              else (primary, secondary))
     else:
-        keyset_pagination = f"{'WHERE' if first_cond else 'AND'} Downloads.id {comp} ?"
+        keyset_pagination = f"{'WHERE' if first_cond else 'AND'} AudioFile.id {comp} ?"
         # if vals_in_order is not None:
         vals_in_order.append(after[0] if after is not None else before[0])
     lines.insert(insert_before, keyset_pagination)
@@ -701,9 +914,9 @@ def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
             FROM (
                 {result}
             ) AS t
-            ORDER BY {order_by.replace('Downloads.', 't.')}"""
+            ORDER BY {order_by.replace('AudioFile.', 't.')}"""
         if un_unique_sort_col:
             # since were using a subquery we need to modify our order by to use the AS tablename
-            result = insert_order_by_id(result, order_by.replace("Downloads.", "t."))
+            result = insert_order_by_id(result, order_by.replace("AudioFile.", "t."))
 
     return result, vals_in_order

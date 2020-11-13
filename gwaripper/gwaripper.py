@@ -8,7 +8,7 @@ import urllib.request
 
 import praw
 
-from typing import List, Union, Optional, cast, Dict, ClassVar, Tuple
+from typing import List, Union, Optional, cast, Dict, ClassVar, Tuple, Any
 
 from . import utils
 from . import config
@@ -17,11 +17,11 @@ from .extractors.base import ExtractorErrorCode, ExtractorReport
 from .extractors.reddit import RedditExtractor
 from .info import (
         FileInfo, FileCollection, RedditInfo, children_iter_dfs,
-        UNKNOWN_USR_FOLDER
+        UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER
         )
 from . import download as dl
 from .reddit import reddit_praw
-from .db import load_or_create_sql_db, export_csv_from_sql, backup_db
+from .db import load_or_create_sql_db, export_table_to_csv, backup_db
 
 rqd = utils.RequestDelayer(0.25, 0.75)
 
@@ -115,7 +115,10 @@ class GWARipper:
         # suppress the exception by returning a true value from this method. If
         # you don't want to suppress errors then you can return a value that
         # evaluates to False.
-        export_csv_from_sql(os.path.join(config.get_root(), "gwarip_db_exp.csv"), self.db_con)
+        export_table_to_csv(
+                self.db_con,
+                os.path.join(config.get_root(), "gwarip_db_exp.csv"),
+                "v_audio_and_collection_combined")
         self.db_con.close()
 
         # so download report will always be written even on KeyboardInterrupt
@@ -263,7 +266,8 @@ class GWARipper:
         return filename
 
     def _download_file(self, info: FileInfo, author_name: Optional[str],
-                       file_index: int = 0, dl_idx: int = 1, dl_max: int = 1) -> Optional[str]:
+                       collection_id: Optional[int] = None, file_index: int = 0,
+                       dl_idx: int = 1, dl_max: int = 1) -> Optional[str]:
         """
         Will download the file to dl_root in a subfolder named like the reddit user name
         if that one is not available the extracted (from the page) author of the file gets
@@ -299,8 +303,8 @@ class GWARipper:
                 # automatically commits changes to db_con if everything succeeds or does a rollback
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
-                    # executes the SQL query but leaves commiting it to with db_con in line above
-                    self._add_to_db(info, author_name, os.path.join(subpath, filename))
+                    # executes the SQL query but leaves commiting it to context manager
+                    self._add_to_db(info, collection_id, filename)
                     # func passed as kwarg reporthook gets called once on establishment
                     # of the network connection and once after each block read thereafter.
                     # The hook will be passed three arguments; a count of blocks transferred
@@ -342,21 +346,34 @@ class GWARipper:
         # priority is 1. reddit 2. file collection author 3. file author 4. fallbacks
         author_name = info.get_preferred_author_name()
 
+        collection_id, reddit_author = None, None
+        if isinstance(info, RedditInfo):
+            collection_id, reddit_author = self._add_to_db_ri(info)
+
         any_downloads = False
-        files_in_collection = info.nr_files()
+        files_in_collection = info.nr_files
         with_file_idx = files_in_collection > 1
         dl_idx = 1
         # don't recurse into separate calls for nested FileCollections
         for rel_idx, fi in children_iter_dfs(info.children,
                                              file_info_only=True, relative_enum=True):
             # rel_idx is 0-based
-            self._download_file(fi, author_name, (rel_idx + 1) if with_file_idx else 0,
+            self._download_file(fi, author_name, collection_id,
+                                (rel_idx + 1) if with_file_idx else 0,
                                 dl_idx=dl_idx, dl_max=files_in_collection)
             any_downloads = any_downloads or fi.downloaded
             dl_idx += 1
 
         # TODO add status codes for downloads
         info.update_downloaded()
+
+        any_audio_downloads = any(fi.is_audio and fi.downloaded for _, fi in
+                                  children_iter_dfs(info.children, file_info_only=True))
+        # _download_file commits after a successful download of an _audio_ file
+        # if there was none we have to roll back to delete the inserted collection
+        if not any_audio_downloads:
+            logger.debug("No successful audio download in collection! Rolling back DB!")
+            self.db_con.rollback()
 
         if any_downloads:
             try:
@@ -369,7 +386,49 @@ class GWARipper:
             except AttributeError:
                 pass  # not redditinfo
 
-    def _add_to_db(self, info: FileInfo, author_subdir: str, filename: str) -> None:
+    def _add_to_db_ri(self, r_info: RedditInfo) -> Tuple[int, str]:
+        c = self.db_con.cursor()
+
+        reddit_author = r_info.author
+        if reddit_author:
+            c.execute("INSERT OR IGNORE INTO Artist(name) VALUES (?)",
+                      (reddit_author,))
+        else:
+            reddit_author = DELETED_USR_FOLDER
+
+        c.execute("""
+        INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
+            ?,
+            (SELECT id FROM Artist WHERE name = ?)
+        )""", (reddit_author, reddit_author))
+
+        c.execute("INSERT INTO RedditInfo(created_utc) VALUES (?)",
+                  (r_info.created_utc,))
+        r_info_id = c.lastrowid
+
+        filecol_dict: Dict[str, Optional[str]] = {
+            "url": f"https://www.reddit.com{r_info.permalink}",
+            "id_on_page": r_info.id,
+            "title": r_info.title,
+            "subpath": r_info.subpath,
+            "reddit_info_id": r_info_id,
+            "parent_id": None,
+            "alias_name": reddit_author
+        }
+
+        c.execute("""
+        INSERT INTO FileCollection(
+            url, id_on_page, title, subpath, reddit_info_id, parent_id,
+            alias_id
+        ) VALUES (
+            :url, :id_on_page, :title, :subpath, :reddit_info_id, :parent_id,
+            (SELECT id FROM Alias WHERE name = :alias_name)
+        )""", filecol_dict)
+        collection_id = c.lastrowid
+
+        return collection_id, reddit_author
+
+    def _add_to_db(self, info: FileInfo, collection_id: Optional[int], filename: str) -> None:
         """
         Adds instance attributes and reddit_info values to the database using named SQL query
         parameters with a dictionary.
@@ -378,50 +437,43 @@ class GWARipper:
 
         :return: None
         """
+
+        c = self.db_con.cursor()
+
+        reddit_author: Optional[str] = None
+        if info.reddit_info:
+            assert collection_id is not None
+            reddit_author = info.reddit_info.author
+
+        c = self.db_con.execute(f"""
+        INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
+            ?,
+            {'(SELECT id FROM Artist WHERE Artist.name = ?)' if reddit_author else 'NULL'}
+        )""", (info.author, reddit_author) if reddit_author else (info.author,))
+
         # create dict with keys that correspond to the named parameters in the SQL query
         # set vals contained in reddit_info to None(Python -> SQLITE: NULL)
-        val_dict: Dict[str, Optional[str]] = {
-            "date": time.strftime("%Y-%m-%d"),
-            "time": time.strftime("%H:%M:%S"),
+        audio_file_dict: Dict[str, Optional[Union[str, int, datetime.date]]] = {
+            "collection_id": collection_id,
+            "downloaded_with_collection": 1 if collection_id is not None else 0,
+            "date": datetime.datetime.now().date(),
             "description": info.descr,
-            "local_filename": filename,
+            "filename": filename,
             "title": info.title,
-            "url_file": info.direct_url,
             "url": info.page_url,
-            "author_page": info.author,
-            # represents the preferred author name of the topmost parent or the
-            # file's author and at the same time the subdirectory which the
-            # local_filename is relative to
-            "author_subdir": author_subdir,
-            "created_utc": None,
-            "r_post_url": None,
-            "reddit_id": None,
-            "reddit_title": None,
-            "reddit_url": None,
-            "reddit_user": None,
-            "subreddit_name": None
+            "alias_name": info.author
         }
 
-        if info.reddit_info:
-            reddit_info = info.reddit_info
-            val_dict.update({
-                "created_utc":    str(reddit_info.created_utc),
-                "r_post_url":     reddit_info.r_post_url,
-                "reddit_id":      reddit_info.id,
-                "reddit_title":   reddit_info.title,
-                "reddit_url":     reddit_info.permalink,
-                "reddit_user":    reddit_info.author,
-                "subreddit_name": reddit_info.subreddit
-            })
-
-        self.db_con.execute("INSERT INTO Downloads(date, time, description, local_filename, "
-                            "title, url_file, url, created_utc, r_post_url, reddit_id, "
-                            "reddit_title, reddit_url, reddit_user, author_page, "
-                            " author_subdir, subreddit_name) "
-                            " VALUES (:date, :time, :description, :local_filename, :title, "
-                            ":url_file, :url, :created_utc, :r_post_url, :reddit_id, "
-                            ":reddit_title, :reddit_url, :reddit_user, :author_page, "
-                            ":author_subdir, :subreddit_name)", val_dict)
+        c.execute("""
+        INSERT INTO AudioFile(
+            collection_id, downloaded_with_collection, date, description,
+            filename, title, url,
+            alias_id
+        ) VALUES (
+            :collection_id, :downloaded_with_collection, :date, :description,
+            :filename, :title, :url,
+            (SELECT id FROM Alias WHERE name = :alias_name)
+        )""", audio_file_dict)
 
     def already_downloaded(self, info: FileInfo) -> bool:
         """
@@ -429,13 +481,13 @@ class GWARipper:
         was downloaded before
         """
         # check both url and url_file since some rows only have the url_file set
-        c = self.db_con.execute("SELECT url, url_file FROM Downloads WHERE url = ?"
-                                "OR url_file = ?", (info.page_url, info.direct_url))
+        c = self.db_con.execute("SELECT id, collection_id FROM AudioFile WHERE url = ?"
+                                "OR url = ?", (info.page_url, info.direct_url))
         duplicate = c.fetchone()
 
-        if info.reddit_info and duplicate and config.config.getboolean(
-                "Settings", "set_missing_reddit", fallback=False):
-            self.set_missing_reddit_db(info, use_file_url=duplicate['url'] is None)
+        if (info.reddit_info and duplicate and not duplicate['collection_id'] and
+                config.config.getboolean("Settings", "set_missing_reddit", fallback=False)):
+            self.set_missing_reddit_db(duplicate['id'], info)
 
         if duplicate:
             info.already_downloaded = True
@@ -444,7 +496,7 @@ class GWARipper:
             info.already_downloaded = False
             return False
 
-    def set_missing_reddit_db(self, info: FileInfo, use_file_url=False) -> None:
+    def set_missing_reddit_db(self, audio_file_id: int, info: FileInfo) -> None:
         """
         Updates row of file entry in db with reddit info, only sets values if previous
         entry was NULL/None
@@ -452,58 +504,49 @@ class GWARipper:
         if not info.reddit_info:
             return
 
-        # even though Row class can be accessed both by index (like tuples) and
-        # case-insensitively by name
-        # reset row_factory to default so we get normal tuples when fetching
-        # (should we generate a new cursor)
-        # new_c will always fetch Row obj and cursor will fetch tuples
+        collection_id, reddit_author = self._add_to_db_ri(info.reddit_info)
 
-        c = self.db_con.execute("SELECT * FROM Downloads WHERE "
-                                f"{'url_file' if use_file_url else 'url'} = ?",
-                                (info.direct_url if use_file_url else info.page_url,))
-        row_cont = c.fetchone()
+        c = self.db_con.execute("""
+        UPDATE AudioFile SET
+            collection_id = ?
+        WHERE id = ?""", (collection_id, audio_file_id))
 
-        set_helper = (("reddit_title", "title"), ("reddit_url", "permalink"),
-                      ("reddit_user", "author"), ("created_utc", "created_utc"),
-                      ("reddit_id", "id"), ("subreddit_name", "subreddit"),
-                      ("r_post_url", "r_post_url"))
+        c.execute("""
+        SELECT
+        filename,
+        title,
+        Alias.name as alias_name
+        Alias.id as alias_id
+        Alias.artist_id as artist_id
+        FROM AudioFile
+        WHERE id = ?
+        JOIN Alias ON Alias.id = AudioFile.alias_id
+        """, (audio_file_id,))
 
-        upd_cols = []
-        upd_vals = []
-        for col, key in set_helper:
-            if row_cont[col] is None:
-                upd_cols.append("{} = ?".format(col))
-                upd_vals.append(getattr(info.reddit_info, key, None))
-        if use_file_url:
-            upd_cols.append("url = ?")
-            upd_vals.append(info.page_url)
+        af_row = c.fetchone()
 
-        if upd_cols:
-            logger.debug("Updating file entry with new info for: {}".format(", ".join(upd_cols)))
-            # append url/_file since upd_vals need to include all the param substitutions for ?
-            upd_vals.append(info.direct_url if use_file_url else info.page_url)
-            # would work in SQLite version 3.15.0 (2016-10-14), but this is 3.8.11, users would
-            # have to update as well so not a good idea
-            # print("UPDATE Downloads SET ({}) = ({}) WHERE url_file = ?".format(
-            #   ",".join(upd_cols), ",".join("?"*len(upd_cols))))
-
-            with self.db_con:
-                c.execute(f"UPDATE Downloads SET {','.join(upd_cols)} WHERE "
-                          f"{'url_file' if use_file_url else 'url'} = ?", upd_vals)
+        # update artist_id of alias if it's NULL
+        if af_row['artist_id'] is None:
+            artist_id_row = c.execute(
+                    "SELECT id FROM Artist WHERE name = ?", (reddit_author,)).fetchone()
+            if artist_id_row:
+                artist_id = artist_id_row[0]
+                c.execute("UPDATE Alias SET artist_id = ? WHERE id = ?",
+                          (artist_id, af_row['alias_id']))
 
         if not info.reddit_info.selftext:
             return
 
-        filename_local = row_cont['local_filename']
-        author_subdir = row_cont['author_subdir']
+        filename_local = af_row['filename']
+        author_subdir = af_row['alias_name']
 
-        # TODO due to my db having been used with older versions there are a lot of
-        # rows where cols local_filename and url are empty -> gen a filename so we
+        # NOTE: due to my db having been used with older versions there are a lot of
+        # rows where cols filename and url are empty -> gen a filename so we
         # can write the selftext
-        if filename_local is None:
+        if not filename_local:  # prev NULL filename will now be ""
             filename_local = re.sub(
                     r"[^\w\-_.,\[\] ]", "_",
-                    row_cont['title'][0:110]) + ".m4a"
+                    af_row['title'][0:110]) + ".m4a"
         # intentionally don't write into subpath that might get used
         # by RedditInfo since this file was downloaded without it
         file_path = os.path.join(author_subdir, filename_local)

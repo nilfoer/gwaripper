@@ -7,7 +7,7 @@ import os.path
 import re
 import datetime
 
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, NamedTuple
 
 from flask import (
         current_app, request, redirect, url_for, Blueprint,
@@ -98,9 +98,10 @@ def get_chunk(filename, byte1=None, byte2=None):
 # create route for artist files/static data that isnt in static, can be used in template with
 # /audio/artist/filename or with url_for(main.artist_file, artist='artist', filename='filename')
 # Custom static data
-@main_bp.route('/audio/<path:artist>/<path:filename>')
-def artist_file(artist, filename):
+@main_bp.route('/artist_file/<path:filename>')
+def artist_file(filename):
     range_header = request.headers.get('Range', None)
+    subpath = request.args.get('subpath', '')
 
     first_byte, last_byte = 0, None
     if range_header:
@@ -120,7 +121,7 @@ def artist_file(artist, filename):
         if last_byte_str:
             last_byte = int(last_byte)
 
-    full_path = os.path.join(current_app.instance_path, artist, filename)
+    full_path = os.path.join(current_app.instance_path, subpath, filename)
     try:
         chunk, start, chunk_size, file_size = get_chunk(full_path, first_byte, last_byte)
     except FileNotFoundError:
@@ -136,15 +137,23 @@ def artist_file(artist, filename):
     return resp
 
 
+# py3.6: new way to define named tuples with types using class syntax
+# order of variables is also the order you pass them during initialization
+# AudioPathHelper('author', 'subpath',  'self.txt')
+class AudioPathHelper(NamedTuple):
+    subpath: str
+    selftext_filename: Optional[str]
+
+
 def get_entries(query: Optional[str] = None) -> Tuple[
-        List[RowData], List[Optional[str]], str, str, Optional[Any], Optional[Any],
+        List[RowData], List[AudioPathHelper], str, str, Optional[Any], Optional[Any],
         Optional[Dict[str, bool]]]:
     order_by_col = request.args.get('sort_col', "id", type=str)
     # validate our sorting col otherwise were vulnerable to sql injection
     if not validate_order_by_str(order_by_col):
         order_by_col = "id"
     asc_desc = "ASC" if request.args.get('order', "DESC", type=str) == "ASC" else "DESC"
-    order_by = f"Downloads.{order_by_col} {asc_desc}"
+    order_by = f"AudioFile.{order_by_col} {asc_desc}"
     # dont need to validate since we pass them in with SQL param substitution
     after = request.args.getlist("after", None)
     after = after if after else None
@@ -168,45 +177,54 @@ def get_entries(query: Optional[str] = None) -> Tuple[
                                 order_by=order_by)
     first, last, more = first_last_more(entries, order_by_col, after, before)
 
-    selftext_fns: List[Optional[str]] = []
+    audio_paths: List[AudioPathHelper] = []
     if entries:
         # account for older selftext filenames
         # <0.3 audio file name + '.txt'
         # ==0.3: subpath + sanitized reddit title + '.txt'
         for entry in entries:
-            if entry.date is None or entry.reddit_id is None or entry.local_filename is None:
-                selftext_fns.append(None)
-                continue
+            selftext_filename: Optional[str] = None
 
-            date: Optional[datetime.datetime]
-            try:
-                date = datetime.datetime.strptime(entry.date, '%Y-%m-%d')
-            except ValueError:
-                date = None
-
-            if date is not None and date > datetime.datetime(year=2020, month=10, day=10):
-                # @Hack basically same code as in ReddInfo.write_selftext_file
-                subpath = os.path.dirname(entry.local_filename)
-                # needs author_subdir to get correct length
-                filename = sanitize_filename(os.path.join(entry.author_subdir, subpath),
-                                             entry.reddit_title)
-                filename = os.path.join(subpath, filename)
-                selftext_fns.append(f"{filename}.txt")
+            if entry.downloaded_with_collection:
+                author_subdir = entry.fcol_alias_name
+                subpath = entry.fcol_subpath
             else:
-                selftext_fns.append(f"{entry.local_filename}.txt")
+                author_subdir = entry.alias_name
+                subpath = ""
 
-    return entries, selftext_fns, order_by_col, asc_desc, first, last, more
+            # we write a selftext in set_missing_reddit even though we don't have a filename
+            # but ignore that here @Incomplete
+            if entry.filename and entry.fcol_id_on_page is not None:
+                date: datetime.date = entry.date
+                # date v0.3 started
+                if date > datetime.date(year=2020, month=10, day=10):
+                    # @CleanUp basically repeating code from info.py here
+
+                    # selftext might have been added later which means it won't use
+                    # fcol_alias_name etc. but just alias_name
+                    # needs author_subdir to get correct length
+                    selftext_filename = sanitize_filename(
+                            os.path.join(author_subdir, subpath),
+                            entry.fcol_title) + '.txt'
+                else:
+                    selftext_filename = f"{entry.filename}.txt"
+
+            audio_paths.append(AudioPathHelper(
+                os.path.join(author_subdir, subpath).replace('\\', '/'),
+                selftext_filename))
+
+    return entries, audio_paths, order_by_col, asc_desc, first, last, more
 
 
 @main_bp.route('/', methods=["GET"])
 def show_entries():
-    entries, selftext_fns, order_by_col, asc_desc, first, last, more = get_entries()
+    entries, audio_paths, order_by_col, asc_desc, first, last, more = get_entries()
 
     return render_template(
         'show_entries.html',
         display_search_err_msg=True if entries is None else False,
         entries=entries,
-        selftext_fns=selftext_fns,
+        audio_paths=audio_paths,
         more=more,
         first=first,
         last=last,
@@ -272,13 +290,13 @@ def search_entries():
     if URL_RE.match(searchstr):
         return redirect(url_for("main.jump_to_book_by_url", ext_url=searchstr))
 
-    entries, selftext_fns, order_by_col, asc_desc, first, last, more = get_entries(searchstr)
+    entries, audio_paths, order_by_col, asc_desc, first, last, more = get_entries(searchstr)
 
     return render_template(
         'show_entries.html',
         display_search_err_msg=True if entries is None else False,
         entries=entries,
-        selftext_fns=selftext_fns,
+        audio_paths=audio_paths,
         more=more,
         first=first,
         last=last,

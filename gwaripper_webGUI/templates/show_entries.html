@@ -10,7 +10,7 @@
             <div class="ribbon {{ 'gwa-visible' if entry.favorite else 'gwa-hidden' }}"><span><i class="fas fa-heart"></i></span></div>
             <div class="row no-margin">
                 <div class="entry-container-title">
-                    {{ entry.reddit_title or entry.title }}
+                    {{ entry.fcol_title or entry.title }}
                 </div>
             </div>
             <div class="row no-margin">
@@ -27,16 +27,18 @@
                     {{ entry.date }}
                 </div>
                 <div class="entry-container-artist">
-                    {# TODO change this to search for both or at least for reddit_user if there is one #}
-                    <a href={{ url_for('main.search_entries', q='author_page:"' + entry.author_page + '"') }} title={{ entry.reddit_user or entry.author_page }}>{{ entry.reddit_user or entry.author_page }}</a>
+                    {# TODO change this to search for both collection and audio alias? #}
+                    <a href="{{ url_for('main.search_entries', q='artist:"' + (entry.artist_name if entry.artist_name else entry.alias_name) + '"') }}" title={{ entry.artist_name or entry.alias_name }}>{{ entry.artist_name or entry.alias_name }}</a>
                 </div>
             </div>
         </div>
         <div class="entry-expand" style="display:none;">
             <div class="entry-expand-inner">
                 <div class="description">
-                    Audio page title: {{ entry.title }}<br/>
-                    Local filename: {{ entry.author_subdir + '/' + entry.local_filename if entry.local_filename else 'Missing!' }}<br/><br/>
+                    <strong>Audio page title:</strong> {{ entry.title }}<br/>
+                    <strong>Local filename:</strong> 
+                    {{ (audio_paths[loop.index0].subpath + '/' + entry.filename) if entry.filename else 'Missing!' }}
+                    <br/><br/>
                     {% if entry.description %}
                         <h2>Description:</h2>
                         {% for ln in entry.description.splitlines() %}
@@ -50,9 +52,8 @@
                     <div class="entry-expand-actions">
                         Source:<br/>
                         <div class="entry-expand-icons">
-                            {% if entry.reddit_url %}
-                            {% set r_url = 'https://reddit.com' + entry.reddit_url if not entry.reddit_url.startswith('http') else entry.reddit_url %}
-                            <a href={{ r_url if r_url else '#' }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
+                            {% if entry.fcol_url %}
+                            <a href={{ entry.fcol_url }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
                             {% endif %}
                             <a href={{ entry.url if entry.url else '#' }} title="Visit audio source page!"><i class="fas fa-globe-americas"></i></a>
                         </div>
@@ -66,7 +67,7 @@
                     <div class="entry-expand-actions">
                         Artist:<br/>
                         <div class="entry-expand-icons">
-                            <a href={{ 'https://reddit.com/user/' + entry.reddit_user if entry.reddit_user else '#' }} class="artist" title="Visit reddit user!"><i class="fab fa-reddit-square"></i></a>
+                            <a href={{ ('https://reddit.com/user/' + entry.fcol_alias_name) if entry.fcol_alias_name else '#' }} class="artist" title="Visit reddit user!"><i class="fab fa-reddit-square"></i></a>
                         </div>
                         <br/>
                         Actions:<br/>
@@ -81,10 +82,11 @@
                 <br/>
             </div> {# entry-expand-inner #}
             <div class="embeds-container row no-margin">
-                {# we don't have local_filename for older entries, so check for it's presence #}
-                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=entry.local_filename) if entry.local_filename else '' }}>
+                {# TODO too much code inside template #}
+                {# we don't have a filename for older entries, so check for it's presence #}
+                <div class="audio-embed" data-local-src={{ url_for('main.artist_file', subpath=audio_paths[loop.index0].subpath, filename=entry.filename) if entry.filename else '' }}>
                 </div>
-                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', artist=entry.author_subdir, filename=selftext_fns[loop.index0]) if selftext_fns[loop.index0] else '' }}>
+                <div class="selftxt-embed" data-local-src={{ url_for('main.artist_file', subpath=audio_paths[loop.index0].subpath, filename=audio_paths[loop.index0].selftext_filename) if audio_paths[loop.index0].selftext_filename else '' }}>
                 </div>
             </div>
         </div> {# entry-expand #}

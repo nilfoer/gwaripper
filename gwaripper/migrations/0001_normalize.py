@@ -184,10 +184,9 @@ def upgrade(db_con):
                 else:
                     submission_self_url = f"https://www.reddit.com{submission_self_url}"
 
+                subpath = ""
                 # <v0.3 won't have a subpath
-                if date < datetime.date(year=2020, month=10, day=10):
-                    subpath = ""
-                else:
+                if date > datetime.date(year=2020, month=10, day=10):
                     #
                     # re-create subpath that was not added to DB previously due to a bug
                     #
@@ -199,13 +198,13 @@ def upgrade(db_con):
                     # than nr_files and thus have a subpath
                     # -> test if the file exists without else assume a subpath
                     # user might have moved file to a backup but that's the best we can do
-                    file_found_without_subpath = os.path.isfile(
-                            os.path.join(config.get_root(),
-                                         r['author_subdir'],
-                                         r['local_filename']))
+                    file_without_subpath = os.path.join(config.get_root(),
+                                                        r['author_subdir'],
+                                                        r['local_filename'])
+                    file_found_without_subpath = os.path.isfile(file_without_subpath)
+
                     if nr_files >= 3 or not file_found_without_subpath:
-                        subpath = sanitize_filename("", r['reddit_title'])
-                        subpath = subpath[:70].strip()
+                        subpath = sanitize_filename("", r['reddit_title'])[:70].strip()
 
                 c.execute("INSERT INTO RedditInfo(created_utc) VALUES (?)",
                           (r['created_utc'],))
