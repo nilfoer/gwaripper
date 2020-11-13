@@ -3,6 +3,7 @@ import os
 import time
 import sqlite3
 import logging
+import datetime
 
 import urllib.error
 
@@ -10,7 +11,7 @@ import gwaripper.config as cfg
 
 from gwaripper.gwaripper import GWARipper, report_preamble
 from gwaripper.db import load_or_create_sql_db
-from gwaripper.info import FileInfo, RedditInfo, FileCollection
+from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER
 from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.reddit import RedditExtractor
@@ -29,15 +30,16 @@ def test_exit_context(setup_tmpdir, monkeypatch):
 
     exp_csv_called = False
 
-    def patch_exp_csv(fn, con):
+    def patch_exp_csv(con, fn, table):
         assert fn == os.path.join(tmpdir, 'gwarip_db_exp.csv')
         assert con
+        assert table == "v_audio_and_collection_combined"
         nonlocal exp_csv_called
         exp_csv_called = True
 
     # gwaripper.py used from .. import .. so it's in it's own 'namespace'
     # so we have to patch it there
-    monkeypatch.setattr('gwaripper.gwaripper.export_csv_from_sql', patch_exp_csv)
+    monkeypatch.setattr('gwaripper.gwaripper.export_table_to_csv', patch_exp_csv)
 
     close_called = False
 
@@ -83,50 +85,54 @@ def test_exit_context(setup_tmpdir, monkeypatch):
     assert write_report_called is False
 
 
-def test_set_missing_reddit(setup_tmpdir):
-    tmpdir = setup_tmpdir
+@pytest.fixture
+def setup_db_2col_5audio(setup_tmpdir):
+    return _setup_db_2col_5audio(setup_tmpdir)
 
-    test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
-    test_con, test_c = load_or_create_sql_db(test_db)
 
-    # NOTE: IMPORTANT not inserting value for favorite and later have 0 as expected value
-    # so we test that's set as default
-    test_c.executescript("""
-    BEGIN TRANSACTION;
+@pytest.fixture
+def setup_db_2col_5audio_without_reddit(setup_tmpdir):
+    return _setup_db_2col_5audio(setup_tmpdir, with_reddit=False)
 
-    INSERT INTO Downloads(
-        date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
-        author_subdir, subreddit_name
-        )
-    VALUES
-        ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
-         "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-         "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL),
 
-        ("2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
-         "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-         "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-         "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-         "26iw32o", NULL, NULL, NULL, "testy_user", "testy_user", NULL),
+def _setup_db_2col_5audio(tmpdir, with_reddit=True):
+    sql_fn = os.path.join(
+            TESTS_DIR, "all_test_files",
+            f"db_2col_5audio{'without_reddit' if not with_reddit else ''}.sql")
+    test_db_fn = os.path.join(tmpdir, "gwarip_db.sqlite")
+    db_con, _ = load_or_create_sql_db(test_db_fn)
 
-        ("2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", NULL,
-         "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate elongate elongate elongate elongate elongate elongate",
-         "https://no-page-url.com/324q523q.mp3", NULL, 1602557093.0,
-         "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-         "2klj654", "don_t change this", NULL, NULL, "old_user", "old_user", NULL);
+    with open(sql_fn, "r", encoding="UTF-8") as f:
+        sql = f.read()
 
-    COMMIT;
-    """)
+    db_con.executescript(sql)
 
-    test_con.close()
+    db_con.close()
 
-    fi = FileInfo(object, True, "m4a", "https://soundgasm.net/sassmastah77/Audio-title-ASMR",
+    return tmpdir, test_db_fn
+
+
+def test_set_missing_reddit(setup_tmpdir) -> None:
+    return # TODO
+    tmpdir, test_db_fn = setup_db_2col_5audio()
+
+    db_con = sqlite3.connect(test_db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
+    c = db_con.execute("SELECT * FROM v_audio_and_collection_combined")
+    original = c.fetchall()
+    # TODO
+
+    # artist inserted and arist_id of alias updated
+    # inserted alias if it wasn't in db
+    # redditinfo, filecol
+    # AudioFile colid updated
+    # selftext written
+    fi = FileInfo(object, True, "m4a",
+                  # only important that it has same url and author as one in db
+                  "https://soundgasm.net/u/skitty/Motherly-Moth-Girl-Keeps-You-Warm-F4M",
                   "https://soundgasm.net/284291412sa324.m4a", None,
                   "AudiLEAVE_PRESENT_FIELDS_UNCHANGED [ASMR]",
-                  "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "LEAVE_PRESENT_FIELDS_UNCHANGED77")
-    ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
+                  "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "skitty")
+    ri = RedditInfo(object, "reddit_url",
                     "inserted_reddit_id", "isnerted_reddit_title", "inserted-reddit-user",
                     "inserted/subreddit", 'inserted_rddt_url', 1254323.0, children=[fi])
     ri.selftext = None
@@ -263,314 +269,329 @@ def test_set_missing_reddit(setup_tmpdir):
     assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
 
 
-def test_add_to_db(setup_tmpdir):
-    tmpdir = setup_tmpdir
+def test_add_to_db(setup_db_2col_5audio):
 
-    test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
-    test_con, test_c = load_or_create_sql_db(test_db)
+    tmpdir, test_db_fn = setup_db_2col_5audio
 
-    test_c.executescript("""
-    BEGIN TRANSACTION;
-
-    INSERT INTO Downloads(
-        date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
-        author_subdir, subreddit_name
-        )
-    VALUES
-        ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
-         "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-         "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL);
-
-    COMMIT;
-    """)
-
-    # everything but time col
-    query_str = """SELECT
-        id, date, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
-        author_subdir, subreddit_name, rating, favorite FROM Downloads"""
-
-    test_con.close()
+    query_str = """
+    SELECT
+        af.*,
+        Alias.name as alias_name,
+        Alias.artist_id as artist_id,
+        Artist.id as artist_id,
+        Artist.name as artist_name
+    FROM AudioFile af
+    JOIN Alias ON Alias.id = af.alias_id
+    LEFT JOIN Artist ON Artist.id = Alias.artist_id
+    {where_expression}
+    """
 
     fi = FileInfo(object, True, "m4a", "https://soundgasm.net/testy_user/Best-title-SFW",
                   "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a", None,
                   "Best title [SFW]",
-                  "This is another description", "testy_user")
+                  "This is another description", "alias_added_with_artist_id")
     ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
-                    "26iw32o", "Best title on reddit [SFW]", "testy_ruser",
+                    "26iw32o", "Best title on reddit [SFW]", "skitty-gwa",
                     "pillowtalkaudio", "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
                     1602557093.0, [fi])
-    ri.selftext = None
-    ri.r_post_url = "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
     fi.parent = ri
 
     # _add_to_db should NOT commit
     with GWARipper() as gwa:
-        gwa._add_to_db(fi, ri.author, "subpath\\generated [file] [name].mp3")
-
-    expected = [
-            [1, "2020-01-23", "This is a description", "audio_file.m4a",
-             "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-             "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
-            ]
+        gwa._add_to_db(fi, 1, "generated [file] [name].mp3")
 
     # UNCHANGED!
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE af.id > 6")) == []
 
     #
     #
     #
+    expected = []
 
     expected.append(
-            [2, time.strftime("%Y-%m-%d"), "This is another description",
-             "subpath\\generated [file] [name].mp3",
-             "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-             "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", "Best title on reddit [SFW]",
-             "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz", "testy_ruser",
-             "testy_user", "testy_ruser", "pillowtalkaudio", None, 0]
+            [7, 1, 1, time.strftime("%Y-%m-%d"), "This is another description",
+             "generated [file] [name].mp3",
+             "Best title [SFW]", "https://soundgasm.net/testy_user/Best-title-SFW",
+             # 6 = alias_id which was added
+             6, None, 0, 'alias_added_with_artist_id', 1, 1, 'skitty-gwa']
             )
 
     with GWARipper() as gwa:
-        # file_author uses ruser
-        gwa._add_to_db(fi, ri.author, "subpath\\generated [file] [name].mp3")
+        # collection_id set -> in db + downloaded_with_collection set
+        # arist_id set on alias if info.reddit_info
+        gwa._add_to_db(fi, 1, "generated [file] [name].mp3")
         gwa.db_con.commit()  # force commit
 
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE af.id > 6")) == [tuple(r) for r in expected]
 
     #
+    # no artist_id if info.reddit_info.author is None
     #
-    #
-
-    expected.append(
-            [3, time.strftime("%Y-%m-%d"),
-             "Subtitle [SFW]\n\nHello what's up\nSuper duper",
-             "filenäme_lo中al rem_veth_se_hehe ____ [let them stay] .this,too elongate "
-             "elongate elongate elongate elongate 123.m4a.txt",
-             "filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
-             "elongate elongate elongate elongate elongate elongate",
-             "https://no-page-url.com/324q523q.mp3", "https://chirb.it/23sf32", None,
-             None, None, None, None, None, "old_user", "diff_author_than_fi", None, None, 0]
-            )
-
-    fi = FileInfo(object, True, "mp3", "https://chirb.it/23sf32",
-                  "https://no-page-url.com/324q523q.mp3", None,
-                  "filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
-                  "elongate elongate elongate elongate elongate elongate",
-                  "Subtitle [SFW]\n\nHello what's up\nSuper duper", "old_user")
-
-    fn = ("filenäme_lo中al rem_veth_se_hehe ____ [let them stay] .this,too elongate "
-          "elongate elongate elongate elongate 123.m4a.txt")
+    ri.author = None
+    fi.page_url = 'adsflkjlasdlkdgflkadfsglkjafd;'
+    fi.author = 'alias_with_ri_added_without_artist_id'
 
     with GWARipper() as gwa:
-        gwa._add_to_db(fi, "diff_author_than_fi", fn)
+        gwa._add_to_db(fi, 2, "generated [file] [name].mp3")
         gwa.db_con.commit()  # force commit
 
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    expected.append(
+            [8, 2, 1, time.strftime("%Y-%m-%d"), "This is another description",
+             "generated [file] [name].mp3",
+             "Best title [SFW]", fi.page_url,
+             7, None, 0, fi.author, None, None, None]
+            )
+
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE af.id > 6")) == [tuple(r) for r in expected]
+
+    with GWARipper() as gwa:
+        # reddit_info but no collection_id raises
+        with pytest.raises(AssertionError):
+            gwa._add_to_db(fi, None, "generated [file] [name].mp3")
+
+    #
+    # no reddit_info
+    #
+    fi.parent = None
+    fi.page_url = 'asflkasdj32532'
+    fi.author = 'alias_without_ri_added_without_artist_id'
+
+    with GWARipper() as gwa:
+        gwa._add_to_db(fi, None, "filename name ... [file] [name].mp3")
+        gwa.db_con.commit()  # force commit
+
+    expected.append(
+            [9, None, 0, time.strftime("%Y-%m-%d"), "This is another description",
+             "filename name ... [file] [name].mp3",
+             "Best title [SFW]", fi.page_url,
+             8, None, 0, fi.author, None, None, None]
+            )
+
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE af.id > 6")) == [tuple(r) for r in expected]
+
+    #
+    # uses already present alias
+    #
+
+    fi.parent = None
+    fi.page_url = '3adslkfaslk34k'
+    fi.author = 'sassmastah77'
+
+    with GWARipper() as gwa:
+        gwa._add_to_db(fi, None, "filename name ... [file] [name].mp3")
+        gwa.db_con.commit()  # force commit
+
+    expected.append(
+            [10, None, 0, time.strftime("%Y-%m-%d"), "This is another description",
+             "filename name ... [file] [name].mp3",
+             "Best title [SFW]", fi.page_url,
+             5, None, 0, fi.author, 2, 2, fi.author]
+            )
+
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE af.id > 6")) == [tuple(r) for r in expected]
 
 
-def test_already_downloaded(setup_tmpdir):
-    tmpdir = setup_tmpdir
+def test_add_to_db_ri(setup_db_2col_5audio):
+    tmpdir, test_db_fn = setup_db_2col_5audio
+
+    query_str = """
+    SELECT
+        fc.*,
+        RedditInfo.created_utc,
+        Alias.name as alias_name,
+        Alias.artist_id as alias_artist_id,
+        Artist.id as artist_id,
+        Artist.name as artist_name
+    FROM FileCollection fc
+    LEFT JOIN RedditInfo ON RedditInfo.id = fc.reddit_info_id
+    JOIN Alias ON Alias.id = fc.alias_id
+    LEFT JOIN Artist ON Artist.id = Alias.artist_id
+    {where_expression}
+    """
+
+    ri = RedditInfo(object, "add/set_missing:should-use-permalink",
+                    "r3dd1t1d", "Best title on reddit [SFW]", "inserted-as-alias-and-artist",
+                    "subr", "/r/subr/comments/r3dd1t1d/foo-bar-baz",
+                    1602557093.0)
+
+    #
+    # _add_to_db_ri should not commit
+    #
+    with GWARipper() as gwa:
+        assert gwa._add_to_db_ri(ri) == (3, ri.author)
+
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE fc.id > 2")) == []
+
+    with GWARipper() as gwa:
+        assert gwa._add_to_db_ri(ri) == (3, ri.author)
+        gwa.db_con.commit()  # force commit
+
+    expected = [
+            [3, "https://www.reddit.com/r/subr/comments/r3dd1t1d/foo-bar-baz",
+             #                            v-ri_id  v-alias_id
+             ri.id, ri.title, ri.subpath, 3, None, 6, ri.created_utc, ri.author, 3, 3, ri.author]
+    ]
+    # artist inserted
+    # alias inserted
+    # alias using artist_id if ri.author
+    # redditinfo inserted
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE fc.id > 2")) == [tuple(r) for r in expected]
+
+    #
+    # ri with subpath
+    #
+    ri.nr_files = 4
+    ri.permalink = 'sadflkjflkasdjlkfsadjlkj'
+    # check if truncated title/subpath stored
+    ri.title = "01234567890123456789012345678901234567890123456789012345678901234567890123456789"
+    # re-use existing alias_id
+    ri.author = 'sassmastah77'
+    ri._update_subpath()
+
+    expected.append(
+        [4, 'https://www.reddit.com' + ri.permalink,
+         #                subpath
+         ri.id, ri.title, ri.title[:70], 4, None, 5, ri.created_utc, ri.author, 2, 2, ri.author]
+    )
+    with GWARipper() as gwa:
+        assert gwa._add_to_db_ri(ri) == (4, ri.author)
+        gwa.db_con.commit()  # force commit
+
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE fc.id > 2")) == [tuple(r) for r in expected]
+
+    #
+    # ri.author is None -> DELETED_USR_FOLDER
+    #
+    ri.nr_files = 2
+    ri.permalink = 'flksadflkasjdlkkl'
+    ri.title = "flkajsdlkl lkdslfkasl lksdflks"
+    # use DELETED_USR_FOLDER
+    ri.author = None
+    ri._update_subpath()
+
+    expected.append(
+        [5, 'https://www.reddit.com' + ri.permalink,
+         ri.id, ri.title, "", 5, None, 1, ri.created_utc,
+         DELETED_USR_FOLDER, None, None, None]
+    )
+    with GWARipper() as gwa:
+        assert gwa._add_to_db_ri(ri) == (5, DELETED_USR_FOLDER)
+        gwa.db_con.commit()  # force commit
+
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE fc.id > 2")) == [tuple(r) for r in expected]
+
+
+def test_already_downloaded(monkeypatch, setup_db_2col_5audio):
+    tmpdir, test_db_fn = setup_db_2col_5audio
     cfg.config["Settings"]["set_missing_reddit"] = "False"
 
-    test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
-    test_con, test_c = load_or_create_sql_db(test_db)
+    db_con = sqlite3.connect(test_db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
 
-    test_c.executescript("""
-    BEGIN TRANSACTION;
+    fi1 = FileInfo(object, True, "m4a",
+                   "https://soundgasm.net/u/skitty/Motherly-Moth-Girl-Keeps-You-Warm-F4M",
+                   *([None] * 5))
 
-    INSERT INTO Downloads(
-        date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
-        author_subdir, subreddit_name
-        )
-    VALUES
-        ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
-         "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-         "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL),
+    db_con.execute("UPDATE AudioFile SET url = ? WHERE id = 2",
+                   ('direct_url_used_for_already_downloaded',))
+    fi2 = FileInfo(object, True, "m4a", None,  # url none
+                   # both url and direct_url should be used for checking in db
+                   'direct_url_used_for_already_downloaded',
+                   *([None] * 4))
 
-        ("2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
-         "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-         "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-         "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-         "26iw32o", NULL, NULL, NULL, "testy_user", "testy_user", NULL),
+    fi3 = FileInfo(object, True, "m4a", 'blakjlaskd',  # url not in db
+                   # both url and direct_url should be used for checking in db
+                   'direct_url_used_for_already_downloaded',
+                   *([None] * 4))
 
-        ("2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", NULL,
-         "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate elongate elongate elongate elongate elongate elongate",
-         "https://no-page-url.com/324q523q.mp3", NULL, 1602557093.0,
-         "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-         "2klj654", "don_t change this", NULL, NULL, "old_user", "old_user", NULL);
+    fi4 = FileInfo(object, True, "m4a",
+                   "https://soundgasm.net/u/skitty/Not-Downloaded",
+                   *([None] * 5))
+    fi5 = FileInfo(object, True, "m4a",
+                   "https://chirb.it/2jkr532k",
+                   *([None] * 5))
 
-    COMMIT;
-    """)
-
-    test_con.close()
-
-    fi1 = FileInfo(object, True, "m4a", "https://soundgasm.net/sassmastah77/Audio-title-ASMR",
-                   "https://soundgasm.net/284291412sa324.m4a", None,
-                   "AudiLEAVE_PRESENT_FIELDS_UNCHANGED [ASMR]",
-                   "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "LEAVE_PRESENT_FIELDS_UNCHANGED77")
-    ri1 = RedditInfo(object, "add/set_missing:should-use-r_post_url",
-                     "inserted_reddit_id", "isnerted_reddit_title", "inserted-reddit-user",
-                     "ssssubreddit", "inserted_rddt_url", 1254323.0, [fi1])
-    ri1.selftext = None
-    ri1.r_post_url = "url-to-self-or-outgoing"
-    fi1.parent = ri1
-
-    # garbage fields for already present col so we can check that they don't get changed
-    fi2 = FileInfo(object, True, "m4a", "https://soundgasm.net/testy_user/Best-title-SFW",
-                   "https://soundgasm.net/24634adra354.m4a", None,
-                   "BeLEAVE_PRESENT_FIELDS_UNCHANGEDe [SFW]",
-                   "This iLEAVE_PRESENT_FIELDS_UNCHANGEDscription",
-                   "LEAVE_PRESENT_FIELDS_UNCHANGED_user")
-    ri2 = RedditInfo(object, "add/set_missing:should-use-r_post_url",
-                     "LEAVE_PRESENT_FIELDS_UNCHANGED", "isnerte222d_reddit_title",
-                     "inserted-reddit-user", "inserted/subreddit", "inserted_rddt2_url",
-                     11111111.0, [fi2])
-    ri2.selftext = "selfff2fffftext"
-    ri2.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
-    fi2.parent = ri2
-
-    fi3 = FileInfo(object, True, "m4a", "insertedPAGEURL",
-                   "https://no-page-url.com/324q523q.mp3", None,
-                   "Use title from DB!",  # needed for selftext fn
-                   "This iLEAgsgVE_PRESENT_FIELDS_UNCHANGEDscription",
-                   "LEAVE_PRESENT_sgsFIELDS_UNCHANGED_user")
-    ri3 = RedditInfo(object, "add/set_missing:should-use-r_post_url",
-                     "LEAVE_PRESENT_FIELDS_UNCHANGED", "LEAVE_TITLE_FIELD_UNCHANGED",
-                     "inserted-reddit3-user", "inserted3/subreddit", "inserted_rddt3_url",
-                     111111.0, [fi3])
-    ri3.selftext = "selfff3fffdszlbdftext"
-    ri3.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
-    fi3.parent = ri3
-
-    fi4 = FileInfo(object, True, "mp3", "https://chirb.it/23sf32",
-                   "https://no-page-url.com/agfads8392423.mp3", None,
-                   "filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
-                   "elongate elongate elongate elongate elongate elongate",
-                   "Subtitle [SFW]\n\nHello what's up\nSuper duper", "old_user")
-    fc4 = FileCollection(object, "skgafd;gaag", None, "akfjglag asdfjlas", "old_user")
-    fc4.parent = ri2
-    fi4.parent = fc4
-
-    fi5 = FileInfo(object, True, "mp3", "https://chirb.it/asfd25sak27k",
-                   "https://chirb.it/agfafsl32923.mp3", None,
-                   "20uw0 fowfsdoif20 wdkfj23jr3245",
-                   "Kkgads sapofp23 [SFW]\n\nHello what's up\nSuper duper", "super-user")
-    ri3.children.append(fi5)
-    fi5.parent = ri3
-
-    fi6 = FileInfo(object, True, "mp3", "https://soundcloud.com/2lj4326up034",
-                   "https://soundcloud.com/2045tjsaolkfjopi423.mp3", None,
-                   "wifjopi345324joi5j34o j34k5jt34kj3o",
-                   "LKlk34lk34l0 alfjla0320 [SFW]\n\nHello what's up\nSuper duper",
-                   "other.user")
+    db_con.commit()
 
     # nothing should happen
     with GWARipper() as gwa:
-        assert gwa.already_downloaded(fi1)
-        assert fi1.already_downloaded
+        assert gwa.already_downloaded(fi1) is True
+        assert fi1.already_downloaded is True
 
-        assert gwa.already_downloaded(fi2)
-        assert fi2.already_downloaded
+        assert gwa.already_downloaded(fi2) is True
+        assert fi2.already_downloaded is True
 
-        assert gwa.already_downloaded(fi3)
-        assert fi3.already_downloaded
+        assert gwa.already_downloaded(fi3) is True
+        assert fi3.already_downloaded is True
 
-        assert not gwa.already_downloaded(fi4)
-        assert not fi4.already_downloaded
+        assert gwa.already_downloaded(fi4) is False
+        assert fi4.already_downloaded is False
 
-        assert not gwa.already_downloaded(fi5)
-        assert not fi5.already_downloaded
-
-        assert not gwa.already_downloaded(fi6)
-        assert not fi6.already_downloaded
+        assert gwa.already_downloaded(fi5) is False
+        assert fi5.already_downloaded is False
 
     #
+    # check if set_missing_reddit is called correctly
     #
-    #
+    ri = RedditInfo(*([None] * 8))
+    fi1.parent = ri
 
-    expected = [
-            [1, "2020-01-23", "13:37", "This is a description", "audio_file.m4a",
-             "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-             "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
-            [2, "2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
-             "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-             "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", None, None, None, "testy_user", "testy_user", None, None, 0],
-            [3, "2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", None,
-             "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
-             "elongate elongate elongate elongate elongate elongate",
-             "https://no-page-url.com/324q523q.mp3", None, 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-             "2klj654", "don_t change this", None, None, "old_user", "old_user", None, None, 0],
-            ]
+    called_with_audio_id = None
+    called_with_info = None
 
-    query_str = "SELECT * FROM Downloads"
+    def patched_set_missing(self, audio_id, info):
+        nonlocal called_with_audio_id
+        nonlocal called_with_info
+        called_with_audio_id = audio_id
+        called_with_info = info
 
-    # db shouldn't change since set_missing_reddit is False
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.set_missing_reddit_db',
+                        patched_set_missing)
 
-    # reset them
-    fi1.already_downloaded = False
-    fi2.already_downloaded = False
-    fi3.already_downloaded = False
-    fi4.already_downloaded = False
-    fi5.already_downloaded = False
-    fi6.already_downloaded = False
-
-    #
-    #
-    #
-
-    expected[0][8:17] = [1254323.0, ri1.r_post_url, ri1.id, ri1.title, ri1.permalink,
-                         ri1.author, "sassmastah77", "sassmastah77", ri1.subreddit]
-
-    expected[1][8:17] = [1602557093.0,
-                         "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-                         "26iw32o", ri2.title, ri2.permalink, ri2.author,
-                         "testy_user", "testy_user", ri2.subreddit]
-
-    # page url inserted
-    expected[2][7] = "insertedPAGEURL"
-    expected[2][8:17] = [1602557093.0,
-                         "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-                         "2klj654", "don_t change this", ri3.permalink, ri3.author,
-                         "old_user", "old_user", ri3.subreddit]
+    with GWARipper() as gwa:
+        gwa.already_downloaded(fi1)
+    assert called_with_audio_id is None
+    assert called_with_info is None
 
     cfg.config["Settings"]["set_missing_reddit"] = "True"
 
+    # don't call if collection_id is set
     with GWARipper() as gwa:
-        assert gwa.already_downloaded(fi1)
-        assert fi1.already_downloaded
+        gwa.already_downloaded(fi1)
+    assert called_with_audio_id is None
+    assert called_with_info is None
 
-        assert gwa.already_downloaded(fi2)
-        assert fi2.already_downloaded
+    # set collection_id to NULL
+    db_con.execute("UPDATE AudioFile SET collection_id = NULL WHERE id = 1")
+    db_con.commit()
+    db_con.close()
 
-        assert gwa.already_downloaded(fi3)
-        assert fi3.already_downloaded
-
-        assert not gwa.already_downloaded(fi4)
-        assert not fi4.already_downloaded
-
-        assert not gwa.already_downloaded(fi5)
-        assert not fi5.already_downloaded
-
-        assert not gwa.already_downloaded(fi6)
-        assert not fi6.already_downloaded
-
-    # set_missing_reddit called
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    with GWARipper() as gwa:
+        gwa.already_downloaded(fi1)
+    assert called_with_audio_id == 1
+    assert called_with_info is fi1
 
 
+# split in downloa_file /download_collection
 def test_download(setup_tmpdir, monkeypatch, caplog):
+    return  # TODO
     tmpdir = setup_tmpdir
 
     rnd = RandomHelper()

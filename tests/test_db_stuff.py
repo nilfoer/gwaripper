@@ -8,7 +8,7 @@ import time
 from utils import gen_hash_from_file, setup_tmpdir, TESTS_DIR
 
 import gwaripper.config as config
-from gwaripper.db import export_csv_from_sql, backup_db
+from gwaripper.db import export_table_to_csv, backup_db
 
 time_str = time.strftime("%Y-%m-%d")
 
@@ -54,10 +54,7 @@ def create_db_for_export(setup_tmpdir):
     # commit changes
     conn.commit()
 
-    yield setup_tmpdir, conn, c
-
-    # setup_tmpdir takes care of deleting files
-    conn.close()
+    return setup_tmpdir, conn, c
 
 
 @pytest.fixture
@@ -105,15 +102,9 @@ def create_db_for_bu(setup_tmpdir):
     # commit changes
     conn.commit()
 
-    export_csv_from_sql(csv_path, conn)
+    export_table_to_csv(conn, csv_path, "Downloads")
 
-    yield setup_tmpdir, conn, c, sql_path, csv_path
-
-    conn.close()
-
-    config.config["Settings"]["db_bu_freq"] = "4.5"
-    config.config["Time"]["last_db_bu"] = "0.0"
-    config.write_config_module()
+    return setup_tmpdir, conn, c, sql_path, csv_path
 
 
 def test_export_csv(create_db_for_export):
@@ -130,7 +121,7 @@ def test_export_csv(create_db_for_export):
                  "https://hostdomain.com/sub/TESTURL/", "", "", "", "", "", "", "TESTUSER", ""]]
 
     tmpdir, con, c = create_db_for_export
-    export_csv_from_sql(os.path.join(tmpdir, "export_test.csv"), con)
+    export_table_to_csv(con, os.path.join(tmpdir, "export_test.csv"), "Downloads")
     rows = []
     with open(os.path.join(tmpdir, "export_test.csv"),
               "r", newline="", encoding='utf-8') as csvf:
@@ -138,6 +129,8 @@ def test_export_csv(create_db_for_export):
         for row in csv_reader:
             rows.append(row)
     assert rows == expected
+
+    con.close()
 
 
 @pytest.mark.parametrize("last_bu, bu_freq, csv_bu, force, backuped, too_many", [
@@ -155,7 +148,11 @@ def test_export_csv(create_db_for_export):
     (str(time.time() - (10.5 * 24 * 60 * 60)), "10", True, False, True, False)
 ])
 def test_backup_db(last_bu, bu_freq, csv_bu, force, backuped, too_many, create_db_for_bu):
+    config.config["Settings"]["db_bu_freq"] = "4.5"
+    config.config["Time"]["last_db_bu"] = "0.0"
+
     tmpdir, con, c, sql_p, csv_p = create_db_for_bu
+
     bu_dir = os.path.join(tmpdir, "_db-autobu")
     bu_sql_path = os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str))
     bu_csv_path = os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str))
@@ -195,3 +192,5 @@ def test_backup_db(last_bu, bu_freq, csv_bu, force, backuped, too_many, create_d
         # deleted one bu if too_many, also deleted csv if written
         assert len([f for f in os.listdir(bu_dir) if f.endswith(".sqlite")]) <= 5
         assert not os.path.isfile(os.path.join(bu_dir, "0_exp.csv"))
+
+    con.close()

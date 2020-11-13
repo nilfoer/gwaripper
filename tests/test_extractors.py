@@ -21,7 +21,7 @@ from gwaripper.exceptions import (
         NoAuthenticationError, InfoExtractingError,
         NoAPIResponseError, AuthenticationFailed
         )
-from gwaripper.info import FileInfo
+from gwaripper.info import FileInfo, FileCollection
 from utils import setup_tmpdir
 
 
@@ -136,7 +136,7 @@ def test_soundgasm_user_extractor(monkeypatch):
             [rep.url for rep in report.children][-len(sgasm_usr_audio_urls):])
 
     # sgasm_usr_audio_urls should be last urls on user page
-    assert sgasm_usr_audio_urls == [c.page_url for c in fcol.children][-len(sgasm_usr_audio_urls):]
+    assert sgasm_usr_audio_urls == [c.page_url for c in fcol._children][-len(sgasm_usr_audio_urls):]
 
 
 def test_extractor_soundgasm():
@@ -398,7 +398,7 @@ def test_extractor_imgur_album(monkeypatch):
         ('https://imgur.com/G52dEpB', 'https://i.imgur.com/G52dEpB.jpg'),
         ('https://imgur.com/ozozXyN', 'https://i.imgur.com/ozozXyN.jpg')
     )
-    for i, img in enumerate(fcol.children):
+    for i, img in enumerate(fcol._children):
         assert img.parent is fcol
         assert img.page_url == img_urls[i][0]
         assert img.direct_url == img_urls[i][1]
@@ -432,7 +432,7 @@ def test_extractor_imgur_album(monkeypatch):
         ('https://imgur.com/YgPICmf', 'https://i.imgur.com/YgPICmf.mp4'),
         ('https://imgur.com/NLm5ffm', 'https://i.imgur.com/NLm5ffm.mp4')
     )
-    for i, img in enumerate(fcol.children):
+    for i, img in enumerate(fcol._children):
         assert img.parent is fcol
         assert img.page_url == animated_urls[i][0]
         assert img.direct_url == animated_urls[i][1]
@@ -575,7 +575,7 @@ class DummyExtractor(BaseExtractor):
     EXTRACTOR_NAME = "Dummy"
     BASE_URL = "dummy.org"
 
-    supported = [ex for ex in AVAILABLE_EXTRACTORS if ex != RedditExtractor]
+    supported = [ex for ex in AVAILABLE_EXTRACTORS if ex is not RedditExtractor]
 
     def __init__(self, url, init_from=None):
         self.url = url
@@ -675,14 +675,14 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
         if attr_val_dict is not None:
             assert report.url == url
             assert report.err_code == ExtractorErrorCode.NO_ERRORS
-            print("\n".join(rep.url for rep in report.children))
+            # print("\n".join(rep.url for rep in report.children))
             assert len(report.children) == len(found_urls)
 
             for attr_name, value in attr_val_dict.items():
                 assert getattr(ri, attr_name) == value
 
             # IMPORTANT check that parent and reddit_info was set
-            for child in ri.children:
+            for child in ri._children:
                 assert child.parent is ri
 
             sorted_urls = list(sorted(found_urls))
@@ -736,7 +736,7 @@ def test_extractor_reddit(setup_tmpdir, monkeypatch, caplog):
         assert getattr(ri, attr_name) == value
 
     # IMPORTANT check that parent and reddit_info was set
-    for child in ri.children:
+    for child in ri._children:
         assert child.parent is ri
     # only 1 child
     rep = report.children[0]
@@ -780,17 +780,15 @@ def test_extractor_reddit_banned_tag_linktext(monkeypatch, caplog):
     assert report.children[1].err_code == ExtractorErrorCode.BANNED_TAG
 
 
-class DummyFileInfo:
+class DummyFileInfo(FileInfo):
     def __init__(self):
-        self.parent = None
-        self.report = None
+        super().__init__(object, True, 'ext', 'url', 'fileURL', None, 'title'
+                         'descr', 'author', None, None)
 
 
-class DummyFileCol:
+class DummyFileCol(FileCollection):
     def __init__(self):
-        self.parent = None
-        self.children = []
-        self.report = None
+        super().__init__(object, '', None, None, 'author', children=[])
 
 
 def test_base_extract(monkeypatch, caplog):
@@ -820,7 +818,7 @@ def test_base_extract(monkeypatch, caplog):
     # err set on parent_report
     assert parent_report.err_code == exerr.ERROR_IN_CHILDREN
     # parent not modified
-    assert not parent.children
+    assert not parent._children
     assert caplog.records[0].message == "Skipping URL 'url' due to broken extractor: Base"
 
     # reset
@@ -864,7 +862,7 @@ def test_base_extract(monkeypatch, caplog):
     assert res.report is rep
     # parent set and appendend
     assert res.parent is parent
-    assert parent.children[0] is res
+    assert parent._children[0] is res
 
     assert rep.url == 'url354'
     assert rep.err_code == exerr.NO_ERRORS
@@ -904,7 +902,7 @@ def test_base_extract(monkeypatch, caplog):
     assert res.report is rep
     # parent set and appendend
     assert res.parent is parent
-    assert parent.children[0] is res
+    assert parent._children[0] is res
 
     assert rep.url == 'url3542'
     assert rep.err_code == exerr.NO_RESPONSE
@@ -926,7 +924,7 @@ def test_base_extract(monkeypatch, caplog):
     assert res.report is rep
     # parent set and appendend
     assert res.parent is parent
-    assert parent.children[0] is res
+    assert parent._children[0] is res
 
     assert rep.url == 'url35426'
     assert rep.err_code == exerr.NO_EXTRACTOR
@@ -991,7 +989,7 @@ def test_base_extract(monkeypatch, caplog):
     caplog.clear()
     res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
     assert res is None
-    assert not parent.children
+    assert not parent._children
 
     assert rep.url == 'url354'
     assert rep.err_code == exerr.BROKEN_EXTRACTOR
@@ -1026,7 +1024,7 @@ def test_base_extract(monkeypatch, caplog):
     caplog.clear()
     res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
     assert res is None
-    assert not parent.children
+    assert not parent._children
 
     assert BaseExtractor.is_broken is True
 
@@ -1064,7 +1062,7 @@ def test_base_extract(monkeypatch, caplog):
         caplog.clear()
         res, rep = BaseExtractor.extract('url354', parent=parent, parent_report=parent_report)
         assert res is None
-        assert not parent.children
+        assert not parent._children
 
         assert BaseExtractor.is_broken is True
 

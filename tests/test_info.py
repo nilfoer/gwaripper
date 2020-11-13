@@ -18,7 +18,64 @@ def test_reddit_info_no_parents_allowed():
     assert "RedditInfo is not allowed to have a parent!" == str(exc.value)
 
 
-def generate_redditinfo_tree(parent_set_fcol=False):
+def test_fc_add_file_collection():
+    fc1 = FileCollection(base.BaseExtractor, "https://imaginary-audio-playlist/3432209",
+                         "3432209", "bestest playlist around that somehow also has a"
+                         " needlessly long title that does not seem to end so we "
+                         "can test filename generation", "dank-author")
+    fc2 = FileCollection(base.BaseExtractor, "https://imaginary-audio-playlist/3432209",
+                         "3432209", "bestest playlist around that somehow also has a"
+                         " needlessly long title that does not seem to end so we "
+                         "can test filename generation", "dank-author")
+    fc3 = FileCollection(base.BaseExtractor, "https://imaginary-audio-playlist/3432209",
+                         "3432209", "bestest playlist around that somehow also has a"
+                         " needlessly long title that does not seem to end so we "
+                         "can test filename generation", "dank-author")
+    fi1 = FileInfo(base.BaseExtractor, True, 'm4a',
+                   "https://soundgasm.net/u/test-1/File-Name-Test",
+                   "https://soudngasm.net/4uowl4235248sla242.m4a", None,
+                   "This is a test audio", "Description for test audio", "authorname")
+    fi2 = FileInfo(base.BaseExtractor, True, 'mp3',
+                   "https://eraudica.com/e/Eraudica-Test-Title",
+                   "https://eraudica.com/EraudicaTestTitle.mp3?adfs=safs234", None,
+                   "This is an eraudica test audio", "eraudica Description", "Eves-garden")
+
+    fc1.add_file(fi1)
+    assert fc1._children[0] is fi1
+    assert fi1.parent is fc1
+    assert fc1.nr_files == 1
+
+    fc1.add_file(fi2)
+    assert fc1._children[0] is fi1
+    assert fc1._children[1] is fi2
+    assert fi2.parent is fc1
+    assert fc1.nr_files == 2
+
+    fc2.add_collection(fc3)
+    assert fc2._children[0] is fc3
+    assert fc3.parent is fc2
+    assert fc2.nr_files == 0
+
+    fc3.add_file(fi1)
+    assert fc3._children[0] is fi1
+    assert fi1.parent is fc3
+    assert fc3.nr_files == 1
+    assert fc2.nr_files == 1
+
+    fc3.add_collection(fc1)
+    assert fc3._children[1] is fc1
+    assert fc1.parent is fc3
+    assert fc3.nr_files == 3
+    assert fc2.nr_files == 3
+    assert fc1.nr_files == 2
+
+    fc2.add_file(fi2)
+    assert fc2.nr_files == 4
+    assert fc3.nr_files == 3
+    assert fc1.nr_files == 2
+
+
+def generate_redditinfo_tree(add_collections=True):
     fi1 = FileInfo(base.BaseExtractor, True, 'm4a',
                    "https://soundgasm.net/u/test-1/File-Name-Test",
                    "https://soudngasm.net/4uowl4235248sla242.m4a", None,
@@ -54,37 +111,33 @@ def generate_redditinfo_tree(parent_set_fcol=False):
                     "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0)
 
     # only set parent on fileinfos since we might test parent propagation
-    fi3.parent = fc1
-    fc1.children.append(fi3)
+    fc1.add_file(fi3)
 
-    fi4.parent = fc2
-    fc2.children.append(fi4)
-    fi5.parent = fc2
-    fc2.children.append(fi5)
+    fc2.add_file(fi4)
+    fc2.add_file(fi5)
 
-    if parent_set_fcol:
-        fc1.parent = ri
-        fc2.parent = ri
+    ri.add_file(fi1)
+    ri.add_file(fi2)
 
-    fi1.parent = ri
-    ri.children.append(fi1)
-    fi2.parent = ri
-    ri.children.append(fi2)
-    ri.children.append(fc1)
-    ri.children.append(fc2)
+    if add_collections:
+        ri.add_collection(fc1)
+        ri.add_collection(fc2)
 
     return fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri
 
 
 def test_parent_sets_reddit_info():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree()
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=False)
 
-    # check that reddit_info not
-
+    # setting parent on a FileCollection should propagate the parent
+    # which currently is only allowed to be RedditInfo to it's
+    # children
+    assert fc1.parent is None
     assert fi3.reddit_info is None
     fc1.parent = ri
     assert fi3.reddit_info is ri
 
+    assert fc2.parent is None
     assert fi4.reddit_info is None
     assert fi5.reddit_info is None
     fc2.parent = ri
@@ -92,50 +145,13 @@ def test_parent_sets_reddit_info():
     assert fi5.reddit_info is ri
 
 
-def test_fcol_nr_files():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
-    assert ri.nr_files() == 5
-    fc2.children = [fi4]
-    assert ri.nr_files() == 4
-    ri.children = [fc2, fi1]
-    assert ri.nr_files() == 2
-
-
-def test_fcol_subpath():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
-    assert ri.subpath == ("[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] "
-                          "____ This Title Is Supposed To Be Ridiculously Long [With] "
-                          "[So Many More Tags] [Max Path Is Crying Right Now] ____ [_EmojisMa")
-    ri.title = None
-    assert ri.subpath == ri.id
-
-    assert fc2.subpath == ""
-    fc2.children = [fi1, fi2, fi4]
-    assert fc2.subpath == fc2.title
-
-
-def test_preferred_author():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
-
-    assert ri.get_preferred_author_name() == ri.author
-    ri.author = None
-    assert ri.get_preferred_author_name() == fi1.author
-
-    assert fc2.get_preferred_author_name() == fc2.author
-    fc2.author = None
-    assert fc2.get_preferred_author_name() == fi4.author
-
-    for _, c in children_iter_dfs(ri.children, file_info_only=False):
-        c.author = None
-
-    # reddit info but no author foudn -> deleted user
-    assert ri.get_preferred_author_name() == DELETED_USR_FOLDER
-
-    assert fc2.get_preferred_author_name() == "_unknown_user_files"
-
-
 def test_finfo_find_rinfo_on_parent_set():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree()
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=False)
+
+    # looks similar to test_parent_sets_reddit_info but here we test that
+    # when a parent that has a RedditInfo as parent somewhere in the chain
+    # gets set on a FileInfo that FileInfo finds and sets that RedditInfo
+    # to it's own attrib fi.reddit_info
 
     # set parent to diff fcol
     fi1.parent = FileCollection(*([None]*5))
@@ -154,8 +170,71 @@ def test_finfo_find_rinfo_on_parent_set():
     assert fi4.reddit_info is ri
 
 
+def test_fcol_nr_files():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
+    assert ri.nr_files == 5
+
+    fc1.nr_files += -1
+    assert fc1.nr_files == 0
+    assert ri.nr_files == 4
+
+    fc1.nr_files += 4
+    assert fc1.nr_files == 4
+    assert ri.nr_files == 8
+
+    fc2.nr_files = 0
+    assert fc2.nr_files == 0
+    assert fc1.nr_files == 4
+    assert ri.nr_files == 6
+
+    # doesnt change others
+    fc2.parent = None
+    fc2.nr_files = 7
+    assert fc2.nr_files == 7
+    assert fc1.nr_files == 4
+    assert ri.nr_files == 6
+
+
+def test_fcol_subpath():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
+    # NOTE: original title ends on a space at char 70 which is important to test that
+    # subpath strips spaces from subpath
+    assert ri.subpath == ("[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] "
+                          "____ This")
+
+    # subpath gets generated in __init__ so we have to gen a new one
+    ri = RedditInfo(base.BaseExtractor, "url", "6ghk3", None, "xhabbaa",
+                    "pillowtalkaudio", "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0)
+    ri.nr_files = 4
+    assert ri.subpath == ri.id
+
+    assert fc2.subpath == ""
+    fc2.nr_files = 3
+    assert fc2.subpath == fc2.title
+
+
+def test_preferred_author():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
+
+    assert ri.get_preferred_author_name() == ri.author
+    ri.author = None
+    assert ri.get_preferred_author_name() == fi1.author
+
+    assert fc2.get_preferred_author_name() == fc2.author
+    fc2.author = None
+    assert fc2.get_preferred_author_name() == fi4.author
+
+    for _, c in children_iter_dfs(ri.children, file_info_only=False):
+        c.author = None
+
+    # reddit info but no author foudn -> deleted user
+    assert ri.get_preferred_author_name() == DELETED_USR_FOLDER
+
+    assert fc2.get_preferred_author_name() == "_unknown_user_files"
+
+
 def test_downloaded_set_on_report():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree()
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
     exerr = base.ExtractorErrorCode
     rep = base.ExtractorReport('url', exerr.NO_ERRORS)
     fi1.report = rep
@@ -173,7 +252,7 @@ def test_downloaded_set_on_report():
 
 
 def test_update_downloaded():
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree()
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
 
     # fc2 [fi4, fi5]
     fi4.downloaded = True
@@ -216,8 +295,8 @@ def test_update_downloaded():
     assert fc1.downloaded is True
 
 
-def test_generate_filename(monkeypatch):
-    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(parent_set_fcol=True)
+def test_generate_filename():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
 
     #
     # no title or id
@@ -261,6 +340,7 @@ def test_generate_filename(monkeypatch):
             "mp4")
     bu = ri.title
     ri.title = None
+    ri._update_subpath()
     assert fi4.generate_filename(0) == (
             "6ghk3",
             "Imgur album TT 012345678901234_35HLlk54",
@@ -270,8 +350,11 @@ def test_generate_filename(monkeypatch):
     # REDDIT BUT NO SUBPATH
     #
     ri.title = bu
+    ri._update_subpath()
+
     bu = ri.children
-    ri.children = [fc2]  # < 3 FileInfo children -> no subpath
+    ri._children = [fc2]
+    ri.nr_files = 2  # < 3 FileInfo children -> no subpath
     assert fi4.generate_filename(0) == (
             "",
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
@@ -283,7 +366,8 @@ def test_generate_filename(monkeypatch):
             "Imgur album TT 012345678901234_03_35HLlk54",
             "mp4")
 
-    ri.children = bu
+    ri._children = bu
+    ri.nr_files = 5
 
     #
     # REDDIT SUBPATH direct parent is reddit -> parent_title does not get appended
@@ -298,6 +382,7 @@ def test_generate_filename(monkeypatch):
             "m4a")
     bu = ri.title
     ri.title = None
+    ri._update_subpath()
     assert fi1.generate_filename(0) == (
             "6ghk3",
             "This is a test audio",
@@ -308,8 +393,11 @@ def test_generate_filename(monkeypatch):
     # -> parent_title does not get appended
     #
     ri.title = bu
+    ri._update_subpath()
+
     bu = ri.children
-    ri.children = []  # < 3 FileInfo children -> no subpath
+    ri.nr_files = 0  # < 3 FileInfo children -> no subpath
+    ri._children = []
     assert fi2.generate_filename(0) == (
             "",
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
@@ -321,7 +409,8 @@ def test_generate_filename(monkeypatch):
             "04_This is an eraudica test audio",
             "mp3")
 
-    ri.children = bu
+    ri._children = bu
+    ri.nr_files = 5
     #
     # LONG PARENT TITLE
     #
@@ -329,6 +418,23 @@ def test_generate_filename(monkeypatch):
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Bestest playlist around that s_This is a super test audio",
             "m4a")
+
+    #
+    # LONG PARENT TITLE WITH NO REDDITINFO
+    #
+    fc1.parent = None
+    # begin and end in spaces to test that no file path begins/ends in spaces
+    # space at cut-off point (40th char) but it doesn't need to get removed here since
+    # filename follows anyway
+    fc1.title = " Bestest playlist around that somehow al o "
+    assert fi3.generate_filename(0) == (
+            "",
+            "Bestest playlist around that somehow al_This is a super test audio",
+            "m4a")
+
+
+def test_generate_filename_nested(monkeypatch):
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=False)
 
     #
     # NESTED FILECOL (not allowed currently but it's in the function)
@@ -356,43 +462,71 @@ def test_generate_filename(monkeypatch):
     patched_prop = FileCollection.parent.setter(patched_parent_setter)
     monkeypatch.setattr('gwaripper.info.FileCollection.parent', patched_prop)
 
-    fc1.parent = None
-    fc1.children.append(fc2)
-    fc2.parent = fc1
+    fc1.add_collection(fc2)
 
     # for testing that no subpaths begin/end in spaces
-    # beginning space gets removed so space b4 e will be 50th
-    #                                                             v 50th char (incl ' ')
-    fc1.title = " Bestest playlist around that somehow also has a n e       "
-    #                                     v 26th char normally ends ther
-    fc2.title = " Imgur album TT 01234567  012345 xtra xtra "
+    fc1.title = (" Bestest playlist around that somehow also has a n e   67890"
+                 # beginning space gets removed so space 70th will be 69th
+                 #         v 70th char (incl ' ')
+                 "1234567890 23")
+    fc1._update_subpath()
+    #                                                    v 41th char
+    fc2.title = " Imgur album TT 01234567  012345 xtra xt a "
+    fc2._update_subpath()
 
-    # direct parent doesn't have subpath
+    assert fi4.parent is fc2
+    assert fc2.parent is fc1
+
+    # topmost parent will be only subpath and direct parent gets appended to name
     assert fi4.generate_filename(2) == (
-                os.path.join(
-                    "Bestest playlist around that somehow also has a n", ""),
+            "Bestest playlist around that somehow also has a n e   678901234567890",
             "Imgur album TT 01234567  012345 xtra xt_02_35HLlk54",
             "mp4")
     assert fi4.generate_filename(0) == (
-                os.path.join(
-                    "Bestest playlist around that somehow also has a n", ""),
+            "Bestest playlist around that somehow also has a n e   678901234567890",
             "Imgur album TT 01234567  012345 xtra xt_35HLlk54",
             "mp4")
 
-    # +1 child -> now has subpath
-    fc2.children.append(fi_none)
+    # no subpath
+    fc1.nr_files = 2
     assert fi4.generate_filename(0) == (
-                os.path.join(
-                    "Bestest playlist around that somehow also has a n",
-                    "Imgur album TT 01234567"),
-            "35HLlk54",
+            "",
+            "Imgur album TT 01234567  012345 xtra xt_35HLlk54",
             "mp4")
     assert fi4.generate_filename(1) == (
-                os.path.join(
-                    "Bestest playlist around that somehow also has a n",
-                    "Imgur album TT 01234567"),
-            "01_35HLlk54",
+            "",
+            "Imgur album TT 01234567  012345 xtra xt_01_35HLlk54",
             "mp4")
+
+    # subpath but direct parent is topmost parent -> don't append to name
+    fc2.parent = None
+    fc2.nr_files = 3
+    fc2.title = " Imgur album TT 01234567  012345 xtra xt a 456789012345678901234567890 2"
+    fc2._update_subpath()
+    assert fi4.generate_filename(0) == (
+            "Imgur album TT 01234567  012345 xtra xt a 456789012345678901234567890",
+            "35HLlk54",
+            "mp4")
+    assert fi4.generate_filename(5) == (
+            "Imgur album TT 01234567  012345 xtra xt a 456789012345678901234567890",
+            "05_35HLlk54",
+            "mp4")
+
+
+def test_get_topmost_parent():
+    fi1, fi2, fi3, fi4, fi5, fc1, fc2, ri = generate_redditinfo_tree(add_collections=True)
+
+    assert fi3.get_topmost_parent() is ri  # fi3.parent == fc1
+    assert fi4.get_topmost_parent() is ri
+
+    fc1.parent = None
+    assert fi3.get_topmost_parent() is fc1
+
+    fc1.parent = fc2
+    assert fi3.get_topmost_parent() is ri
+
+    fc2.parent = None
+    assert fi3.get_topmost_parent() is fc2
 
 
 @pytest.mark.parametrize(

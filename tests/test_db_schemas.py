@@ -5,11 +5,14 @@ import datetime
 import shutil
 import sqlite3
 import importlib
+import re
+
+from typing import Optional, List
 
 import gwaripper.migrate as migrate
 
 from utils import load_db_from_sql_file, TESTS_DIR, setup_tmpdir, load_db
-from gwaripper.db import export_to_sql
+from gwaripper.db import export_to_sql, load_or_create_sql_db
 
 
 def test_export_to_sql(setup_tmpdir):
@@ -436,6 +439,93 @@ def test_db_migration(setup_tmpdir, monkeypatch, caplog):
             "SELECT test FROM Downloads LIMIT 1").fetchall()
     assert rows[0][0] == "migration success"
     migrated_db_bu.close()
+
+
+def clean_sql(sql: Optional[str]) -> Optional[List[str]]:
+    if not sql:
+        return None
+    sql_comment = re.compile(r'--.*')
+    sql = re.sub(sql_comment, "", sql)
+    return sql.split()
+
+
+def test_db_migration_to_latest_same_as_create(setup_tmpdir):
+    tmpdir = setup_tmpdir
+
+    tmp_migrated_db_fn = os.path.join(tmpdir, 'migrated.sqlite')
+    db_migrated = sqlite3.connect(tmp_migrated_db_fn)
+    # v -1 creation statement
+    db_migrated.executescript("""
+    BEGIN TRANSACTION;
+    PRAGMA foreign_keys=off;
+    CREATE VIRTUAL TABLE Downloads_fts_idx USING fts5(
+              title, reddit_title, content='Downloads', content_rowid='id');
+    CREATE TABLE "Downloads"(
+        id INTEGER PRIMARY KEY ASC,
+        date TEXT,
+        time TEXT,
+        description TEXT,
+        local_filename TEXT,
+        title TEXT,
+        url_file TEXT,
+        url TEXT,
+        created_utc REAL,
+        r_post_url TEXT,
+        reddit_id TEXT,
+        reddit_title TEXT,
+        reddit_url TEXT,
+        reddit_user TEXT,
+        sgasm_user TEXT,
+        subreddit_name TEXT, rating REAL, favorite INTEGER DEFAULT 0 NOT NULL);
+    CREATE TRIGGER Downloads_au AFTER UPDATE ON Downloads BEGIN
+              INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
+              VALUES('delete', old.id, old.title, old.reddit_title);
+              INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+              VALUES (new.id, new.title, new.reddit_title);
+            END;
+    CREATE TRIGGER Downloads_ad AFTER DELETE ON Downloads BEGIN
+                  INSERT INTO Downloads_fts_idx(Downloads_fts_idx, rowid, title, reddit_title)
+                  VALUES('delete', old.id, old.title, old.reddit_title);
+                END;
+    CREATE TRIGGER Downloads_ai AFTER INSERT ON Downloads BEGIN
+                  INSERT INTO Downloads_fts_idx(rowid, title, reddit_title)
+                  VALUES (new.id, new.title, new.reddit_title);
+                END;
+    PRAGMA foreign_keys=on;
+    COMMIT;""")
+
+    with migrate.Database(tmp_migrated_db_fn) as m:
+        m.upgrade_to_latest()
+
+    tmp_db_fn = os.path.join(tmpdir, 'created.sqlite')
+    db_created, _ = load_or_create_sql_db(tmp_db_fn)
+
+    #
+    # comparing same db setup
+    # (not migrating rows or comparing same rows)
+    #
+    db_created.row_factory = None
+    c_expected = db_created.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name")
+    expected = c_expected.fetchall()
+    db_migrated.row_factory = None
+    # same tables, indices and sql stmt
+    c_actual = db_migrated.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name")
+    actual = c_actual.fetchall()
+    expected = [(_type, tbl_name, name, clean_sql(sql)) for _type, tbl_name, name, sql in expected]
+    actual = [(_type, tbl_name, name, clean_sql(sql)) for _type, tbl_name, name, sql in actual]
+    assert expected == actual
+
+    # technically already the same since we compare sql statements
+    # same table setups: columns, types, nullable etc.
+    for exp_row, act_row in zip(expected, actual):
+        # Unfortunately pragma statements do not work with parameters
+        exp_tbl = c_expected.execute(
+                f"pragma table_info('{exp_row[2]}')").fetchall()
+        act_tbl = c_actual.execute(
+                f"pragma table_info('{act_row[2]}')").fetchall()
+        assert exp_tbl == act_tbl
 
 
 def test_gather_migrations(setup_tmpdir, monkeypatch):
