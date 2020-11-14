@@ -20,14 +20,14 @@ globs = ['gwaripper/**/*.py', 'gwaripper_webGUI/static/**/*.*',
          'gwaripper_webGUI/*.py']
 
 # relpaths so we can replicate them more easily
-if len(sys.argv) < 2:
+if len(sys.argv) != 2:
     print("Usage: build_dir_dist output_dir")
     sys.exit(1)
 
 out_dir = os.path.abspath(sys.argv[1])
 
 if os.path.exists(out_dir):
-    print("Output directory '", out_dir, "' will be deleted!")
+    print(f"Output directory '{out_dir}' will be deleted!")
     ans = input("Proceed(y/n)?")
     if ans.lower() not in ('y', 'yes'):
         print("Stopping!")

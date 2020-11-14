@@ -20,7 +20,7 @@ globs = ['gwaripper/**/*.py', 'gwaripper_webGUI/static/**/*.*',
          'gwaripper_webGUI/*.py']
 
 # relpaths so we can replicate them more easily
-if len(sys.argv) < 3:
+if len(sys.argv) != 3:
     print("Usage: build_dir_dist project_root output_file")
     sys.exit(1)
 
