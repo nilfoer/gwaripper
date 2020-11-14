@@ -528,6 +528,235 @@ def test_db_migration_to_latest_same_as_create(setup_tmpdir):
         assert exp_tbl == act_tbl
 
 
+def test_db_constraints(setup_tmpdir):
+    tmpdir = setup_tmpdir
+
+    test_db_fn = os.path.join(tmpdir, 'test_db.sqlite')
+    db_con, c = load_or_create_sql_db(test_db_fn)
+
+    #
+    # AudioFile
+    #
+
+    # collection_id FK FileCollection(id)
+    # (alias UNKNOWN_USR_FOLDER and DELETED_USR_FOLDER are inserted by default)
+    with pytest.raises(sqlite3.IntegrityError, match='FOREIGN KEY constraint failed'):
+        # inserting with invalid collection_id
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO AudioFile(collection_id, date, filename, url, alias_id)
+            VALUES (4, '2020-05-12', 'asf', 'sadfsadf', 1);
+        """)
+
+    db_con.rollback()
+
+    # date NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: AudioFile.date'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO AudioFile(date, filename, url, alias_id)
+            VALUES (NULL, 'asf', 'sadfsadf', 1);
+        """)
+
+    db_con.rollback()
+
+    # filename NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: AudioFile.filename'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO AudioFile(date, filename, url, alias_id)
+            VALUES ('2020-12-12', NULL, 'sadfsadf', 1);
+        """)
+
+    db_con.rollback()
+
+    # url UNIQUE NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='UNIQUE constraint failed: AudioFile.url'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO AudioFile(date, filename, url, alias_id)
+            VALUES ('2020-12-12', 'filename', 'url', 1);
+        INSERT INTO AudioFile(date, filename, url, alias_id)
+            VALUES ('2020-12-12', 'filename', 'url', 1);
+        """)
+
+    db_con.rollback()
+
+    # alias_id NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: AudioFile.alias_id'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO AudioFile(date, filename, url, alias_id)
+            VALUES ('2020-12-12', 'filename', 'url', NULL);
+        """)
+
+    db_con.rollback()
+
+    # alias_id FK Alias(id)
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='FOREIGN KEY constraint failed'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO AudioFile(date, filename, url, alias_id)
+            VALUES ('2020-12-12', 'filename', 'url', 2384);
+        """)
+
+    db_con.rollback()
+
+    #
+    # Artist
+    #
+
+    # name UNIQUE
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='UNIQUE constraint failed: Artist.name'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO Artist(name) VALUES ('asdf');
+        INSERT INTO Artist(name) VALUES ('asdf');
+        """)
+
+    db_con.rollback()
+
+    #
+    # Alias
+    #
+
+    # name UNIQUE
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='UNIQUE constraint failed: Alias.name'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO Alias(name) VALUES ('asdf');
+        INSERT INTO Alias(name) VALUES ('asdf');
+        """)
+
+    db_con.rollback()
+
+    # name NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: Alias.name'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO Alias(name) VALUES (NULL);
+        """)
+
+    db_con.rollback()
+
+    # artist_id FK Artist(id)
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='FOREIGN KEY constraint failed'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO Alias(name, artist_id) VALUES ('afsdf', 2343);
+        """)
+
+    db_con.rollback()
+
+    #
+    # FileCollection
+    #
+
+    # url UNIQUE
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='UNIQUE constraint failed: FileCollection.url'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', 'subpath', NULL, NULL, 1);
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', 'subpath', NULL, NULL, 1);
+        """)
+
+    db_con.rollback()
+
+    # url NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: FileCollection.url'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES (NULL, 'subpath', NULL, NULL, 1);
+        """)
+
+    db_con.rollback()
+
+    # subpath NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: FileCollection.subpath'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', NULL, NULL, NULL, 1);
+        """)
+
+    db_con.rollback()
+
+    # reddit_info_id FK RedditInfo(id)
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='FOREIGN KEY constraint failed'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', 'subpath', 242, NULL, 1);
+        """)
+
+    db_con.rollback()
+
+    # parent_id FK FileCollection(id)
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='FOREIGN KEY constraint failed'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', 'subpath', NULL, 435, 1);
+        """)
+
+    db_con.rollback()
+    
+    # alias_id NOT NULL
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='NOT NULL constraint failed: FileCollection.alias_id'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', 'subpath', NULL, NULL, NULL);
+        """)
+
+    db_con.rollback()
+
+    # alias_id FK Alias(id)
+    with pytest.raises(
+            sqlite3.IntegrityError,
+            match='FOREIGN KEY constraint failed'):
+        c.executescript("""
+        BEGIN TRANSACTION;
+        INSERT INTO FileCollection(url, subpath, reddit_info_id, parent_id, alias_id)
+            VALUES ('url', 'subpath', NULL, NULL, 1309);
+        """)
+
+    db_con.rollback()
+
+
 def test_gather_migrations(setup_tmpdir, monkeypatch):
     tmpdir = setup_tmpdir
 

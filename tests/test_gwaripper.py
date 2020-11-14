@@ -11,7 +11,7 @@ import gwaripper.config as cfg
 
 from gwaripper.gwaripper import GWARipper, report_preamble
 from gwaripper.db import load_or_create_sql_db
-from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER
+from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER, UNKNOWN_USR_FOLDER
 from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.reddit import RedditExtractor
@@ -98,7 +98,7 @@ def setup_db_2col_5audio_without_reddit(setup_tmpdir):
 def _setup_db_2col_5audio(tmpdir, with_reddit=True):
     sql_fn = os.path.join(
             TESTS_DIR, "all_test_files",
-            f"db_2col_5audio{'without_reddit' if not with_reddit else ''}.sql")
+            f"db_2col_5audio{'_without_reddit' if not with_reddit else ''}.sql")
     test_db_fn = os.path.join(tmpdir, "gwarip_db.sqlite")
     db_con, _ = load_or_create_sql_db(test_db_fn)
 
@@ -112,20 +112,34 @@ def _setup_db_2col_5audio(tmpdir, with_reddit=True):
     return tmpdir, test_db_fn
 
 
-def test_set_missing_reddit(setup_tmpdir) -> None:
-    return # TODO
-    tmpdir, test_db_fn = setup_db_2col_5audio()
+def test_set_missing_reddit(setup_db_2col_5audio_without_reddit) -> None:
+    tmpdir, test_db_fn = setup_db_2col_5audio_without_reddit
 
-    db_con = sqlite3.connect(test_db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
-    c = db_con.execute("SELECT * FROM v_audio_and_collection_combined")
-    original = c.fetchall()
-    # TODO
+    query_str = """
+    SELECT
+        AudioFile.*,
+        Alias.name as alias_name,
+        Alias.artist_id as alias_artist_id,
+        Artist.name as artist_name,
+        FileCollection.id as fcol_id,
+        FileCollection.url as fcol_url,
+        FileCollection.id_on_page as fcol_id_on_page,
+        FileCollection.title as fcol_title,
+        FileCollection.subpath as fcol_subpath,
+        FileCollection.reddit_info_id as fcol_reddit_info_id,
+        FileCollection.parent_id as fcol_parent_id,
+        FileCollection.alias_id as fcol_alias_id,
+        (SELECT
+                Alias.name
+         FROM Alias WHERE Alias.id = FileCollection.alias_id) as fcol_alias_name,
+        RedditInfo.created_utc as reddit_created_utc
+    FROM AudioFile
+    LEFT JOIN FileCollection ON AudioFile.collection_id = FileCollection.id
+    LEFT JOIN RedditInfo ON FileCollection.reddit_info_id = RedditInfo.id
+    JOIN Alias ON Alias.id = AudioFile.alias_id
+    LEFT JOIN Artist ON Artist.id = Alias.artist_id
+    {where_expression}"""
 
-    # artist inserted and arist_id of alias updated
-    # inserted alias if it wasn't in db
-    # redditinfo, filecol
-    # AudioFile colid updated
-    # selftext written
     fi = FileInfo(object, True, "m4a",
                   # only important that it has same url and author as one in db
                   "https://soundgasm.net/u/skitty/Motherly-Moth-Girl-Keeps-You-Warm-F4M",
@@ -133,140 +147,127 @@ def test_set_missing_reddit(setup_tmpdir) -> None:
                   "AudiLEAVE_PRESENT_FIELDS_UNCHANGED [ASMR]",
                   "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "skitty")
     ri = RedditInfo(object, "reddit_url",
-                    "inserted_reddit_id", "isnerted_reddit_title", "inserted-reddit-user",
+                    #                                              v use this as artist
+                    "inserted_reddit_id", "isnerted_reddit_title", "sassmastah77",
                     "inserted/subreddit", 'inserted_rddt_url', 1254323.0, children=[fi])
-    ri.selftext = None
+    ri.nr_files = 4
+    ri.selftext = "selftext not written to subpath even though ri has subpath"
     ri.r_post_url = "url-to-self-or-outgoing"
-
-    # nothing should happen
-    with GWARipper() as gwa:
-        gwa.set_missing_reddit_db(fi)
+    fi.parent = ri
 
     expected = [
-            [1, "2020-01-23", "13:37", "This is a description", "audio_file.m4a",
-             "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-             "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
-            [2, "2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
-             "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-             "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", None, None, None, "testy_user", "testy_user", None, None, 0],
-            [3, "2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", None,
-             "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
-             "elongate elongate elongate elongate elongate elongate",
-             "https://no-page-url.com/324q523q.mp3", None, 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-             "2klj654", "don_t change this", None, None, "old_user", "old_user", None, None, 0],
-            ]
+        # id, col_id, downloaded_with_collection, date
+        (1, 1, 0, '2020-11-13',
+         # descr
+         '[F4M] [Gentle Fdom] [Size difference] [Thicc] [Monster Mommy] [Breast play] '
+         '[Outercourse] [Handjob] [Cozy blanket] [Kissing] [Thighjob] [Pinning you '
+         'down] [Grinding] [Wrapped in wings] [Aftercare] [ASMR] [Script: BowTieGuy]',
+         # filename
+         '02_Motherly Moth Girl Keeps You Warm [F4M].m4a',
+         # title
+         'Motherly Moth Girl Keeps You Warm [F4M]',
+         # url
+         'https://soundgasm.net/u/skitty/Motherly-Moth-Girl-Keeps-You-Warm-F4M',
+         # alias_id, rating, fav
+         4, None, 0,
+         # alias_name, alias_artist_id, artist_name
+         'skitty', 1, 'sassmastah77',
+         # fcol_id
+         1,
+         # fcol_url
+         'https://www.reddit.cominserted_rddt_url',
+         # fcol_id_on_page, fcol_title,
+         'inserted_reddit_id', 'isnerted_reddit_title',
+         # fcol_subpath
+         'isnerted_reddit_title',
+         # fcol_reddit_info_id, fcol_parent_id, fcol_alias_id, fcol_alias_name
+         1, None, 5, 'sassmastah77',
+         # created_utc
+         1254323.0)
+    ]
 
-    query_str = "SELECT * FROM Downloads"
-
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    #
-    #
-    #
-
-    fi.parent = ri
     with GWARipper() as gwa:
-        gwa.set_missing_reddit_db(fi)
+        gwa.set_missing_reddit_db(1, fi)
 
-    expected[0][8:17] = [1254323.0, ri.r_post_url, ri.id, ri.title, ri.permalink,
-                         ri.author, "sassmastah77", "sassmastah77", ri.subreddit]
-    # selftext not written
-    assert os.listdir(tmpdir) == ['gwarip_db.sqlite', 'gwarip_db_exp.csv', '_db-autobu']
-
-    # reconnect so we make sure it's visible from diff connections
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    #
-    #
-    #
-
-    ri.selftext = "selffffffftext"
-    with GWARipper() as gwa:
-        gwa.set_missing_reddit_db(fi)
+    # artist inserted (technically part of _add_to_db_ri) and arist_id of alias updated
+    # redditinfo, filecol
+    # AudioFile colid updated
+    assert get_all_rowtuples_db(
+        test_db_fn,
+        query_str.format(where_expression="WHERE collection_id IS NOT NULL")
+    ) == [tuple(r) for r in expected]
 
     # selftext written
-    with open(os.path.join(tmpdir, "sassmastah77", "audio_file.m4a.txt"), 'r') as f:
-        assert f.read() == ("Title: isnerted_reddit_title\nPermalink: inserted_rddt_url\n"
-                            "Selftext:\n\nselffffffftext")
-
-    # unchanged rows
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    # under alias_name of AudioFile _without_ subpath since it was
+    # obv. not downloade as part of an collection
+    with open(os.path.join(tmpdir, "skitty",
+                           # AudioFile.filename
+                           expected[0][5] + ".txt"), "r") as f:
+        assert f.read() == (f"Title: {ri.title}\nPermalink: {ri.permalink}\n"
+                            f"Selftext:\n\n{ri.selftext}")
 
     #
+    # artist_id should not be updated if it's not NULL
     #
-    #
+    ri.author = 'sdaflksjdl'  # will still be inserted
+    ri.permalink = 'asdfjlaksfsdlfls'
+    with GWARipper() as gwa:
+        gwa.set_missing_reddit_db(1, fi)
 
-    # garbage fields for already present col so we can check that they don't get changed
-    fi = FileInfo(object, True, "m4a", "https://soundgasm.net/testy_user/Best-title-SFW",
-                  "https://soundgasm.net/24634adra354.m4a", None,
-                  "BeLEAVE_PRESENT_FIELDS_UNCHANGEDe [SFW]",
-                  "This iLEAVE_PRESENT_FIELDS_UNCHANGEDscription",
-                  "LEAVE_PRESENT_FIELDS_UNCHANGED_user")
-    ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
-                    "LEAVE_PRESENT_FIELDS_UNCHANGED", "isnerte222d_reddit_title",
-                    "inserted-reddit-user", "inserted/subreddit", "inserted_rddt2_url",
-                    11111111.0, [fi])
-    ri.selftext = "selfff2fffftext"
-    ri.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
+    # artist_id should not be updated if it's not NULL
+    assert get_all_rowtuples_db(
+        test_db_fn,
+        """
+        SELECT Alias.artist_id, Artist.name
+        FROM Alias
+        LEFT JOIN Artist ON Artist.id = Alias.artist_id
+        WHERE Alias.id = 4"""
+    ) == [(1, 'sassmastah77')]
+
+
+def test_set_missing_reddit_no_filenme(
+        setup_db_2col_5audio_without_reddit,
+        monkeypatch):
+    # only testing selftext written from re-computed filename
+    tmpdir, test_db_fn = setup_db_2col_5audio_without_reddit
+
+    fi = FileInfo(object, True, "m4a",
+                  # only important that it has same url and author as one in db
+                  "https://soundgasm.net/u/skitty/Motherly-Moth-Girl-Keeps-You-Warm-F4M",
+                  "https://soundgasm.net/284291412sa324.m4a", None,
+                  "AudiLEAVE_PRESENT_FIELDS_UNCHANGED [ASMR]",
+                  "ThisLEAVE_PRESENT_FIELDS_UNCHANGEDion", "skitty")
+    ri = RedditInfo(object, "reddit_url",
+                    #                                              v use this as artist
+                    "inserted_reddit_id", "isnerted_reddit_title", "sassmastah77",
+                    "inserted/subreddit", 'inserted_rddt_url', 1254323.0, children=[fi])
+    ri.nr_files = 4
+    ri.selftext = "selftext written to re-computed filename"
+    ri.r_post_url = "url-to-self-or-outgoing"
     fi.parent = ri
 
+    title = (
+        "[F4M] [Gentle Fdom] [Size difference] [Thicc] !@#:<M>)((❤💋 [Breast play]"
+        " [Outercourse] [Handjob] [Cozy blanket] [Kissing] [Thighjob] [Pinning you "
+        "down] [Grinding] [Wrapped in wings] [Aftercare] [ASMR] [Script: BowTieGuy]"
+    )
+    db_con = sqlite3.connect(test_db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
+    db_con.execute("UPDATE AudioFile SET filename = ?, title = ? WHERE id = ?",
+                   ("", title, 1))
+    db_con.commit()
+    db_con.close()
+
+    fn = (
+        "[F4M] [Gentle Fdom] [Size difference] [Thicc] _____M______ [Breast play]"
+        " [Outercourse] [Handjob] [Cozy blanket.m4a.txt"
+    )
     with GWARipper() as gwa:
-        gwa.set_missing_reddit_db(fi)
+        gwa.set_missing_reddit_db(1, fi)
 
-    expected[1][8:17] = [1602557093.0,
-                         "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-                         "26iw32o", ri.title, ri.permalink, ri.author,
-                         "testy_user", "testy_user", ri.subreddit]
-
-    # selftext written
-    with open(os.path.join(tmpdir, "testy_user", "subpath", "super_file.mp3.txt"), 'r') as f:
-        assert f.read() == ("Title: isnerte222d_reddit_title\nPermalink: inserted_rddt2_url\n"
-                            "Selftext:\n\nselfff2fffftext")
-
-    # reconnect so we make sure it's visible from diff connections
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    #
-    #
-    #
-
-    fi = FileInfo(object, True, "m4a", "insertedPAGEURL",
-                  "https://no-page-url.com/324q523q.mp3", None,
-                  "Use title from DB!",  # needed for selftext fn
-                  "This iLEAgsgVE_PRESENT_FIELDS_UNCHANGEDscription",
-                  "LEAVE_PRESENT_sgsFIELDS_UNCHANGED_user")
-    ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
-                    "LEAVE_PRESENT_FIELDS_UNCHANGED", "LEAVE_TITLE_FIELD_UNCHANGED",
-                    "inserted-reddit3-user", "inserted3/subreddit", "inserted_rddt3_url",
-                    111111.0, [fi])
-    ri.selftext = "selfff3fffdszlbdftext"
-    ri.r_post_url = "LEAVE_PRESENT_FIELDS_UNCHANGED"
-    fi.parent = ri
-
-    # no page url in db
-    with GWARipper() as gwa:
-        gwa.set_missing_reddit_db(fi, use_file_url=True)
-
-    # page url inserted
-    expected[2][7] = "insertedPAGEURL"
-    expected[2][8:17] = [1602557093.0,
-                         "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-                         "2klj654", "don_t change this", ri.permalink, ri.author,
-                         "old_user", "old_user", ri.subreddit]
-
-    fn = ("No-filenäme_lo中al rem_veth_se_hehe ____ [let them stay] .this,too elongate "
-          "elongate elongate elongate elongate.m4a.txt")
-    # selftext written
-    with open(os.path.join(tmpdir, "old_user", fn), 'r') as f:
-        assert f.read() == ("Title: LEAVE_TITLE_FIELD_UNCHANGED\nPermalink: inserted_rddt3_url\n"
-                            "Selftext:\n\nselfff3fffdszlbdftext")
-
-    # reconnect so we make sure it's visible from diff connections
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    # re-computed filename from title if filename missing
+    with open(os.path.join(tmpdir, "skitty", fn), "r") as f:
+        assert f.read() == (f"Title: {ri.title}\nPermalink: {ri.permalink}\n"
+                            f"Selftext:\n\n{ri.selftext}")
 
 
 def test_add_to_db(setup_db_2col_5audio):
@@ -452,6 +453,19 @@ def test_add_to_db_ri(setup_db_2col_5audio):
             query_str.format(where_expression="WHERE fc.id > 2")) == [tuple(r) for r in expected]
 
     #
+    # inserting a FileCollection whose url is already in the db
+    # returns that FileCollection's id and
+    #
+    ri.author = 'asdlkfjsal'  # return artist_name of existing fcol in DB
+    with GWARipper() as gwa:
+        assert gwa._add_to_db_ri(ri) == (3, 'inserted-as-alias-and-artist')
+        gwa.db_con.commit()  # force commit
+    # nothing changed
+    assert get_all_rowtuples_db(
+            test_db_fn,
+            query_str.format(where_expression="WHERE fc.id > 2")) == [tuple(r) for r in expected]
+
+    #
     # ri with subpath
     #
     ri.nr_files = 4
@@ -589,367 +603,507 @@ def test_already_downloaded(monkeypatch, setup_db_2col_5audio):
     assert called_with_info is fi1
 
 
-# split in downloa_file /download_collection
-def test_download(setup_tmpdir, monkeypatch, caplog):
-    return  # TODO
-    tmpdir = setup_tmpdir
+def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
+    tmpdir, test_db_fn = setup_db_2col_5audio
 
-    rnd = RandomHelper()
+    called_with = {}
 
-    test_db = os.path.join(tmpdir, "gwarip_db.sqlite")
-    test_con, test_c = load_or_create_sql_db(test_db)
+    class DummyCon:
+        def __enter__(self):
+            called_with['db_con__enter__'] = True
 
-    testdl_files = os.path.join(tmpdir, "_testdls")
-    os.makedirs(testdl_files)
+        def __exit__(self, *args, **kwargs):
+            # just important that it was called
+            called_with['db_con__exit__'] = True
 
-    test_c.executescript("""
-    BEGIN TRANSACTION;
+    already_downloaded = True
 
-    INSERT INTO Downloads(
-        date, time, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
-        author_subdir, subreddit_name
-        )
-    VALUES
-        ("2020-01-23", "13:37", "This is a description", "audio_file.m4a",
-         "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-         "https://soundgasm.net/sassmastah77/Audio-title-ASMR", NULL,
-         NULL, NULL, NULL, NULL, NULL, "sassmastah77", "sassmastah77", NULL),
+    def patched_already_downloaded(self, *args, **kwargs):
+        called_with['already_downloaded'] = (args, kwargs)
+        return already_downloaded
 
-        ("2020-12-13", "13:37", "This is another description", "subpath\\super_file.mp3",
-         "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-         "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-         "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-         "26iw32o", NULL, NULL, NULL, "testy_user", "testy_user", NULL),
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper.already_downloaded",
+                        patched_already_downloaded)
 
-        ("2020-12-15", "15:37", "asdlkgjadslkg lkfdgjdslkgjslkd", NULL,
-         "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate elongate elongate elongate elongate elongate elongate",
-         "https://no-page-url.com/324q523q.mp3", NULL, 1602557093.0,
-         "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-         "2klj654", "don_t change this", NULL, NULL, "old_user", "old_user", NULL);
+    generate_filename_ret = ("subpath_test", "fi_ena_e", "txt")
 
-    COMMIT;
-    """)
+    def patched_generate_filename(self, *args, **kwargs):
+        called_with['generate_filename'] = (args, kwargs)
+        return generate_filename_ret
 
-    expected = [
-            [1, "2020-01-23", "This is a description", "audio_file.m4a",
-             "Audio title [ASMR]", "https://soundgasm.net/284291412sa324.m4a",
-             "https://soundgasm.net/sassmastah77/Audio-title-ASMR", None,
-             None, None, None, None, None, "sassmastah77", "sassmastah77", None, None, 0],
-            [2, "2020-12-13", "This is another description", "subpath\\super_file.mp3",
-             "Best title [SFW]", "https://soundgsgasgagasm.net/28429SGSAG24sa324.m4a",
-             "https://soundgasm.net/testy_user/Best-title-SFW", 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-             "26iw32o", None, None, None, "testy_user", "testy_user", None, None, 0],
-            [3, "2020-12-15", "asdlkgjadslkg lkfdgjdslkgjslkd", None,
-             "No-filenäme_lo中al rem\\veth:se/hehe 🍕🥟🧨❤ [let them stay] .this,too elongate "
-             "elongate elongate elongate elongate elongate elongate",
-             "https://no-page-url.com/324q523q.mp3", None, 1602557093.0,
-             "https://www.reddit.com/r/pillowtalkaudio/comments/2klj654/salfl-slaf-asfl",
-             "2klj654", "don_t change this", None, None, "old_user", "old_user", None, None, 0],
-            ]
+    monkeypatch.setattr("gwaripper.info.FileInfo.generate_filename",
+                        patched_generate_filename)
 
-    # everything but time col
-    query_str = """SELECT
-        id, date, description, local_filename, title, url_file, url, created_utc,
-        r_post_url, reddit_id, reddit_title, reddit_url, reddit_user, author_page,
-        author_subdir, subreddit_name, rating, favorite FROM Downloads"""
+    pad_filename_ret = "fi_ena_e_02"
 
-    test_con.close()
+    def patched_pad_filename(self, *args, **kwargs):
+        called_with['pad_filename'] = (args, kwargs)
+        return pad_filename_ret
 
-    fi_file_contents = []
-    for i in range(5):
-        fi_file_contents.append(rnd.random_string(100))
-        with open(os.path.join(testdl_files,  f"fi{i}"), "w") as f:
-            f.write(fi_file_contents[i])
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._pad_filename_if_exists",
+                        patched_pad_filename)
 
-    # so first file name gets incremented
-    os.makedirs(os.path.join(tmpdir, "page_user"))
-    dont_overwrite_file = os.path.join(tmpdir, "page_user",  "dont_overwrite.jpg")
-    with open(dont_overwrite_file, "w") as f:
-        f.write("not overwritten")
+    def patched_add_to_db(self, *args, **kwargs):
+        called_with['add_to_db'] = (args, kwargs)
 
-    fi0 = FileInfo(object, False, "jpg", "https://page.url/al3234653",
-                   build_file_url(os.path.join(testdl_files, "fi0")), None,  # id
-                   "dont_overwrite",  # title
-                   "This is the description fi0", "page_user")
-    fi0_rep = ExtractorReport(fi0.page_url, ExtractorErrorCode.NO_ERRORS)
-    fi0.report = fi0_rep
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db",
+                        patched_add_to_db)
 
-    # non audio file should not be added to db - only downloaded
-    with GWARipper() as gwa:
-        gwa.download(fi0)
-        assert fi0.downloaded is True
-        assert fi0.report.downloaded is True
+    download_sould_raise = None
 
-    with open(dont_overwrite_file, "r") as f:
-        assert f.read() == "not overwritten"
+    def patched_download_in_chunks(*args, **kwargs):
+        called_with['download_in_chunks'] = (args, kwargs)
+        if download_sould_raise is not None:
+            raise download_sould_raise
 
-    # padded with number
-    with open(os.path.join(tmpdir, fi0.author, "dont_overwrite_02.jpg"), "r") as f:
-        assert f.read() == fi_file_contents[0]
+    monkeypatch.setattr("gwaripper.download.download_in_chunks",
+                        patched_download_in_chunks)
 
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    fi = FileInfo(object, True, "jpg", "https://page.url/al3234653",
+                  "direct_url", None,  # id
+                  "dont_overwrite",  # title
+                  "This is the description fi0", "page_user")
+
+    caplog.set_level(logging.INFO)
+
+    # already downloaded file
+    gwa = GWARipper()
+    assert gwa._download_file(fi, author_name='author_name', collection_id=None,
+                              file_index=0, dl_idx=3, dl_max=5) is None
+    assert fi.downloaded is False
+
+    assert called_with == {
+        'already_downloaded': ((fi,), {}),
+    }
+    assert f"File was already downloaded, skipped URL: {fi.page_url}" == (
+            caplog.records[0].message)
+
+    called_with.clear()
+    caplog.clear()
 
     #
-    #
+    # normal audio download
     #
 
-    bu_already_dled = GWARipper.already_downloaded
-    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
-                        lambda x, fi: True)
-    fi1 = FileInfo(object, True, "m4a", "https://page.url/al323asf4653",
-                   build_file_url(os.path.join(testdl_files, "fi1")), None,  # id
-                   rnd.random_string(20),  # title
-                   rnd.random_string(50), "dummy_usr")
-    fi1_rep = ExtractorReport(fi1.page_url, ExtractorErrorCode.NO_ERRORS)
-    fi1.report = fi1_rep
+    already_downloaded = False
 
-    # testing file has already_downloaded set
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=3, dl_max=5) == generate_filename_ret[0]
+    assert fi.downloaded is True
+
+    abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
+    fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
+    # check dirs created
+    assert os.path.isdir(abs_subpath)
+
+    assert called_with == {
+        'already_downloaded': ((fi,), {}),
+        'generate_filename': ((2,), {}),
+        'pad_filename': (
+            (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
+        # is_audio -> using context manager to commit or rollback
+        'db_con__enter__': True,
+        'db_con__exit__': True,
+        'add_to_db': ((fi, 3252, fn), {}),
+        'download_in_chunks': (
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+    }
+
+    # download logging call using dl_idx and dl_max
+    assert f"Downloading: {fn}..., File 3 of 5" == (caplog.records[0].message)
+
+    fi.downloaded = False
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # non-audio does not commit to db
+    #
+    fi.is_audio = False
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.downloaded is True
+
+    abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
+    fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
+    # check dirs created
+    assert os.path.isdir(abs_subpath)
+
+    # is_audio False -> not using context manager
+    assert called_with == {
+        'already_downloaded': ((fi,), {}),
+        'generate_filename': ((2,), {}),
+        'pad_filename': (
+            (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
+        'download_in_chunks': (
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+    }
+
+    # download logging call using dl_idx and dl_max
+    assert f"Downloading: {fn}..., File 7 of 120" == (caplog.records[0].message)
+
+    fi.is_audio = True
+    fi.downloaded = False
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # no author name -> UNKNOWN_USR_FOLDER
+    #
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    assert gwa._download_file(fi, author_name=None, collection_id=3252,
+                              file_index=2, dl_idx=3, dl_max=5) == generate_filename_ret[0]
+    assert fi.downloaded is True
+
+    abs_subpath = os.path.join(tmpdir, UNKNOWN_USR_FOLDER, generate_filename_ret[0])
+    fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
+    # check dirs created
+    assert os.path.isdir(abs_subpath)
+
+    assert called_with == {
+        'already_downloaded': ((fi,), {}),
+        'generate_filename': ((2,), {}),
+        'pad_filename': (
+            (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
+        # is_audio -> using context manager to commit or rollback
+        'db_con__enter__': True,
+        'db_con__exit__': True,
+        'add_to_db': ((fi, 3252, fn), {}),
+        'download_in_chunks': (
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+    }
+
+    # download logging call using dl_idx and dl_max
+    assert f"Downloading: {fn}..., File 3 of 5" == (caplog.records[0].message)
+
+    fi.downloaded = False
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # except HTTPError, ContentTooShortError, URLError
+    #
+
+    # DOES NOT WORK
+    # caplog.set_level(logging.WARNING)
+
+    abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
+    fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
+    exc_tests_called_with = {
+        'already_downloaded': ((fi,), {}),
+        'generate_filename': ((2,), {}),
+        'pad_filename': (
+            (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
+        # is_audio -> using context manager to commit or rollback
+        'db_con__enter__': True,
+        'db_con__exit__': True,
+        'add_to_db': ((fi, 3252, fn), {}),
+        'download_in_chunks': (
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+    }
+    #
+    # HTTPError
+    #
+    download_sould_raise = urllib.error.HTTPError(
+            fi.direct_url, 404, "Not Found", {}, None)
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=7, dl_max=120)
+    assert fi.downloaded is False
+
+    assert called_with == exc_tests_called_with
+
+    assert caplog.records[1].message == (f"HTTP Error 404: Not Found: \"{fi.direct_url}\"")
+
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # ContentTooShortError
+    #
+    download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=7, dl_max=120)
+    assert fi.downloaded is False
+
+    assert called_with == exc_tests_called_with
+
+    assert caplog.records[1].message == ("Content too short!")
+    assert "File information was not added to DB!" in caplog.records[2].message
+
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # ContentTooShortError WITH fc parent
+    #
+    fc = FileCollection(None, "fc_url", *([None] * 3))
+    fi.parent = fc
+    download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=7, dl_max=120)
+    assert fi.downloaded is False
+
+    assert called_with == exc_tests_called_with
+
+    assert caplog.records[1].message == ("Content too short!")
+    assert "File information was not added to DB!" in caplog.records[2].message
+    assert caplog.records[3].message == (f"Containing root collection: {fc.url}")
+
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # ContentTooShortError WITH ri parent
+    #
+    ri = RedditInfo(None, "fc_url", *([None] * 6))
+    fi.parent = ri
+    download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=7, dl_max=120)
+    assert fi.downloaded is False
+
+    assert called_with == exc_tests_called_with
+
+    assert caplog.records[1].message == ("Content too short!")
+    assert "File information was not added to DB!" in caplog.records[2].message
+    assert caplog.records[3].message == (f"Containing root collection: {ri.url}")
+
+    called_with.clear()
+    caplog.clear()
+
+    #
+    # URLError
+    #
+    fi.parent = None
+    fi.extractor = SoundgasmExtractor
+    download_sould_raise = urllib.error.URLError("Reason for error!")
+    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
+                              file_index=2, dl_idx=7, dl_max=120)
+    assert fi.downloaded is False
+
+    assert called_with == exc_tests_called_with
+
+    assert (f"URL Error for {fi.direct_url}: Reason for error!\nExtractor "
+            f"{fi.extractor} is probably broken!") in caplog.records[1].message
+
+
+def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
+    tmpdir, test_db_fn = setup_db_2col_5audio
+
+    called_with = {'download_file': []}
+
+    preferred_author_ret = "pref_auth"
+
+    def patched_get_preferred_author(self, *args, **kwargs):
+        called_with['preferred_author'] = (args, kwargs)
+        return preferred_author_ret
+
+    monkeypatch.setattr("gwaripper.info.FileCollection.get_preferred_author_name",
+                        patched_get_preferred_author)
+
+    add_to_db_ri_ret = (5, 'redd_auth')
+
+    def patched_add_to_db_ri(self, *args, **kwargs):
+        called_with['add_to_db_ri'] = (args, kwargs)
+        return add_to_db_ri_ret
+
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db_ri",
+                        patched_add_to_db_ri)
+
+    children_iter_from = []
+
+    def patched_children_iter(*args, **kwargs):
+        called_with['children_iter'] = (args, kwargs)
+        yield from children_iter_from
+
+    # patch it in gwaripper namespace
+    monkeypatch.setattr("gwaripper.gwaripper.children_iter_dfs",
+                        patched_children_iter)
+
+    set_downloaded = [False, False, False]
+
+    def patched_download_file(self, info, auth, colid, fi_idx, dl_idx, *args, **kwargs):
+        called_with['download_file'].append(((info, auth, colid, fi_idx, dl_idx) + args, kwargs))
+        info.downloaded = set_downloaded[dl_idx - 1]
+
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._download_file",
+                        patched_download_file)
+
+    def patched_update_downloaded(self, *args, **kwargs):
+        called_with['update_downloaded'] = (args, kwargs)
+
+    monkeypatch.setattr("gwaripper.info.FileCollection.update_downloaded",
+                        patched_update_downloaded)
+
+    class DummyCon:
+        def rollback(self):
+            called_with['db_con_rollback'] = True
+
+    generate_filename_ret = ("subpath_test", "fi_ena_e", "txt")
+
+    def patched_generate_filename(self, *args, **kwargs):
+        called_with['generate_filename'] = (args, kwargs)
+        return generate_filename_ret
+
+    monkeypatch.setattr("gwaripper.info.FileInfo.generate_filename",
+                        patched_generate_filename)
+
+    def patched_write_selftext(self, *args, **kwargs):
+        called_with['write_selftext'] = (args, kwargs)
+
+    monkeypatch.setattr("gwaripper.info.RedditInfo.write_selftext_file",
+                        patched_write_selftext)
+
+    #
+    # only add fcol to db if redditinfo
+    #
+
+    fi1 = FileInfo(None, True, *([None] * 7))
+    fc1 = FileCollection(None, 'fcol_url', *([None] * 3))
+    fc1.add_file(fi1)
+    children_iter_from.append((0, fi1))
+
+    # sanity check
+    assert [info for i, info in children_iter_from] == fc1.children
+
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    gwa._download_collection(fc1)
+
+    # downloaded is False so db would get rolled back if it were a RedditInfo
     assert fi1.downloaded is False
-    with GWARipper() as gwa:
-        gwa.download(fi1)
-        assert fi1.downloaded is False
-        assert fi1.report.downloaded is False
 
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    # checking the whole dict equals .. better than just checking specific items
+    # or using ... in called_with
+    assert called_with == {
+        # no file_idx passed if only one file
+        'download_file': [
+            ((fi1, preferred_author_ret, None, 0, 1), {'dl_max': 1})
+        ],
+        'children_iter': ((fc1.children,), {'file_info_only': True, 'relative_enum': True}),
+        'preferred_author': ((), {}),
+        'update_downloaded': ((), {}),
+    }
 
-    #
-    #
-    #
-
-    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
-                        bu_already_dled)
-    fi1_fn = f"{fi1.title}.{fi1.ext}"
-    expected.append(
-            [4, time.strftime("%Y-%m-%d"), fi1.descr, fi1_fn,
-             fi1.title, fi1.direct_url, fi1.page_url, None, None, None, None,
-             None, None, fi1.author, fi1.author, None, None, 0]
-            )
-
-    with GWARipper() as gwa:
-        gwa.download(fi1)
-        assert fi1.downloaded is True
-        assert fi1.report.downloaded is True
-
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    with open(os.path.join(tmpdir, fi1.author, fi1_fn), "r") as f:
-        assert f.read() == fi_file_contents[1]
-
-    #
-    #
-    #
-
-    # fi1 = FileInfo(object, True, "ext", "https://page.url/al3234653",
-    #                "https://direct.url/24sff3j3l434520.ext", None,  # id
-    #                "Onpage title",
-    #                "This is the description", "page_user")
-    # ri2 = RedditInfo(object, "url-not-used-when-adding-to-db",
-    #                  "r3dd1tid", "Best title on reddit [SFW]", "reddit_user",
-    #                  "subreddit", [fi1])  MISSING permalink+created_utc
-    fi2 = FileInfo(object, True, "m4a", "https://page.url/2l345jsaofjso932",
-                   build_file_url(os.path.join(testdl_files, "fi2")), None,  # id
-                   rnd.random_string(20),  # title
-                   rnd.random_string(50), "other-than_rddt-usr")
-    fi2_rep = ExtractorReport(fi2.page_url, ExtractorErrorCode.NO_ERRORS)
-    fi2.report = fi2_rep
-    fi2_fn = f"01_{fi2.title}.{fi2.ext}"
-    fi3 = FileInfo(object, True, "mp3", "https://page.url/242lk2598242jrtn3l4",
-                   build_file_url(os.path.join(testdl_files, "fi3")), None,  # id
-                   "[Foo] Bar qux ❤",  # title
-                   rnd.random_string(50), "other-than_rddt-usr")
-    fi3_rep = ExtractorReport(fi3.page_url, ExtractorErrorCode.NO_ERRORS)
-    fi3.report = fi3_rep
-    fi3_fn = f"Prepended title_01_[Foo] Bar qux _.{fi3.ext}"
-    # extr, url, id
-    fc1 = FileCollection(object, rnd.random_string(30), rnd.random_string(7),
-                         "Prepended title", "other-than_rddt-usr2",
-                         [fi3])
-    fc1_rep = ExtractorReport(fc1.url, ExtractorErrorCode.NO_ERRORS)
-    fc1.report = fc1_rep
-    fi4 = FileInfo(object, False, "gif", "https://page.url/245j2l56t2098432",
-                   build_file_url(os.path.join(testdl_files, "fi4")), rnd.random_string(5),  # id
-                   "non-audio_file",  # title
-                   None, "other-than_rddt-usr3")
-    fi4_rep = ExtractorReport(fi4.page_url, ExtractorErrorCode.NO_ERRORS)
-    fi4.report = fi4_rep
-    fi4_fn = f"02_{fi4.title}.{fi4.ext}"
-    ri1 = RedditInfo(object, "https://dont-use-this-url/in-db",
-                     rnd.random_string(6), "Reddit:title / as sub\\path", "reddit_user",
-                     rnd.random_string(15), "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-                     1602557093.0, [fi2, fc1, fi4])
-    ri1.selftext = "selftext_should not have been written"
-    ri1.r_post_url = "https://www.reddit.com/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz"
-    ri1_rep = ExtractorReport(ri1.url, ExtractorErrorCode.NO_ERRORS)
-    ri1.report = ri1_rep
-    # set parent
-    fi2.parent = ri1
-    fi3.parent = fc1
-    fc1.parent = ri1
-    fi4.parent = ri1
-    # set already downloaded so collection gets skipped
-    fi2.already_downloaded = True
-    fi3.already_downloaded = True
-    fi4.already_downloaded = True
-
-    def patched_alrdy_dled(self, fi):
-        if fi is fi2 or fi is fi3 or fi is fi4:
-            return True
-        else:
-            return False
-
-    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
-                        patched_alrdy_dled)
-
-    with GWARipper() as gwa:
-        gwa.download(ri1)
-    # all downloaded or already_downloaded children means collection is also downloaded
-    assert ri1.downloaded is True
-    assert ri1.report.downloaded is True
-
-    # report.downloaded set on children
-    assert fc1.downloaded is True
-
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    # assure that no seltext was written when collections was skipped
-    for dirpath, dirs, files in os.walk(tmpdir):
-        for fn in (f for f in files if f.endswith(".txt")):
-            with open(os.path.join(dirpath, fn), "r") as f:
-                assert ri1.selftext not in f.read()
-
-    #
-    #
-    #
-
-    monkeypatch.setattr('gwaripper.gwaripper.GWARipper.already_downloaded',
-                        bu_already_dled)
-
-    ri1.selftext = "this selftext should be written !!!!"
-    ri1.downloaded = False
-    fc1.downloaded = False
-    # reset already downloaded
-    fi2.already_downloaded = False
-    fi3.already_downloaded = False
-    fi4.already_downloaded = False
-
-    ri1_dirname = os.path.join("Reddit_title _ as sub_path")
-    expected.extend([
-            [5, time.strftime("%Y-%m-%d"), fi2.descr, os.path.join(ri1_dirname, fi2_fn),
-             fi2.title, fi2.direct_url, fi2.page_url, ri1.created_utc, ri1.r_post_url,
-             ri1.id, ri1.title, ri1.permalink,  ri1.author, fi2.author, ri1.author,
-             ri1.subreddit, None, 0],
-            [6, time.strftime("%Y-%m-%d"), fi3.descr, os.path.join(ri1_dirname, fi3_fn),
-             fi3.title, fi3.direct_url, fi3.page_url, ri1.created_utc, ri1.r_post_url,
-             ri1.id, ri1.title, ri1.permalink,  ri1.author, fi3.author, ri1.author,
-             ri1.subreddit, None, 0],
-            ])
-
-    with GWARipper() as gwa:
-        gwa.download(ri1)
-    assert ri1.downloaded is True
-    # also set on children _collections_
-    assert fc1.downloaded is True
-
-    assert fi2.downloaded
-    assert fi3.downloaded
-    assert fi4.downloaded
-
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    # selftext
-    ri1_dir_abs = os.path.join(tmpdir, ri1.author, ri1_dirname)
-    with open(os.path.join(ri1_dir_abs, "Reddit_title _ as sub_path.txt"), "r") as f:
-        assert f.read() == (
-                f"Title: {ri1.title}\nPermalink: {ri1.permalink}\nSelftext:\n\n{ri1.selftext}")
-    fns = [None, fi1_fn, fi2_fn, fi3_fn, fi4_fn]
-    for i in range(2, 5):
-        with open(os.path.join(ri1_dir_abs, fns[i]), "r") as f:
-            assert f.read() == fi_file_contents[i]
-
-    #
-    # fcol download with one failed dl
-    #
-    # reuse fi4 since it wasn't added to db but with diff parent
-    fi4.downloaded = False
-    fi4.is_audio = True
-    fi4.ext = "wav"
-    fi4_fn = f"FC2 _ Prep_ended ti_tle_01_{fi4.title}.{fi4.ext}"
-
-    fi5 = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
-                   build_file_url(os.path.join(testdl_files, "fi5")), rnd.random_string(5),  # id
-                   "should raise",  # title
-                   None, "exceptional")
-    # extr, url, id
-    fc2 = FileCollection(object, rnd.random_string(30), rnd.random_string(7),
-                         "FC2 ? Prep/ended ti:tle", "fcol_author",
-                         [fi4, fi5])
-    fi4.parent = fc2
-    fi5.parent = fc2
-
-    expected.append(
-            [7, time.strftime("%Y-%m-%d"), fi4.descr, fi4_fn,
-             fi4.title, fi4.direct_url, fi4.page_url, None, None,
-             None, None, None,  None, fi4.author, fc2.author, None, None, 0]
-            )
-
-    assert fi4.reddit_info is None  # just to be sure
-    assert fi5.reddit_info is None  # just to be sure
-
-    with GWARipper() as gwa:
-        gwa.download(fc2)
-    # not all children could be downloaded
-    assert fc2.downloaded is False
-
-    assert fi4.downloaded
-
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    fc2_dir = os.path.join(tmpdir, fc2.author)
-    with open(os.path.join(fc2_dir, fi4_fn), "r") as f:
-        assert f.read() == fi_file_contents[4]
-
-    # reset parent
-    fi5.parent = None
-
-    caplog.clear()
-    caplog.set_level(logging.WARNING)
-
-    with GWARipper() as gwa:
-        gwa.download(fi5)
-
-    assert ("Extractor gwaripper.extractors.soundgasm.SoundgasmExtractor is probably "
-            "broken! Please report this error on github!") in caplog.text
-
-    assert fi5.downloaded is False
-
-    # should not commit adding fi5 to db!!
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
-
-    def always_raise_cts(url, fn, headers=None, prog_bar=None):
-        raise urllib.error.ContentTooShortError("Content too short!", None)
-
-    monkeypatch.setattr('gwaripper.download.download_in_chunks', always_raise_cts)
-
+    children_iter_from.clear()
+    called_with.clear()
+    called_with['download_file'] = []
+    called_with['children_iter'] = []
     caplog.clear()
 
-    with GWARipper() as gwa:
-        gwa.download(fi5)
+    #
+    # log and rollback if no audio downloads
+    # + file_idx passed to download_file if > 1 file
+    #
+    fi1 = FileInfo(None, False, *([None] * 7))
+    fi2 = FileInfo(None, True, *([None] * 7))
+    ri = RedditInfo(None, 'reddit_url', *([None] * 6))
+    ri.add_file(fi1)
+    children_iter_from.append((0, fi1))
+    ri.add_file(fi2)
+    children_iter_from.append((1, fi2))
 
-    logs = "\n".join(rec.message for rec in caplog.records)
+    # non audio will be downloaded, audio not -> any_audio_downloads = False
+    set_downloaded = [True, False]
 
-    assert fi5.downloaded is False
-    assert "not added to DB" in logs
-    assert "selftext might not be written" in logs
-    assert "manually delete and re-download" in logs
+    # sanity check
+    assert [info for i, info in children_iter_from] == ri.children
 
-    # should not commit adding fi5 to db!!
-    assert get_all_rowtuples_db(test_db, query_str) == [tuple(r) for r in expected]
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    gwa._download_collection(ri)
 
+    assert fi1.downloaded is True
+    # downloaded on _only_ audio is False so db will get rolled back
+    assert fi2.downloaded is False
+
+    assert called_with == {
+        # file_idx passed if more than one file
+        'download_file': [
+            ((fi1, preferred_author_ret, 5, 1, 1), {'dl_max': 2}),
+            ((fi2, preferred_author_ret, 5, 2, 2), {'dl_max': 2})
+        ],
+        'children_iter': ((ri.children,), {'file_info_only': True, 'relative_enum': True}),
+        'preferred_author': ((), {}),
+        'update_downloaded': ((), {}),
+        'db_con_rollback': True,
+        'add_to_db_ri': ((ri,), {}),
+    }
+
+    assert caplog.records[1].message == (
+            "No successful audio download in collection! Rolling back DB!")
+
+    children_iter_from.clear()
+    called_with.clear()
+    called_with['download_file'] = []
+    called_with['children_iter'] = []
+    caplog.clear()
+
+    #
+    # normal ri download
+    # + write selftext
+    #
+
+    fi1 = FileInfo(None, False, *([None] * 7))
+    fi2 = FileInfo(None, True, *([None] * 7))
+    fi3 = FileInfo(None, False, *([None] * 7))
+    fi4 = FileInfo(None, True, *([None] * 7))
+    fc1 = FileCollection(None, 'fcol_url', *([None] * 3))
+    ri = RedditInfo(None, 'reddit_url', *([None] * 6))
+    ri.add_file(fi1)
+    children_iter_from.append((0, fi1))
+    ri.add_file(fi2)
+    children_iter_from.append((1, fi2))
+    fc1.add_file(fi3)
+    children_iter_from.append((0, fi3))
+    fc1.add_file(fi4)
+    children_iter_from.append((1, fi4))
+    ri.add_collection(fc1)
+
+    # any_audio_downloads = True
+    set_downloaded = [False, False, False, True]
+
+    # sanity check
+    assert [info for i, info in children_iter_from] == [fi1, fi2, fi3, fi4]
+
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    gwa._download_collection(ri)
+
+    assert fi1.downloaded is False
+    assert fi2.downloaded is False
+    assert fi3.downloaded is False
+    # downloaded on _only_ audio is True so selftext will be written
+    assert fi4.downloaded is True
+
+    assert called_with == {
+        # file_idx passed if more than one file
+        'download_file': [
+            ((fi1, preferred_author_ret, 5, 1, 1), {'dl_max': 4}),
+            ((fi2, preferred_author_ret, 5, 2, 2), {'dl_max': 4}),
+            ((fi3, preferred_author_ret, 5, 1, 3), {'dl_max': 4}),
+            ((fi4, preferred_author_ret, 5, 2, 4), {'dl_max': 4}),
+        ],
+        'children_iter': ((ri.children,), {'file_info_only': True, 'relative_enum': True}),
+        'preferred_author': ((), {}),
+        'update_downloaded': ((), {}),
+        'generate_filename': ((), {}),
+        'add_to_db_ri': ((ri,), {}),
+        'write_selftext': (
+            (cfg.get_root(), os.path.join(preferred_author_ret, generate_filename_ret[0])), {})
+    }
+    assert caplog.records[0].message == (
+            f"Starting download of collection: {ri.url}")
+    
 
 def test_set_urls(setup_tmpdir):
-    tmpdir = setup_tmpdir
 
     urls = [
             'https://old.reddit.com/r/gonewildaudio/comments/jia91q/escaped_title_string/',
@@ -977,7 +1131,6 @@ def test_set_urls(setup_tmpdir):
 
 def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
     # setup_tmpdir sets root_path in config
-    tmpdir = setup_tmpdir
 
     soundgasmfi = FileInfo(SoundgasmExtractor, False, "gif", "https://page.url/asjfgl3oi5j23",
                            'https://page.url/asjfgl3oi5j23/file.mp3', "sfkjl",  # id
@@ -1232,14 +1385,14 @@ def test_pad_filename(setup_tmpdir, caplog):
     caplog.set_level(logging.INFO)
     caplog.clear()
     with GWARipper() as gwa:
-        assert gwa._pad_filename_if_exits(tmpdir, 'test', 'txt') == 'test_03'
+        assert gwa._pad_filename_if_exists(tmpdir, 'test', 'txt') == 'test_03'
         assert caplog.records[0].message == 'FILE ALREADY EXISTS - ADDED: _03'
 
         caplog.clear()
-        assert gwa._pad_filename_if_exits(tmpdir, 'foo', 'bar.txt') == 'foo_02'
+        assert gwa._pad_filename_if_exists(tmpdir, 'foo', 'bar.txt') == 'foo_02'
         assert caplog.records[0].message == 'FILE ALREADY EXISTS - ADDED: _02'
 
-        assert gwa._pad_filename_if_exits(tmpdir, 'baz', '.m4a') == 'baz'
+        assert gwa._pad_filename_if_exists(tmpdir, 'baz', '.m4a') == 'baz'
 
 
 def test_write_report(setup_tmpdir):

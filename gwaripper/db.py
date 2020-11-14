@@ -530,22 +530,6 @@ def get_x_entries(con: sqlite3.Connection, x: int,
         return None
 
 
-def search_assoc_col_string_parse(valuestring, delimiter=";"):
-    """Splits multiple keywords into include kws and exclude kws"""
-    # is list comprehension faster even though we have to iterate over the list twice?
-    vals_and = []
-    vals_ex = []
-    # sort vals for search_tags_intersection_exclude func
-    for val in valuestring.split(delimiter):
-        if val[0] == "!":
-            # remove ! then append
-            vals_ex.append(val[1:])
-        else:
-            vals_and.append(val)
-
-    return vals_and, vals_ex
-
-
 VALID_ORDER_BY = {"ASC", "DESC", "AudioFile.id", "AudioFile.rating", "id", "rating"}
 
 

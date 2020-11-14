@@ -5,6 +5,7 @@ import time
 import datetime
 import re
 import urllib.request
+import urllib.error
 
 import praw
 
@@ -248,7 +249,7 @@ class GWARipper:
         else:
             self._download_collection(info)
 
-    def _pad_filename_if_exits(self, dirpath: str, filename: str, ext: str):
+    def _pad_filename_if_exists(self, dirpath: str, filename: str, ext: str):
         filename_old = filename
         i = 1
 
@@ -291,7 +292,7 @@ class GWARipper:
 
         mypath = os.path.join(config.get_root(), author_name, subpath)
         os.makedirs(mypath, exist_ok=True)
-        filename = self._pad_filename_if_exits(mypath, filename, ext)
+        filename = self._pad_filename_if_exists(mypath, filename, ext)
         filename = f"{filename}.{ext}"
 
         logger.info("Downloading: %s..., File %d of %d", filename,
@@ -327,7 +328,7 @@ class GWARipper:
                            "using GWARipper!")
             if info.parent:
                 logger.warning(
-                        "Containging root collection: %s",
+                        "Containing root collection: %s",
                         info.reddit_info.url if info.reddit_info is not None
                         else info.parent.url)
         except urllib.error.URLError as err:
@@ -346,48 +347,63 @@ class GWARipper:
         # priority is 1. reddit 2. file collection author 3. file author 4. fallbacks
         author_name = info.get_preferred_author_name()
 
+        is_reddit_info = isinstance(info, RedditInfo)
         collection_id, reddit_author = None, None
-        if isinstance(info, RedditInfo):
+        if is_reddit_info:
             collection_id, reddit_author = self._add_to_db_ri(info)
 
-        any_downloads = False
+        first_file_info = None
+        any_audio_downloads = False
         files_in_collection = info.nr_files
         with_file_idx = files_in_collection > 1
         dl_idx = 1
         # don't recurse into separate calls for nested FileCollections
         for rel_idx, fi in children_iter_dfs(info.children,
                                              file_info_only=True, relative_enum=True):
+            first_file_info = first_file_info or fi
             # rel_idx is 0-based
             self._download_file(fi, author_name, collection_id,
                                 (rel_idx + 1) if with_file_idx else 0,
                                 dl_idx=dl_idx, dl_max=files_in_collection)
-            any_downloads = any_downloads or fi.downloaded
+            any_audio_downloads = any_audio_downloads or (fi.downloaded and fi.is_audio)
             dl_idx += 1
 
         # TODO add status codes for downloads
         info.update_downloaded()
 
-        any_audio_downloads = any(fi.is_audio and fi.downloaded for _, fi in
-                                  children_iter_dfs(info.children, file_info_only=True))
-        # _download_file commits after a successful download of an _audio_ file
-        # if there was none we have to roll back to delete the inserted collection
-        if not any_audio_downloads:
-            logger.debug("No successful audio download in collection! Rolling back DB!")
-            self.db_con.rollback()
-
-        if any_downloads:
-            try:
+        # only RedditInfo gets added to db
+        if is_reddit_info:
+            # _download_file commits after a successful download of an _audio_ file
+            # if there was none we have to roll back to delete the inserted collection
+            if not any_audio_downloads:
+                logger.debug("No successful audio download in collection! Rolling back DB!")
+                self.db_con.rollback()
+            else:
                 # :PassSubpathSelftext
-                _, fi = next(children_iter_dfs(info.children, file_info_only=True))
-                subpath, _, _ = fi.generate_filename()
+                subpath, _, _ = first_file_info.generate_filename()
                 # assuming RedditInfo and excepting AttributeError
                 cast(RedditInfo, info).write_selftext_file(
                         config.get_root(), os.path.join(author_name, subpath))
-            except AttributeError:
-                pass  # not redditinfo
 
     def _add_to_db_ri(self, r_info: RedditInfo) -> Tuple[int, str]:
         c = self.db_con.cursor()
+
+        # joins usually faster (but it depends on the specific case obv.) and
+        # better supported than multiple select statements or subqueries
+        # (and better to understand)
+        # (DB can optimize the joins better, joins are used more often,
+        #  better caching of joins, in the case of subquery (FROM (SELECT ..))
+        #  vs join: join works on a table with indices while subquery
+        #  does not -> large result -> slow)
+        existing_collection = c.execute("""
+        SELECT FileCollection.id as collection_id , Alias.name as alias_name
+        FROM FileCollection
+        JOIN Alias ON Alias.id = FileCollection.alias_id
+        WHERE url = ?""", (f"https://www.reddit.com{r_info.permalink}",)).fetchone()
+
+        # FileCollection already in DB -> just return id and artist/alias
+        if existing_collection:
+            return existing_collection['collection_id'], existing_collection['alias_name']
 
         reddit_author = r_info.author
         if reddit_author:
@@ -500,55 +516,57 @@ class GWARipper:
         """
         Updates row of file entry in db with reddit info, only sets values if previous
         entry was NULL/None
+        Commits results to DB
         """
         if not info.reddit_info:
             return
 
-        collection_id, reddit_author = self._add_to_db_ri(info.reddit_info)
+        with self.db_con:
+            collection_id, reddit_author = self._add_to_db_ri(info.reddit_info)
 
-        c = self.db_con.execute("""
-        UPDATE AudioFile SET
-            collection_id = ?
-        WHERE id = ?""", (collection_id, audio_file_id))
+            c = self.db_con.execute("""
+            UPDATE AudioFile SET
+                collection_id = ?
+            WHERE id = ?""", (collection_id, audio_file_id))
 
-        c.execute("""
-        SELECT
-        filename,
-        title,
-        Alias.name as alias_name
-        Alias.id as alias_id
-        Alias.artist_id as artist_id
-        FROM AudioFile
-        WHERE id = ?
-        JOIN Alias ON Alias.id = AudioFile.alias_id
-        """, (audio_file_id,))
+            c.execute("""
+            SELECT
+            filename,
+            title,
+            Alias.name as alias_name,
+            Alias.id as alias_id,
+            Alias.artist_id as artist_id
+            FROM AudioFile
+            JOIN Alias ON Alias.id = AudioFile.alias_id
+            WHERE AudioFile.id = ?
+            """, (audio_file_id,))
 
-        af_row = c.fetchone()
+            af_row = c.fetchone()
 
-        # update artist_id of alias if it's NULL
-        if af_row['artist_id'] is None:
-            artist_id_row = c.execute(
-                    "SELECT id FROM Artist WHERE name = ?", (reddit_author,)).fetchone()
-            if artist_id_row:
-                artist_id = artist_id_row[0]
-                c.execute("UPDATE Alias SET artist_id = ? WHERE id = ?",
-                          (artist_id, af_row['alias_id']))
+            # update artist_id of alias if it's NULL
+            if af_row['artist_id'] is None:
+                artist_id_row = c.execute(
+                        "SELECT id FROM Artist WHERE name = ?", (reddit_author,)).fetchone()
+                if artist_id_row:
+                    artist_id = artist_id_row[0]
+                    c.execute("UPDATE Alias SET artist_id = ? WHERE id = ?",
+                              (artist_id, af_row['alias_id']))
 
-        if not info.reddit_info.selftext:
-            return
+            if not info.reddit_info.selftext:
+                return
 
-        filename_local = af_row['filename']
-        author_subdir = af_row['alias_name']
+            filename_local = af_row['filename']
+            author_subdir = af_row['alias_name']
 
-        # NOTE: due to my db having been used with older versions there are a lot of
-        # rows where cols filename and url are empty -> gen a filename so we
-        # can write the selftext
-        if not filename_local:  # prev NULL filename will now be ""
-            filename_local = re.sub(
-                    r"[^\w\-_.,\[\] ]", "_",
-                    af_row['title'][0:110]) + ".m4a"
-        # intentionally don't write into subpath that might get used
-        # by RedditInfo since this file was downloaded without it
-        file_path = os.path.join(author_subdir, filename_local)
-        info.reddit_info.write_selftext_file(
-                config.get_root(), file_path, force_path=True)
+            # NOTE: due to my db having been used with older versions there are a lot of
+            # rows where cols filename and url are empty -> gen a filename so we
+            # can write the selftext
+            if not filename_local:  # prev NULL filename will now be ""
+                filename_local = re.sub(
+                        r"[^\w\-_.,\[\] ]", "_",
+                        af_row['title'][0:110]) + ".m4a"
+            # intentionally don't write into subpath that might get used
+            # by RedditInfo since this file was downloaded without it
+            file_path = os.path.join(author_subdir, filename_local)
+            info.reddit_info.write_selftext_file(
+                    config.get_root(), file_path, force_path=True)
