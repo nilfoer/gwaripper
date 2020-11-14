@@ -71,12 +71,11 @@ Additionally you can search the following fields:
 
 | Field                                 | search keyword |
 | -------------------------------------:| --------------:|
-| (Title)                               | title          |
-| Host page (e.g. soundgasm) user       | author\_page   |
-| Reddit user name                      | reddit\_user   |
+| (Title and Reddit Title)              | title          |
+| Host page (e.g. soundgasm) user       | artist         |
+| OR Reddit user name                   |                |
 | Reddit id                             | reddit\_id     |
-| Reddit url                            | reddit\_url    |
-| Host page URL                         | url            |
+| Reddit or Host page url               | url            |
 
 All of these fields can be combined in one search. When the search string for a specific keyword contains spaces, it needs to be escaped with quotes. To search for multiple items that have to be present, separate them with semicolons. Everything but the title requires exact (case-sensitive as well) matches!
 
@@ -93,9 +92,9 @@ Searching the title uses SQLite full-text-search:
 - Normally double-quotes(**"**) would be allowed but due to the way we're currently parsing the search query they're not!
 - For more information see: [SQLite.org: Full-text Query Syntax](https://www.sqlite.org/fts5.html#full_text_query_syntax)
 
-E.g. this string searches for audios by sassmastah77 with GFE in the title
+E.g. this string searches for audios by sassmastah77 (as reddit user or as author on an audio-host like soundgasm.net) with GFE in the title
 ```
-author_page:sassmastah77 GFE
+artist:sassmastah77 GFE
 ```
 
 Search for 'monster girl' or 'demon girl' being in the title:
