@@ -17,8 +17,8 @@ def init_app(app):
                 current_app.logger.error("Session is missing CSRF token!")
                 abort(403)
 
-            # is_xhr -> ajax request
-            if request.is_xhr:
+            # XMLHttpRequest set by jquery on ajax request (other js libs don't!)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                 # configured jquery ajax to send token as X-CSRFToken header
                 if token != request.headers.get("X-CSRFToken", None):
                     current_app.logger.error("AJAX request CSRF token is invalid!")
