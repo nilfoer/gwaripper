@@ -269,6 +269,7 @@ class FileInfo:
         self._downloaded: bool = False
         # already downloaded and in db; gets set by already_downloaded
         self.already_downloaded: bool = False
+        self.id_in_db: Optional[int] = None
         self.report: Optional[ExtractorReport] = None
 
     def __str__(self):
@@ -308,7 +309,8 @@ class FileInfo:
             p = p.parent
         return p
 
-    def generate_filename(self, file_index: int = 0) -> Tuple[str, str, str]:
+    def generate_filename(self, top_parent: Optional['FileCollection'],
+                          file_index: int = 0) -> Tuple[str, str, str]:
         """
         Generates filename to save file locally by replacing chars in the title that are not:
         \\w(regex) - , . _ [ ] or a whitespace(" ")
@@ -317,42 +319,33 @@ class FileInfo:
 
         :param file_index: When part of a FileCollection and the files should be numbered
                            0 means no numbering
+        :param subpath: relative to gwaripper_root/author/
         :return: Tuple of subpath(for non-audio file collections >=3 files), filename and
                  extension
         """
 
         title = []
-        # NOTE: relative to gwaripper_root/author/
-        subpath: str = ""
+        # always save everything in at most one sub-directory
+        # even if further FileCollections would have a subpath
+        # NOTE: IMPORTANT! if we change this behaviour also change
+        # :PassSubpathSelftext
+        subpath = top_parent.subpath if top_parent is not None else ""
         if self.parent:
             # reddit_title can only be a RedditInfo.title
             # but parent_title can also be a RedditInfo.title
             parent_title = self.parent.title if self.parent.title else self.parent.id
-
-            # always save everything in at most one sub-directory
-            # even if further FileCollections would have a subpath
-            # NOTE: IMPORTANT! if we change this behaviour also change
-            # :PassSubpathSelftext
-            if self.reddit_info is not None:
-                if self.reddit_info.subpath:
-                    subpath = self.reddit_info.subpath
-                else:
-                    # other FileCollections can't be >=3 files since then we'd have
-                    # a reddit subpath
-                    title.append(self.reddit_info.title[:70])
-                # only append parent_title if it's not also the reddit_info
-                if parent_title and self.parent is not self.reddit_info:
+            if subpath:
+                # only append parent_title if it's not also the top_parent
+                if parent_title and self.parent is not top_parent:
                     title.append(parent_title[:30])
             else:
-                # we might have nested FileCollections; but currently not allowed!
-                topmost_parent = self.get_topmost_parent()
-                if topmost_parent:
-                    subpath = topmost_parent.subpath
-
+                # other FileCollections can't be >=3 files since then we'd have a subpath
+                if top_parent and top_parent.title:
+                    title.append(top_parent.title[:70])
                 # include parent_title if we're not in a parent's subpath
-                # or if the subpath we're in is not the one of our direct parent
-                if not subpath or topmost_parent is not self.parent:
-                    title.append(parent_title[:40])
+                # and if top_parent is not our direct parent
+                if parent_title and self.parent is not top_parent:
+                    title.append(parent_title[:30])
 
         # file index and file title are always last
         if file_index:
@@ -371,10 +364,19 @@ class FileInfo:
         #   when they have a different type
         #   There is no efficiency gain when reusing names: the assignments
         #   will have to create new objects anyway
-        title_combined: str = "_".join(title)
+        title_combined: str = "_".join(s.strip() for s in title)
 
         filename = sanitize_filename(subpath, title_combined)
         return (subpath, filename, self.ext)
+
+
+def parent_iter(start: Union[FileInfo, 'FileCollection']):
+    p = start
+    while True:
+        if not p.parent:
+            break
+        yield p.parent
+        p = p.parent
 
 
 class FileCollection:
@@ -387,6 +389,11 @@ class FileCollection:
         self.id = _id
         self.title = title
         self.author = author
+        # whether the FileCollection contains audio files; only FileCollection
+        # with has_audio==True will be added to the DB
+        self.has_audio = False
+        # NOTE: will be set by _add_to_db_collection
+        self.id_in_db: Optional[int] = None
 
         if children is None:
             self._children = []
@@ -402,7 +409,7 @@ class FileCollection:
         self._nr_files: int = sum(1 for _, _ in
                                   children_iter_dfs(self._children, file_info_only=True))
 
-        self._parent: Optional[RedditInfo] = None
+        self._parent: Optional[FileCollection] = None
         # NOTE: a collection only counts as downloaded if all of it's children are
         self._downloaded: bool = False
         self.report: Optional[ExtractorReport] = None
@@ -432,6 +439,13 @@ class FileCollection:
             self.parent.nr_files += delta
 
     def add_file(self, info: FileInfo) -> None:
+        # if an audio file gets added, this FileCollection as well as all its
+        # parents need to be marked accordingly
+        if not self.has_audio and info.is_audio:
+            self.has_audio = True
+            for parent in parent_iter(self):
+                parent.has_audio = True
+
         self._children.append(info)
         info.parent = self
 
@@ -440,6 +454,12 @@ class FileCollection:
         # TODO handle downloaded and already_downloaded here and in add_collection?
 
     def add_collection(self, collection: 'FileCollection'):
+        # if a collection that contains audio files gets added, this FileCollection as well
+        # as all its parents need to be marked accordingly
+        if not self.has_audio and collection.has_audio:
+            self.has_audio = True
+            for parent in parent_iter(self):
+                parent.has_audio = True
         self._children.append(collection)
         collection.parent = self
         self.nr_files += collection.nr_files
@@ -467,6 +487,11 @@ class FileCollection:
         else:
             return ""
 
+    # @CleanUp this is clunky
+    @property
+    def full_url(self):
+        return self.url
+
     @property
     def downloaded(self):
         return self._downloaded
@@ -482,20 +507,29 @@ class FileCollection:
         return self._parent
 
     @parent.setter
-    def parent(self, parent: 'RedditInfo'):
+    def parent(self, parent: 'FileCollection'):
+        self._set_parent(parent)
+
+    # used so this can be called easily from subclasses
+    def _set_parent(self, parent: 'FileCollection'):
         self._parent = parent
-        # NOTE: set reddit_info on all children when parent gets set since we
-        # only accept RedditInfo as parent for FileCollections currently
-        # see TODO above children declaration
-        for child in cast(List[FileInfo], self.children):
-            child.reddit_info = parent
+
+        if isinstance(parent, RedditInfo):
+            # NOTE: set reddit_info on all children when parent gets set
+            for child in cast(List[FileInfo], self.children):
+                child.reddit_info = parent
 
     def get_preferred_author_name(self) -> str:
         names = [self.author]
 
         # bfs yields the names in level order level0 then level1 etc.
         for _, child in children_iter_bfs(self.children, file_info_only=False):
-            names.append(child.author)
+            # NOTE: since we allow nested FileCollections now and we still want
+            # prioritize reddit author names we have to prepend reddit info authors
+            if isinstance(child, RedditInfo):
+                names.insert(0, child.author)
+            else:
+                names.append(child.author)
 
         # @Hack
         names.append(DELETED_USR_FOLDER if isinstance(self, RedditInfo) else None)
@@ -546,15 +580,16 @@ class RedditInfo(FileCollection):
     def __str__(self):
         return f"RedditInfo<{self.url}, children: {len(self.children)}>"
 
-    @property
-    def parent(self):
-        # crash here since we never should try to access a RedditInfo parent
-        # not true if we just walk up the chain finding the topmost parent etc.
-        return None
+    # override base class implementation to disallow recursive RedditInfos
+    def _set_parent(self, parent: 'FileCollection'):
+        if isinstance(parent, RedditInfo):
+            raise Exception("RedditInfo is not allowed to contain other RedditInfos!")
+        else:
+            super()._set_parent(parent)
 
-    @parent.setter
-    def parent(self, parent):
-        raise AssertionError("RedditInfo is not allowed to have a parent!")
+    @property
+    def full_url(self):
+        return f"https://www.reddit.com{self.permalink}"
 
     def write_selftext_file(self, root_dir: str, subpath: str, force_path: bool = False):
         """

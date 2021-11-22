@@ -12,11 +12,12 @@ from gwaripper.reddit import reddit_praw
 from gwaripper.extractors import find_extractor, AVAILABLE_EXTRACTORS
 from gwaripper.extractors.base import (
         ExtractorReport, ExtractorErrorCode, BaseExtractor, title_has_banned_tag)
-from gwaripper.extractors.soundgasm import SoundgasmExtractor
+from gwaripper.extractors.soundgasm import SoundgasmExtractor, SoundgasmUserExtractor
 from gwaripper.extractors.eraudica import EraudicaExtractor
 from gwaripper.extractors.chirbit import ChirbitExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from gwaripper.extractors.reddit import RedditExtractor
+from gwaripper.extractors.skittykat import SkittykatExtractor
 from gwaripper.exceptions import (
         NoAuthenticationError, InfoExtractingError,
         NoAPIResponseError, AuthenticationFailed
@@ -28,17 +29,17 @@ from utils import setup_tmpdir
 @pytest.mark.parametrize(
         'url, expected, attr_val',
         [('https://soundgasm.net/user/DDCherryB/Tantus-Toy-Review', SoundgasmExtractor,
-          {'is_user': False, 'author': 'DDCherryB'}),
+          {'author': 'DDCherryB'}),
          ('https://soundgasm.net/u/tarkustrooper/F-Journey-of-The-Sorcerer-by-The-Eagles'
           '-excerpt-cover', SoundgasmExtractor,
-          {'is_user': False, 'author': 'tarkustrooper'}),
+          {'author': 'tarkustrooper'}),
          ('https://soundgasm.net/u/belle_in_the_woods/F4M-Kiss-Me-Touch-Me-Take-Me-From-Behind-'
           'spooning-sexpillow-bitingcreampiebeggingmaking-outkissinggropingdry-humpingwhispers',
-          SoundgasmExtractor, {'is_user': False, 'author': 'belle_in_the_woods'}),
-         ('https://soundgasm.net/u/test-1234/', SoundgasmExtractor,
-          {'is_user': True, 'author': 'test-1234'}),
-         ('https://soundgasm.net/user/SAfs_05dfas', SoundgasmExtractor,
-          {'is_user': True, 'author': 'SAfs_05dfas'}),
+          SoundgasmExtractor, {'author': 'belle_in_the_woods'}),
+         ('https://soundgasm.net/u/test-1234/', SoundgasmUserExtractor,
+          {'author': 'test-1234'}),
+         ('https://soundgasm.net/user/SAfs_05dfas', SoundgasmUserExtractor,
+          {'author': 'SAfs_05dfas'}),
          ('http://eraudica.com/e/eve/2014/Cock-Worship-A-Lazy-Sunday-Wake-Up-Suck',
           EraudicaExtractor, {}),
          ('http://eraudica.com/e/eve/2014/Cock-Worship-A-Lazy-Sunday-Wake-Up-Suck/gwa',
@@ -63,6 +64,8 @@ from utils import setup_tmpdir
           'gift_lbombs_kisses_giggles/', RedditExtractor, {}),
          ('https://www.reddit.com/r/gonewildaudio/comments/4r44q5/f4m_its_a_sassapalooza_'
           '4_new_audios_scripts_by', RedditExtractor, {}),
+         ('skittykat.cc/category/this-is-the-id', SkittykatExtractor, {}),
+         ('https://skittykat.cc/category/the-title-or-id/', SkittykatExtractor, {}),
          ('https://chirb.it/hnze3A/sdjkfas', None, None),
          ('https://youtube.com/watch?v=32ksdf83', None, None),
          ('http://reddit.com/r/gonewildaudio/', None, None),
@@ -122,9 +125,9 @@ def test_banned_tags_deactivated():
 def test_soundgasm_user_extractor(monkeypatch):
     # make sure extractor also accepts init_from even if it doesnt support
     # intializing from it
-    ex = SoundgasmExtractor("https://soundgasm.net/u/DDCherryB", init_from=None)
+    ex = SoundgasmUserExtractor("https://soundgasm.net/u/DDCherryB", init_from=None)
     # otherwise _extract_user will extract all files from the ONLINE website
-    monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor._extract_file',
+    monkeypatch.setattr('gwaripper.extractors.soundgasm.SoundgasmExtractor._extract',
                         lambda x: (FileInfo(x.__class__, True, None, x.url,
                                             None, None, None, None, None),
                                    ExtractorReport(x.url, ExtractorErrorCode.NO_ERRORS)))
@@ -148,7 +151,6 @@ def test_extractor_soundgasm():
     # make sure extractor also accepts init_from even if it doesnt support
     # intializing from it
     ex = SoundgasmExtractor(url, init_from=None)
-    assert not ex.is_user
     assert ex.author == "kinkyshibby"
     fi, report = ex._extract()
 
@@ -199,7 +201,6 @@ def test_extractor_soundgasm_banned_tag(monkeypatch):
            "-Part-1-JOEJOIcheatingteasingbitchystrippingspankingmasturbationperv-on-my-ass")
 
     ex = SoundgasmExtractor(url, init_from=None)
-    assert not ex.is_user
     assert ex.author == "belle_in_the_woods"
     fi, report = ex._extract()
     assert fi is None
@@ -519,29 +520,27 @@ reddit_extractor_url_expected = [
          "non-supported", None),
         # i.redd.it in selftext
         # https://old.reddit.com/r/gonewildaudio/comments/izmq8r/fff4m_three_elven_princesses_come_together_to/
-        ("https://www.reddit.com/r/gonewildaudio/comments/ewco8n/"
-         "becoming_the_lamia_tribehusband_ffff4m/",  # 1 sg link in text + imgur album
-         ["https://soundgasm.net/u/POVscribe/Becoming-the-Lamia-Tribe-Husband-FFFF4MMonstergirls",
-          "https://imgur.com/a/4iaKN9F"],
+        ("https://www.reddit.com/r/gonewildaudio/comments/8pyayj/"
+         "ff4m_busting_beauty_joip_teacherslubegigglingtit/",
+         # 1 sg link in text + imgur album
+         ["https://soundgasm.net/u/sweetcarolinekisses/JOIP-to-Busty-Babes",
+          "https://imgur.com/a/lb8rc1t"],
          {
              # fcol
-             "url": ('https://www.reddit.com/r/gonewildaudio/comments/ewco8n/'
-                     'becoming_the_lamia_tribehusband_ffff4m/'),
-             "id": 'ewco8n',
-             "title": ("Becoming the Lamia Tribe-Husband [FFFF4M] [Monstergirls][4 Lusty "
-                       "Lamia Ladies][Fivesome/Orgy][Aphrodisiac Venom][Fdom]and[Fsub]"
-                       "[Deflowering][Blowjob][Facial][Many Creampies][Impreg][Breeding]"
-                       "[MoreTagsBelow][Collab] with /u/AuralAllusions /u/DanseuseElectrique "
-                       "/u/valeriethinevalkyrie"),
-             "author": "POVscribe",
+             "url": ("https://www.reddit.com/r/gonewildaudio/comments/8pyayj/"
+                     "ff4m_busting_beauty_joip_teacherslubegigglingtit/"),
+             "id": '8pyayj',
+             "title": ("[FF4M] Busting Beauty JOIP [teachers][lube][giggling]"
+                       "[tit fucking][interactive][marathon][gallery][explicit][cock worship]"),
+             "author": "sweetcarolinekisses",
              # ri
-             "permalink": ("/r/gonewildaudio/comments/ewco8n/"
-                           "becoming_the_lamia_tribehusband_ffff4m/"),
-             "selftext": """^(More tags: \\[Multiple orgasms\\]\\[Fingering\\]\\[Cunnilingus\\]\\[Taking Turns\\]\\[Multiple Positions\\])\n\n**Premise**: A well-known mercenary gets invited to a remote desert town for a special contract. When he arrives, he learns the town is a small tribal [lamia](https://imgur.com/a/4iaKN9F) queendom, whose queen has a very special offer for him….\n\n4 lusty Lamia ladies assemble to fill this [script](https://www.reddit.com/r/gonewildaudio/comments/e4495x/becoming_the_lamia_tribehusbandscript/) offered by u/RamblingKnight.\n\n**LISTEN**: [**Becoming the Lamia Tribe-Husband**](https://soundgasm.net/u/POVscribe/Becoming-the-Lamia-Tribe-Husband-FFFF4MMonstergirls) {41 min}\n\n"*You will give up your old life to come live here, and be the father of our children. You will devote the rest of your life to mating with us.…..*\n\n*…..and of course satiate our tribe’s ……every desire….."*\n\n\\+ + + + + + +\n\n**CAST**:\n\nDiana, our Queen, u/AuralAllusions\n\nKassia, Captain of the Guard, by u/POVscribe\n\nSophia, the court priestess, by u/DanseuseElectrique\n\nEris, the Queen\'s concubine, by u/valeriethinevalkyrie\n\n**PRODUCTION**:\n\nSound Editor/Mixer: u/Kilbeggan32 (Want to sound *this* good? Check out his [page](https://www.reddit.com/r/Kilbeggan32/) to learn more.)\n\nProject Manager: u/POVscribe\n\nAll music/sounds are copyright/royalty-free.\n\n\\+ + + + + + +\n\n^(A wholly fictional fantasy made by, about, and for adults 18+)""",
-             "created_utc": 1580419842.0,
+             "permalink": ("/r/gonewildaudio/comments/8pyayj/"
+                           "ff4m_busting_beauty_joip_teacherslubegigglingtit/"),
+             "selftext": """JOIP time again! This time I was joined by u/brainy_babe as a fellow teacher. We help you learn about your gorgeous cock.\n\n[Here](https://imgur.com/a/lb8rc1t) is an album for you to follow along with. \n\n[Here](https://soundgasm.net/u/sweetcarolinekisses/JOIP-to-Busty-Babes) is the audio to listen to while we look at the girls with you and direct how you jerk off. \n\nAll the thanks to BrainyBabe for playing with me and to u/VincentPrince5 for making the album!\n\n\n""",
+             "created_utc": 1528602283.0,
              "subreddit": "gonewildaudio",
-             "r_post_url": ("https://www.reddit.com/r/gonewildaudio/comments/ewco8n/"
-                            "becoming_the_lamia_tribehusband_ffff4m/"),
+             "r_post_url": ("https://www.reddit.com/r/gonewildaudio/comments/8pyayj/"
+                            "ff4m_busting_beauty_joip_teacherslubegigglingtit/"),
          }),
          ("https://www.reddit.com/r/pillowtalkaudio/comments/feagis/f4m_seven_minutes"
           "_in_heaven_with_your_crush/",  # xpost with one sgasm link in text
@@ -580,6 +579,7 @@ class DummyExtractor(BaseExtractor):
     def __init__(self, url, init_from=None):
         self.url = url
         self.init_from = init_from
+        self.is_audio = False
 
     # only match supported urls
     @classmethod
@@ -768,16 +768,20 @@ def test_extractor_reddit_banned_tag_linktext(monkeypatch, caplog):
 
     assert report.url == url
     assert report.err_code == ExtractorErrorCode.ERROR_IN_CHILDREN
-    assert len(report.children) == 2
+    assert len(report.children) == 3
 
     assert report.children[0].url == (
-            "https://soundgasm.net/u/auralcandy/Tomboy-Friend-Helps"
-            "-You-Save-Money-on-Strippers-4M")
-    assert report.children[0].err_code == ExtractorErrorCode.NO_ERRORS
+            "https://www.reddit.com/r/gonewildaudio/comments/53fi5m/f4m_script_offer_"
+            "tomboy_saves_her_best_friend/?utm_source=share&utm_medium=ios_app&utm_name=iossmf")
+    assert report.children[0].err_code == ExtractorErrorCode.STOP_RECURSION
     assert report.children[1].url == (
             "https://soundgasm.net/u/auralcandy/Tomboy-Friend-Helps"
+            "-You-Save-Money-on-Strippers-4M")
+    assert report.children[1].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[2].url == (
+            "https://soundgasm.net/u/auralcandy/Tomboy-Friend-Helps"
             "-You-Save-Money-on-Strippers-4F")
-    assert report.children[1].err_code == ExtractorErrorCode.BANNED_TAG
+    assert report.children[2].err_code == ExtractorErrorCode.BANNED_TAG
 
 
 class DummyFileInfo(FileInfo):
@@ -1098,3 +1102,122 @@ def test_extr_broken_http_code(http_code, expected):
             assert BaseExtractor.http_code_is_extractor_broken(htc) is expected
     except TypeError:
         assert BaseExtractor.http_code_is_extractor_broken(http_code) is expected
+
+
+def test_extractor_skittykat_patreon(monkeypatch):
+    # NOTE: use DummyExtractor since we only care about the extracted urls
+    # but make sure to still return RedditExtractor since that is used
+    # to avoid extracting forther reddit submissions
+    backup_find = find_extractor  # save orig func
+    mock_findex = lambda x: (RedditExtractor if RedditExtractor.is_compatible(x)
+                             else DummyExtractor if DummyExtractor.is_compatible(x) else
+                             None)
+    monkeypatch.setattr('gwaripper.extractors.find_extractor', mock_findex)
+
+    extr = SkittykatExtractor("https://skittykat.cc/patreon/how-many-kisses-til-you-pop/")
+    assert extr.content_category == 'patreon'
+    assert extr.id == 'how-many-kisses-til-you-pop'
+
+    fc, report = extr._extract()
+
+    # TODO fix this: How Many Kisses 'Til You Pop?
+    # assert fc.title == "How Many Kisses æTil You Pop?"
+    assert fc.author == "skitty-gwa"
+
+    assert len(fc.children) == 0
+    assert report.err_code == ExtractorErrorCode.ERROR_IN_CHILDREN
+
+    assert len(report.children) == 2
+    assert report.children[0].err_code == ExtractorErrorCode.NO_EXTRACTOR
+    assert report.children[0].url == "https://www.patreon.com/posts/30983046"
+    assert report.children[1].err_code == ExtractorErrorCode.STOP_RECURSION
+    assert report.children[1].url == "https://www.reddit.com/r/gonewildaudio/comments/bxlykc/f4m_milking_a_yummy_little_cutie_gentle_fdom/"
+
+
+def test_extractor_skittykat_sg_and_reddit(monkeypatch):
+    # NOTE: use DummyExtractor since we only care about the extracted urls
+    # but make sure to still return RedditExtractor since that is used
+    # to avoid extracting forther reddit submissions
+    backup_find = find_extractor  # save orig func
+    mock_findex = lambda x: (RedditExtractor if RedditExtractor.is_compatible(x)
+                             else DummyExtractor if DummyExtractor.is_compatible(x) else
+                             None)
+    monkeypatch.setattr('gwaripper.extractors.find_extractor', mock_findex)
+    def reddit_extract(self):
+        return None, ExtractorReport(
+                "https://www.reddit.com/r/gonewildaudio/comments/jal6m0/f4mf4tf_"
+                "kidnapped_by_your_jealous_little_roommate/",
+                ExtractorErrorCode.NO_ERRORS)
+    monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor._extract', reddit_extract)
+
+
+    extr = SkittykatExtractor("https://skittykat.cc/gonewildaudio/kidnapped-by-your-jealous-little-roommate/")
+    assert extr.content_category == 'gonewildaudio'
+    assert extr.id == 'kidnapped-by-your-jealous-little-roommate'
+
+    fc, report = extr._extract()
+
+    assert fc.title == "Kidnapped by Your Jealous Little Roommate"
+    assert fc.author == "skitty-gwa"
+
+    assert fc.children[0].page_url == "https://soundgasm.net/u/skitty/Kidnapped-by-Your-Jealous-Little-Roommate-F4M"
+    assert fc.children[1].page_url == "https://soundgasm.net/u/skitty/Kidnapped-by-Your-Jealous-Little-Roommate-F4TF"
+
+    # reddit extractor would normally also return FileInfos but it was patched above
+    assert len(fc.children) == 2
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+
+    assert len(report.children) == 6
+    assert report.children[0].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[0].url == ("https://www.reddit.com/r/gonewildaudio/comments/jal6m0/f4mf4tf_"
+        "kidnapped_by_your_jealous_little_roommate/")
+    assert report.children[1].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[1].url == "https://soundgasm.net/u/skitty/Kidnapped-by-Your-Jealous-Little-Roommate-F4M"
+    assert report.children[2].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[2].url == "https://soundgasm.net/u/skitty/Kidnapped-by-Your-Jealous-Little-Roommate-F4TF"
+    assert report.children[3].err_code == ExtractorErrorCode.STOP_RECURSION
+    assert report.children[3].url == "https://www.reddit.com/r/yandere/comments/fw7tht/im_a_normal_person_i_swear/"
+    assert report.children[4].err_code == ExtractorErrorCode.STOP_RECURSION
+    assert report.children[4].url == "https://www.reddit.com/r/gonewildaudio/comments/e6nka1/f4m_yandere_halfpint_threatens_to_love_you_dark/"
+    assert report.children[5].err_code == ExtractorErrorCode.STOP_RECURSION
+    assert report.children[5].url == "https://www.reddit.com/r/gonewildaudio/comments/ha7cvo/f4m_script_offer_kidnapped_by_your_jealous_little/"
+
+
+def test_extractor_skittykat_embed(monkeypatch):
+    # NOTE: use DummyExtractor since we only care about the extracted urls
+    # but make sure to still return RedditExtractor since that is used
+    # to avoid extracting forther reddit submissions
+    backup_find = find_extractor  # save orig func
+    mock_findex = lambda x: (RedditExtractor if RedditExtractor.is_compatible(x)
+                             else DummyExtractor if DummyExtractor.is_compatible(x) else
+                             None)
+    monkeypatch.setattr('gwaripper.extractors.find_extractor', mock_findex)
+
+
+    extr = SkittykatExtractor("https://skittykat.cc/gonewildaudio/secret-playtime-mommy/")
+    assert extr.content_category == 'gonewildaudio'
+    assert extr.id == 'secret-playtime-mommy'
+
+    fc, report = extr._extract()
+
+    assert fc.title == "Secret Playtime Mommy"
+    assert fc.author == "skitty-gwa"
+
+    # reddit extractor would normally also return FileInfos but it was patched above
+    assert len(fc.children) == 2
+    assert report.err_code == ExtractorErrorCode.NO_ERRORS
+
+    assert fc.children[0].title == "F4TF “Good Girl” Version"
+    assert fc.children[0].page_url == "https://skittykat.cc/wp-content/uploads/2021/04/enno-secret-playtime-f4tf.mp3?_=1"
+    assert fc.children[0].is_audio is True
+    assert fc.children[0].ext == "mp3"
+    assert fc.children[1].title == "F4M “Good Boy” Version"
+    assert fc.children[1].page_url == "https://skittykat.cc/wp-content/uploads/2021/06/enno-secret-playtime-f4m.mp3?_=2"
+    assert fc.children[1].is_audio is True
+    assert fc.children[1].ext == "mp3"
+
+    assert len(report.children) == 2
+    assert report.children[0].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[0].url == "https://skittykat.cc/wp-content/uploads/2021/04/enno-secret-playtime-f4tf.mp3?_=1"
+    assert report.children[1].err_code == ExtractorErrorCode.NO_ERRORS
+    assert report.children[1].url == "https://skittykat.cc/wp-content/uploads/2021/06/enno-secret-playtime-f4m.mp3?_=2"

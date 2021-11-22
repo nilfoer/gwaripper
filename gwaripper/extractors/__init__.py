@@ -2,18 +2,20 @@ from typing import Type, Optional, Sequence
 
 from .base import BaseExtractor
 from .reddit import RedditExtractor
-from .soundgasm import SoundgasmExtractor
+from .soundgasm import SoundgasmExtractor, SoundgasmUserExtractor
 from .eraudica import EraudicaExtractor
 from .chirbit import ChirbitExtractor
 from .imgur import ImgurImageExtractor, ImgurAlbumExtractor
+from .skittykat import SkittykatExtractor
 
 AVAILABLE_EXTRACTORS: Sequence[Type[BaseExtractor]] = (
         RedditExtractor,
-        SoundgasmExtractor,
+        SoundgasmExtractor, SoundgasmUserExtractor,
         EraudicaExtractor,
         ChirbitExtractor,
         ImgurImageExtractor,
         ImgurAlbumExtractor,
+        SkittykatExtractor,
         )
 
 

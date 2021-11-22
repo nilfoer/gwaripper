@@ -11,13 +11,6 @@ from gwaripper.info import (
 from gwaripper.extractors import base
 
 
-def test_reddit_info_no_parents_allowed():
-    ri = RedditInfo(None, None, None, None, None, None, 'sfasd', 1234.0)
-    with pytest.raises(AssertionError) as exc:
-        ri.parent = RedditInfo(None, None, None, None, None, None, 'sfasd', 1234.0)
-    assert "RedditInfo is not allowed to have a parent!" == str(exc.value)
-
-
 def test_fc_add_file_collection():
     fc1 = FileCollection(base.BaseExtractor, "https://imaginary-audio-playlist/3432209",
                          "3432209", "bestest playlist around that somehow also has a"
@@ -302,7 +295,7 @@ def test_generate_filename():
     # no title or id
     #
     fi_none = FileInfo(*([None]*9))
-    fi_none.generate_filename(0) == ('', 'unnamed', None)
+    fi_none.generate_filename(None, 0) == ('', 'unnamed', None)
 
     #
     # NO PARENT
@@ -312,14 +305,14 @@ def test_generate_filename():
                      " sit amet] [soungasm.net] [💋🤔👌 #EmojisSoDank ❤👱🤴🥞] sdkfjslkjflks"
                      "skgslk dsfkjsalkfs sdfkjsaldfd dsflksajdlkf dfklasjlkfd skdf")
     fi_none.ext = "m4a"
-    assert fi_none.generate_filename() == (
+    assert fi_none.generate_filename(None) == (
             "",
             "[F4M] Déjà vu, but I_m blind [äö-.-üö] [___] [ASMR] [Tag1] [Tag2]"
             " [Re-post] [Extra Long Title] [Not Long Enough Yet] [Lorem ipsum dolor"
             " sit amet] [soungasm.net] [___ _EmojisSoDank ____]",
             "m4a")
 
-    assert fi_none.generate_filename(5) == (
+    assert fi_none.generate_filename(None, 5) == (
             "",
             "05_[F4M] Déjà vu, but I_m blind [äö-.-üö] [___] [ASMR] [Tag1] [Tag2]"
             " [Re-post] [Extra Long Title] [Not Long Enough Yet] [Lorem ipsum dolor"
@@ -330,18 +323,18 @@ def test_generate_filename():
     # REDDIT SUBPATH
     #
 
-    assert fi4.generate_filename(0) == (
+    assert fi4.generate_filename(ri, 0) == (
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Imgur album TT 012345678901234_35HLlk54",
             "mp4")
-    assert fi4.generate_filename(9) == (
+    assert fi4.generate_filename(ri, 9) == (
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Imgur album TT 012345678901234_09_35HLlk54",
             "mp4")
     bu = ri.title
     ri.title = None
     ri._update_subpath()
-    assert fi4.generate_filename(0) == (
+    assert fi4.generate_filename(ri, 0) == (
             "6ghk3",
             "Imgur album TT 012345678901234_35HLlk54",
             "mp4")
@@ -355,14 +348,14 @@ def test_generate_filename():
     bu = ri.children
     ri._children = [fc2]
     ri.nr_files = 2  # < 3 FileInfo children -> no subpath
-    assert fi4.generate_filename(0) == (
+    assert fi4.generate_filename(ri, 0) == (
             "",
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This_"
             "Imgur album TT 012345678901234_35HLlk54",
             "mp4")
-    assert fi4.generate_filename(3) == (
+    assert fi4.generate_filename(ri, 3) == (
             "",
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This_"
             "Imgur album TT 012345678901234_03_35HLlk54",
             "mp4")
 
@@ -372,18 +365,18 @@ def test_generate_filename():
     #
     # REDDIT SUBPATH direct parent is reddit -> parent_title does not get appended
     #
-    assert fi1.generate_filename(0) == (
+    assert fi1.generate_filename(ri, 0) == (
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "This is a test audio",
             "m4a")
-    assert fi1.generate_filename(9) == (
+    assert fi1.generate_filename(ri, 9) == (
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "09_This is a test audio",
             "m4a")
     bu = ri.title
     ri.title = None
     ri._update_subpath()
-    assert fi1.generate_filename(0) == (
+    assert fi1.generate_filename(ri, 0) == (
             "6ghk3",
             "This is a test audio",
             "m4a")
@@ -398,14 +391,14 @@ def test_generate_filename():
     bu = ri.children
     ri.nr_files = 0  # < 3 FileInfo children -> no subpath
     ri._children = []
-    assert fi2.generate_filename(0) == (
+    assert fi2.generate_filename(ri, 0) == (
             "",
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This_"
             "This is an eraudica test audio",
             "mp3")
-    assert fi2.generate_filename(4) == (
+    assert fi2.generate_filename(ri, 4) == (
             "",
-            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This _"
+            "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This_"
             "04_This is an eraudica test audio",
             "mp3")
 
@@ -414,7 +407,7 @@ def test_generate_filename():
     #
     # LONG PARENT TITLE
     #
-    assert fi3.generate_filename(0) == (
+    assert fi3.generate_filename(ri, 0) == (
             "[F4M][ASMR] Breathy Whispers For You [Extremely Long Title] ____ This",
             "Bestest playlist around that s_This is a super test audio",
             "m4a")
@@ -424,12 +417,12 @@ def test_generate_filename():
     #
     fc1.parent = None
     # begin and end in spaces to test that no file path begins/ends in spaces
-    # space at cut-off point (40th char) but it doesn't need to get removed here since
+    # space at cut-off point (70th char) but it doesn't need to get removed here since
     # filename follows anyway
-    fc1.title = " Bestest playlist around that somehow al o "
-    assert fi3.generate_filename(0) == (
+    fc1.title = " Bestest playlist around that somehow al 1234567890 1234567890 1234  7  "
+    assert fi3.generate_filename(fc1, 0) == (
             "",
-            "Bestest playlist around that somehow al_This is a super test audio",
+            "Bestest playlist around that somehow al 1234567890 1234567890 1234  7_This is a super test audio",
             "m4a")
 
 
@@ -478,24 +471,26 @@ def test_generate_filename_nested(monkeypatch):
     assert fc2.parent is fc1
 
     # topmost parent will be only subpath and direct parent gets appended to name
-    assert fi4.generate_filename(2) == (
+    assert fi4.generate_filename(fc1, 2) == (
             "Bestest playlist around that somehow also has a n e   678901234567890",
-            "Imgur album TT 01234567  012345 xtra xt_02_35HLlk54",
+            "Imgur album TT 01234567  0123_02_35HLlk54",
             "mp4")
-    assert fi4.generate_filename(0) == (
+    assert fi4.generate_filename(fc1, 0) == (
             "Bestest playlist around that somehow also has a n e   678901234567890",
-            "Imgur album TT 01234567  012345 xtra xt_35HLlk54",
+            "Imgur album TT 01234567  0123_35HLlk54",
             "mp4")
 
     # no subpath
     fc1.nr_files = 2
-    assert fi4.generate_filename(0) == (
+    assert fi4.generate_filename(fc1, 0) == (
             "",
-            "Imgur album TT 01234567  012345 xtra xt_35HLlk54",
+            "Bestest playlist around that somehow also has a n e   678901234567890_"
+            "Imgur album TT 01234567  0123_35HLlk54",
             "mp4")
-    assert fi4.generate_filename(1) == (
+    assert fi4.generate_filename(fc1, 1) == (
             "",
-            "Imgur album TT 01234567  012345 xtra xt_01_35HLlk54",
+            "Bestest playlist around that somehow also has a n e   678901234567890_"
+            "Imgur album TT 01234567  0123_01_35HLlk54",
             "mp4")
 
     # subpath but direct parent is topmost parent -> don't append to name
@@ -503,11 +498,11 @@ def test_generate_filename_nested(monkeypatch):
     fc2.nr_files = 3
     fc2.title = " Imgur album TT 01234567  012345 xtra xt a 456789012345678901234567890 2"
     fc2._update_subpath()
-    assert fi4.generate_filename(0) == (
+    assert fi4.generate_filename(fc2, 0) == (
             "Imgur album TT 01234567  012345 xtra xt a 456789012345678901234567890",
             "35HLlk54",
             "mp4")
-    assert fi4.generate_filename(5) == (
+    assert fi4.generate_filename(fc2, 5) == (
             "Imgur album TT 01234567  012345 xtra xt a 456789012345678901234567890",
             "05_35HLlk54",
             "mp4")

@@ -351,11 +351,6 @@ def test_add_to_db(setup_db_2col_5audio):
             test_db_fn,
             query_str.format(where_expression="WHERE af.id > 6")) == [tuple(r) for r in expected]
 
-    with GWARipper() as gwa:
-        # reddit_info but no collection_id raises
-        with pytest.raises(AssertionError):
-            gwa._add_to_db(fi, None, "generated [file] [name].mp3")
-
     #
     # no reddit_info
     #
@@ -643,8 +638,11 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     monkeypatch.setattr("gwaripper.gwaripper.GWARipper._pad_filename_if_exists",
                         patched_pad_filename)
 
+    ret_id_in_db = 99
+
     def patched_add_to_db(self, *args, **kwargs):
         called_with['add_to_db'] = (args, kwargs)
+        return ret_id_in_db
 
     monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db",
                         patched_add_to_db)
@@ -668,8 +666,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     # already downloaded file
     gwa = GWARipper()
-    assert gwa._download_file(fi, author_name='author_name', collection_id=None,
-                              file_index=0, dl_idx=3, dl_max=5) is None
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=0, dl_idx=3, dl_max=5) == (None, None)
     assert fi.downloaded is False
 
     assert called_with == {
@@ -689,8 +687,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=3, dl_max=5) == generate_filename_ret[0]
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=3, dl_max=5) == (generate_filename_ret[0], ret_id_in_db) 
     assert fi.downloaded is True
 
     abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
@@ -700,13 +698,13 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     assert called_with == {
         'already_downloaded': ((fi,), {}),
-        'generate_filename': ((2,), {}),
+        'generate_filename': ((None, 2), {}),
         'pad_filename': (
             (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
         # is_audio -> using context manager to commit or rollback
         'db_con__enter__': True,
         'db_con__exit__': True,
-        'add_to_db': ((fi, 3252, fn), {}),
+        'add_to_db': ((fi, None, fn), {}),
         'download_in_chunks': (
             (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
     }
@@ -724,8 +722,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.is_audio = False
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
     assert fi.downloaded is True
 
     abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
@@ -736,7 +734,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     # is_audio False -> not using context manager
     assert called_with == {
         'already_downloaded': ((fi,), {}),
-        'generate_filename': ((2,), {}),
+        'generate_filename': ((None, 2), {}),
         'pad_filename': (
             (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
         'download_in_chunks': (
@@ -756,8 +754,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     #
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    assert gwa._download_file(fi, author_name=None, collection_id=3252,
-                              file_index=2, dl_idx=3, dl_max=5) == generate_filename_ret[0]
+    assert gwa._download_file(fi, author_name=None, top_collection=None,
+                              file_index=2, dl_idx=3, dl_max=5) == (generate_filename_ret[0], ret_id_in_db)
     assert fi.downloaded is True
 
     abs_subpath = os.path.join(tmpdir, UNKNOWN_USR_FOLDER, generate_filename_ret[0])
@@ -767,13 +765,13 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     assert called_with == {
         'already_downloaded': ((fi,), {}),
-        'generate_filename': ((2,), {}),
+        'generate_filename': ((None, 2), {}),
         'pad_filename': (
             (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
         # is_audio -> using context manager to commit or rollback
         'db_con__enter__': True,
         'db_con__exit__': True,
-        'add_to_db': ((fi, 3252, fn), {}),
+        'add_to_db': ((fi, None, fn), {}),
         'download_in_chunks': (
             (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
     }
@@ -796,13 +794,13 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
     exc_tests_called_with = {
         'already_downloaded': ((fi,), {}),
-        'generate_filename': ((2,), {}),
+        'generate_filename': ((None, 2), {}),
         'pad_filename': (
             (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
         # is_audio -> using context manager to commit or rollback
         'db_con__enter__': True,
         'db_con__exit__': True,
-        'add_to_db': ((fi, 3252, fn), {}),
+        'add_to_db': ((fi, None, fn), {}),
         'download_in_chunks': (
             (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
     }
@@ -813,8 +811,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
             fi.direct_url, 404, "Not Found", {}, None)
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=7, dl_max=120)
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
     assert fi.downloaded is False
 
     assert called_with == exc_tests_called_with
@@ -828,8 +826,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     # ContentTooShortError
     #
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=7, dl_max=120)
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
     assert fi.downloaded is False
 
     assert called_with == exc_tests_called_with
@@ -846,8 +844,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fc = FileCollection(None, "fc_url", *([None] * 3))
     fi.parent = fc
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=7, dl_max=120)
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120 == (generate_filename_ret[0], None))
     assert fi.downloaded is False
 
     assert called_with == exc_tests_called_with
@@ -865,8 +863,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     ri = RedditInfo(None, "fc_url", *([None] * 6))
     fi.parent = ri
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=7, dl_max=120)
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120 == (generate_filename_ret[0], None))
     assert fi.downloaded is False
 
     assert called_with == exc_tests_called_with
@@ -884,8 +882,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.parent = None
     fi.extractor = SoundgasmExtractor
     download_sould_raise = urllib.error.URLError("Reason for error!")
-    assert gwa._download_file(fi, author_name='author_name', collection_id=3252,
-                              file_index=2, dl_idx=7, dl_max=120)
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
     assert fi.downloaded is False
 
     assert called_with == exc_tests_called_with
@@ -908,7 +906,18 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     monkeypatch.setattr("gwaripper.info.FileCollection.get_preferred_author_name",
                         patched_get_preferred_author)
 
-    add_to_db_ri_ret = (5, 'redd_auth')
+    id_in_db = 11
+    add_to_db_col_ret = ('redd_auth', False)
+
+    def patched_add_to_db_col(self, col, author, **kwargs):
+        called_with['add_to_db_col'] = ((col, author), kwargs)
+        col.id_in_db = id_in_db
+        return add_to_db_col_ret
+
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db_collection",
+                        patched_add_to_db_col)
+
+    add_to_db_ri_ret = (id_in_db, 'redd_auth')
 
     def patched_add_to_db_ri(self, *args, **kwargs):
         called_with['add_to_db_ri'] = (args, kwargs)
@@ -917,21 +926,11 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db_ri",
                         patched_add_to_db_ri)
 
-    children_iter_from = []
+    set_downloaded = set()
 
-    def patched_children_iter(*args, **kwargs):
-        called_with['children_iter'] = (args, kwargs)
-        yield from children_iter_from
-
-    # patch it in gwaripper namespace
-    monkeypatch.setattr("gwaripper.gwaripper.children_iter_dfs",
-                        patched_children_iter)
-
-    set_downloaded = [False, False, False]
-
-    def patched_download_file(self, info, auth, colid, fi_idx, dl_idx, *args, **kwargs):
-        called_with['download_file'].append(((info, auth, colid, fi_idx, dl_idx) + args, kwargs))
-        info.downloaded = set_downloaded[dl_idx - 1]
+    def patched_download_file(self, info, auth, top_col, fi_idx, dl_idx, *args, **kwargs):
+        called_with['download_file'].append(((info, auth, top_col, fi_idx, dl_idx) + args, kwargs))
+        info.downloaded = True if info in set_downloaded else False
 
     monkeypatch.setattr("gwaripper.gwaripper.GWARipper._download_file",
                         patched_download_file)
@@ -943,8 +942,20 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
                         patched_update_downloaded)
 
     class DummyCon:
+        lastrowid = id_in_db
+
         def rollback(self):
             called_with['db_con_rollback'] = True
+
+        def cursor(self):
+            return self
+
+        def execute(self, *args, **kwargs):
+            return self
+
+        def fetchone(self):
+            return dict()
+
 
     generate_filename_ret = ("subpath_test", "fi_ena_e", "txt")
 
@@ -968,14 +979,10 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     fi1 = FileInfo(None, True, *([None] * 7))
     fc1 = FileCollection(None, 'fcol_url', *([None] * 3))
     fc1.add_file(fi1)
-    children_iter_from.append((0, fi1))
-
-    # sanity check
-    assert [info for i, info in children_iter_from] == fc1.children
 
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    gwa._download_collection(fc1)
+    gwa._download_collection(fc1, None)
 
     # downloaded is False so db would get rolled back if it were a RedditInfo
     assert fi1.downloaded is False
@@ -985,17 +992,13 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     assert called_with == {
         # no file_idx passed if only one file
         'download_file': [
-            ((fi1, preferred_author_ret, None, 0, 1), {'dl_max': 1})
+            ((fi1, preferred_author_ret, fc1, 0, 1), {'dl_max': 1})
         ],
-        'children_iter': ((fc1.children,), {'file_info_only': True, 'relative_enum': True}),
         'preferred_author': ((), {}),
-        'update_downloaded': ((), {}),
     }
 
-    children_iter_from.clear()
     called_with.clear()
     called_with['download_file'] = []
-    called_with['children_iter'] = []
     caplog.clear()
 
     #
@@ -1006,19 +1009,14 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     fi2 = FileInfo(None, True, *([None] * 7))
     ri = RedditInfo(None, 'reddit_url', *([None] * 6))
     ri.add_file(fi1)
-    children_iter_from.append((0, fi1))
     ri.add_file(fi2)
-    children_iter_from.append((1, fi2))
 
     # non audio will be downloaded, audio not -> any_audio_downloads = False
-    set_downloaded = [True, False]
-
-    # sanity check
-    assert [info for i, info in children_iter_from] == ri.children
+    set_downloaded = {fi1}
 
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    gwa._download_collection(ri)
+    gwa._download_collection(ri, None)
 
     assert fi1.downloaded is True
     # downloaded on _only_ audio is False so db will get rolled back
@@ -1027,23 +1025,14 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     assert called_with == {
         # file_idx passed if more than one file
         'download_file': [
-            ((fi1, preferred_author_ret, 5, 1, 1), {'dl_max': 2}),
-            ((fi2, preferred_author_ret, 5, 2, 2), {'dl_max': 2})
+            ((fi1, preferred_author_ret, ri, 1, 1), {'dl_max': 2}),
+            ((fi2, preferred_author_ret, ri, 2, 2), {'dl_max': 2})
         ],
-        'children_iter': ((ri.children,), {'file_info_only': True, 'relative_enum': True}),
         'preferred_author': ((), {}),
-        'update_downloaded': ((), {}),
-        'db_con_rollback': True,
-        'add_to_db_ri': ((ri,), {}),
     }
 
-    assert caplog.records[1].message == (
-            "No successful audio download in collection! Rolling back DB!")
-
-    children_iter_from.clear()
     called_with.clear()
     called_with['download_file'] = []
-    called_with['children_iter'] = []
     caplog.clear()
 
     #
@@ -1056,26 +1045,19 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     fi3 = FileInfo(None, False, *([None] * 7))
     fi4 = FileInfo(None, True, *([None] * 7))
     fc1 = FileCollection(None, 'fcol_url', *([None] * 3))
-    ri = RedditInfo(None, 'reddit_url', *([None] * 6))
+    ri = RedditInfo(None, 'reddit_url', None, "subpath_test", *([None] * 5))
     ri.add_file(fi1)
-    children_iter_from.append((0, fi1))
     ri.add_file(fi2)
-    children_iter_from.append((1, fi2))
     fc1.add_file(fi3)
-    children_iter_from.append((0, fi3))
     fc1.add_file(fi4)
-    children_iter_from.append((1, fi4))
     ri.add_collection(fc1)
 
     # any_audio_downloads = True
-    set_downloaded = [False, False, False, True]
-
-    # sanity check
-    assert [info for i, info in children_iter_from] == [fi1, fi2, fi3, fi4]
+    set_downloaded = {fi4}
 
     gwa = GWARipper()
     gwa.db_con = DummyCon()
-    gwa._download_collection(ri)
+    gwa._download_collection(ri, None)
 
     assert fi1.downloaded is False
     assert fi2.downloaded is False
@@ -1086,15 +1068,14 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     assert called_with == {
         # file_idx passed if more than one file
         'download_file': [
-            ((fi1, preferred_author_ret, 5, 1, 1), {'dl_max': 4}),
-            ((fi2, preferred_author_ret, 5, 2, 2), {'dl_max': 4}),
-            ((fi3, preferred_author_ret, 5, 1, 3), {'dl_max': 4}),
-            ((fi4, preferred_author_ret, 5, 2, 4), {'dl_max': 4}),
+            ((fi1, preferred_author_ret, ri, 1, 1), {'dl_max': 4}),
+            ((fi2, preferred_author_ret, ri, 2, 2), {'dl_max': 4}),
+            ((fi3, preferred_author_ret, ri, 1, 3), {'dl_max': 4}),
+            ((fi4, preferred_author_ret, ri, 2, 4), {'dl_max': 4}),
         ],
-        'children_iter': ((ri.children,), {'file_info_only': True, 'relative_enum': True}),
         'preferred_author': ((), {}),
         'update_downloaded': ((), {}),
-        'generate_filename': ((), {}),
+        'add_to_db_col': ((fc1, preferred_author_ret), {}),
         'add_to_db_ri': ((ri,), {}),
         'write_selftext': (
             (cfg.get_root(), os.path.join(preferred_author_ret, generate_filename_ret[0])), {})
@@ -1280,7 +1261,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         assert download_called_with is None
 
         # needs to be inside context otherwise db auto bu is run and logs msg
-        assert len(caplog.records) == 2
+        assert len(caplog.records) == 1
         assert (f"Error occured while extracting information from '{urls[4]}' "
                 "- site structure or API probably changed! See if there are "
                 "updates available!") == caplog.records[0].message

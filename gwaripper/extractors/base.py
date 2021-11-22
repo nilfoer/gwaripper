@@ -1,9 +1,11 @@
 import urllib.request
 import urllib.error
 import logging
+import re
 
 from typing import (
-        Optional, Dict, Union, ClassVar, Tuple, List, Any, TypeVar, Generic
+        Optional, Dict, Union, ClassVar, Tuple, List, Any, TypeVar, Generic,
+        Pattern
         )
 from enum import Enum, auto, unique
 
@@ -23,6 +25,7 @@ logger = logging.getLogger(__name__)
 # that there are no child reports and EMPTY_COLLECTION
 # and ERROR_IN_CHILDREN so don't mark a parent as NO_ERRORS when
 # a child has errors
+# NOTE: should not be serialized since values might shift
 @unique
 class ExtractorErrorCode(Enum):
     NO_ERRORS = 0
@@ -36,6 +39,9 @@ class ExtractorErrorCode(Enum):
     ERROR_IN_CHILDREN = auto()
     EMPTY_COLLECTION = auto()  # no children at all
     NO_SUPPORTED_AUDIO_LINK = auto()  # only use this if there are no child reports
+    # used when an extractor that returns a FileCollection encounters an url
+    # that itself would result in a FileCollection with more FileCollections etc.
+    STOP_RECURSION = auto()
 
 
 # TODO @CleanUp make this more general since it's not just extractor specific anymore
@@ -99,6 +105,21 @@ class BaseExtractor(Generic[T]):
         ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK.value: (
             "No supported audio could be extracted but there were known unsupported audio links!"),
     }
+
+
+    # known URL patterns that can contain audio sources but are not yet supported
+    # used to include them in the ExtractorReport as unsupported audio links
+    FILTER_URLS_RE: ClassVar[List[Pattern]] = [
+            re.compile(r"^(?:https?://)?(?:www\.)?soundcloud\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?clyp.it/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?vocaroo\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?sndup\.net/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?patreon\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?psstaudio\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?erocast\.me/", re.IGNORECASE),
+            ]
+
 
     # NOTE: workaround to get type checking to work with passing differently
     # typed kwarg in BaseExtractor.__init__
@@ -166,14 +187,14 @@ class BaseExtractor(Generic[T]):
 
                 logger.error("%s: %s (URL was: %s)", err.__class__.__name__, err.msg,
                              err.url)
-                logger.debug("Full exception info for unexpected extraction failure:",
+                logger.debug("Full exception info for unexpected extraction failure:\n%s: %s\n",
                              cls.EXTRACTOR_NAME, err.url, exc_info=True)
             except Exception:
                 cls.is_broken = True
                 logger.error("Error occured while extracting information from '%s' "
                              "- site structure or API probably changed! See if there are "
                              "updates available!", url)
-                logger.debug("Full exception info for unexpected extraction failure:",
+                logger.debug("Full exception info for unexpected extraction failure:\n%s: %s\n",
                              cls.EXTRACTOR_NAME, url, exc_info=True)
             else:
                 # only log/print if no exc was raised since exc already get logged above
@@ -228,6 +249,11 @@ class BaseExtractor(Generic[T]):
             return False
 
     @classmethod
+    def is_unsupported_audio_url(cls, url: str) -> bool:
+        return any(filtered_re.match(url) for filtered_re in
+                   cls.FILTER_URLS_RE)
+
+    @classmethod
     def get_html(cls, url: str,
                  additional_headers: Optional[Dict[str, str]] = None) -> Tuple[
                          Optional[str], Optional[int]]:
@@ -250,7 +276,6 @@ class BaseExtractor(Generic[T]):
             # doesn’t exist
             logger.warning("URL Error: %s (url: %s)", err.reason, url)
         else:
-            # leave the decoding up to bs4
             response = site.read()
             site.close()
 

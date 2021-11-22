@@ -30,6 +30,8 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
     :return: connection to sqlite3 db and cursor instance
     """
     create_new = not os.path.isfile(filename)
+    if create_new:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
     conn: sqlite3.Connection = sqlite3.connect(filename,
                                                detect_types=sqlite3.PARSE_DECLTYPES)
 

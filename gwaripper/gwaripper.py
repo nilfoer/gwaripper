@@ -245,9 +245,9 @@ class GWARipper:
 
     def download(self, info: Union[FileInfo, FileCollection]):
         if isinstance(info, FileInfo):
-            self._download_file(info, info.author)
+            self._download_file(info, info.author, None)
         else:
-            self._download_collection(info)
+            self._download_collection(info, None)
 
     def _pad_filename_if_exists(self, dirpath: str, filename: str, ext: str):
         filename_old = filename
@@ -267,8 +267,8 @@ class GWARipper:
         return filename
 
     def _download_file(self, info: FileInfo, author_name: Optional[str],
-                       collection_id: Optional[int] = None, file_index: int = 0,
-                       dl_idx: int = 1, dl_max: int = 1) -> Optional[str]:
+                       top_collection: Optional[FileCollection], file_index: int = 0,
+                       dl_idx: int = 1, dl_max: int = 1) -> Tuple[Optional[str], Optional[int]]:
         """
         Will download the file to dl_root in a subfolder named like the reddit user name
         if that one is not available the extracted (from the page) author of the file gets
@@ -283,12 +283,12 @@ class GWARipper:
         already_downloaded = self.already_downloaded(info)
         if already_downloaded:
             logger.info("File was already downloaded, skipped URL: %s", info.page_url)
-            return None
+            return None, None
 
         if not author_name:
             author_name = UNKNOWN_USR_FOLDER
 
-        subpath, filename, ext = info.generate_filename(file_index)
+        subpath, filename, ext = info.generate_filename(top_collection, file_index)
 
         mypath = os.path.join(config.get_root(), author_name, subpath)
         os.makedirs(mypath, exist_ok=True)
@@ -298,6 +298,7 @@ class GWARipper:
         logger.info("Downloading: %s..., File %d of %d", filename,
                     dl_idx, dl_max)
 
+        file_info_id_in_db: Optional[int] = None
         # TODO retries etc. or use requests lib?
         try:
             if info.is_audio:
@@ -305,7 +306,7 @@ class GWARipper:
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
                     # executes the SQL query but leaves commiting it to context manager
-                    self._add_to_db(info, collection_id, filename)
+                    file_info_id_in_db = self._add_to_db(info, None, filename)
                     # func passed as kwarg reporthook gets called once on establishment
                     # of the network connection and once after each block read thereafter.
                     # The hook will be passed three arguments; a count of blocks transferred
@@ -337,55 +338,75 @@ class GWARipper:
                          str(err.reason).strip(), info.extractor)
         else:
             info.downloaded = True
+            info.id_in_db = file_info_id_in_db
+            return subpath, file_info_id_in_db
 
-        return subpath
+        return subpath, None
 
-    def _download_collection(self, info: FileCollection):
+    def _download_collection(self, info: FileCollection, top_collection: Optional[FileCollection],
+                             dl_idx: int = 1):
         logger.info("Starting download of collection: %s", info.url)
 
-        # collection determines best author_name to use
+        if top_collection is None:
+            top_collection = info
+
+        # top collection determines best author_name to use
         # priority is 1. reddit 2. file collection author 3. file author 4. fallbacks
-        author_name = info.get_preferred_author_name()
+        author_name = top_collection.get_preferred_author_name()
 
-        is_reddit_info = isinstance(info, RedditInfo)
-        collection_id, reddit_author = None, None
-        if is_reddit_info:
-            collection_id, reddit_author = self._add_to_db_ri(info)
+        # NOTE: this function needs to be recursive, since otherwise collections
+        # that had no (successful) audio downloads will still be added to the DB
 
-        first_file_info = None
         any_audio_downloads = False
-        files_in_collection = info.nr_files
-        with_file_idx = files_in_collection > 1
-        dl_idx = 1
-        # don't recurse into separate calls for nested FileCollections
-        for rel_idx, fi in children_iter_dfs(info.children,
-                                             file_info_only=True, relative_enum=True):
-            first_file_info = first_file_info or fi
-            # rel_idx is 0-based
-            self._download_file(fi, author_name, collection_id,
-                                (rel_idx + 1) if with_file_idx else 0,
-                                dl_idx=dl_idx, dl_max=files_in_collection)
-            any_audio_downloads = any_audio_downloads or (fi.downloaded and fi.is_audio)
-            dl_idx += 1
-
-        # TODO add status codes for downloads
-        info.update_downloaded()
-
-        # only RedditInfo gets added to db
-        if is_reddit_info:
-            # _download_file commits after a successful download of an _audio_ file
-            # if there was none we have to roll back to delete the inserted collection
-            if not any_audio_downloads:
-                logger.debug("No successful audio download in collection! Rolling back DB!")
-                self.db_con.rollback()
+        with_file_idx = info.nr_files > 1
+        rel_idx = 1
+        for fi_or_fc in info.children:
+            # add FileCollections to DB here
+            if isinstance(fi_or_fc, FileCollection):
+                # recursive call
+                any_dl, dl_idx = self._download_collection(fi_or_fc, top_collection, dl_idx=dl_idx)
+                any_audio_downloads = any_audio_downloads or any_dl
             else:
+                fi: FileInfo = fi_or_fc
+                # rel_idx is 0-based
+                self._download_file(
+                        fi, author_name, top_collection,
+                        rel_idx if with_file_idx else 0,
+                        dl_idx=dl_idx, dl_max=top_collection.nr_files)
+                if fi.is_audio and fi.downloaded:
+                    any_audio_downloads = True
+                rel_idx += 1
+                dl_idx += 1
+
+        # only file collections containing audio files get added to db
+        if any_audio_downloads:
+            if isinstance(info, RedditInfo):
+                with self.db_con:
+                    self._add_to_db_ri(cast(RedditInfo, info))
+
+                subpath = top_collection.subpath if top_collection is not None else ""
                 # :PassSubpathSelftext
-                subpath, _, _ = first_file_info.generate_filename()
-                # assuming RedditInfo and excepting AttributeError
                 cast(RedditInfo, info).write_selftext_file(
                         config.get_root(), os.path.join(author_name, subpath))
+            else:
+                with self.db_con:
+                    self._add_to_db_collection(info, author_name)
 
-    def _add_to_db_ri(self, r_info: RedditInfo) -> Tuple[int, str]:
+            # TODO add status codes for downloads
+            info.update_downloaded()
+
+        return any_audio_downloads, dl_idx
+
+    # TODO: @CleanUp this RedditInfo stuff is clunky, generalize it to just be added metadata
+    # like storing upvotes etc.
+    def _add_to_db_collection(self, file_col: FileCollection, author: str) -> Tuple[str, bool]:
+        """
+        Add FileCollection to DB; will return a pre-existing FileCollection if
+        the url column matches file_col.full_url
+        :return: Tuple of the alias name of the author
+                 that was assigned to this collection and whether FileCollection
+                 was found in the DB
+        """
         c = self.db_con.cursor()
 
         # joins usually faster (but it depends on the specific case obv.) and
@@ -399,52 +420,74 @@ class GWARipper:
         SELECT FileCollection.id as collection_id , Alias.name as alias_name
         FROM FileCollection
         JOIN Alias ON Alias.id = FileCollection.alias_id
-        WHERE url = ?""", (f"https://www.reddit.com{r_info.permalink}",)).fetchone()
+        WHERE url = ?""", (file_col.full_url,)).fetchone()
 
         # FileCollection already in DB -> just return id and artist/alias
         if existing_collection:
-            return existing_collection['collection_id'], existing_collection['alias_name']
+            file_col.id_in_db = existing_collection['collection_id']
+            return existing_collection['alias_name'], True
 
-        reddit_author = r_info.author
-        if reddit_author:
-            c.execute("INSERT OR IGNORE INTO Artist(name) VALUES (?)",
-                      (reddit_author,))
-        else:
-            reddit_author = DELETED_USR_FOLDER
-
+        c.execute("INSERT OR IGNORE INTO Artist(name) VALUES (?)",
+                  (author,))
         c.execute("""
         INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
             ?,
             (SELECT id FROM Artist WHERE name = ?)
-        )""", (reddit_author, reddit_author))
+        )""", (author, author))
 
-        c.execute("INSERT INTO RedditInfo(created_utc) VALUES (?)",
-                  (r_info.created_utc,))
-        r_info_id = c.lastrowid
-
-        filecol_dict: Dict[str, Optional[str]] = {
-            "url": f"https://www.reddit.com{r_info.permalink}",
-            "id_on_page": r_info.id,
-            "title": r_info.title,
-            "subpath": r_info.subpath,
-            "reddit_info_id": r_info_id,
-            "parent_id": None,
-            "alias_name": reddit_author
+        filecol_dict: Dict[str, Optional[Union[str, int]]] = {
+            "url": file_col.full_url,
+            "id_on_page": file_col.id,
+            "title": file_col.title,
+            "subpath": file_col.subpath,
+            "parent_id": file_col.parent.id_in_db if file_col.parent else None,
+            "alias_name": author
         }
 
         c.execute("""
         INSERT INTO FileCollection(
-            url, id_on_page, title, subpath, reddit_info_id, parent_id,
+            url, id_on_page, title, subpath, parent_id,
             alias_id
         ) VALUES (
-            :url, :id_on_page, :title, :subpath, :reddit_info_id, :parent_id,
+            :url, :id_on_page, :title, :subpath, :parent_id,
             (SELECT id FROM Alias WHERE name = :alias_name)
         )""", filecol_dict)
-        collection_id = c.lastrowid
+        file_col.id_in_db = c.lastrowid
 
-        return collection_id, reddit_author
+        # update the parent ids of all our audio files or collections
+        for fi_or_fc in file_col.children:
+            if isinstance(fi_or_fc, FileCollection) and fi_or_fc.id_in_db is not None:
+                c.execute("UPDATE FileCollection SET parent_id = ? WHERE id = ?",
+                          (file_col.id_in_db, fi_or_fc.id_in_db))
+            elif cast(FileInfo, fi_or_fc).is_audio and cast(FileInfo, fi_or_fc).downloaded is True:
+                c.execute("UPDATE AudioFile SET collection_id = ? WHERE id = ?",
+                          (file_col.id_in_db, fi_or_fc.id_in_db))
 
-    def _add_to_db(self, info: FileInfo, collection_id: Optional[int], filename: str) -> None:
+        return author, False
+
+
+    def _add_to_db_ri(self, r_info: RedditInfo) -> Tuple[int, str]:
+        c = self.db_con.cursor()
+
+        # for cases where the post is still available (as well as the linked
+        # audio files) but the reddit user has been deleted
+        reddit_author = r_info.author if r_info.author else DELETED_USR_FOLDER
+
+        # TODO: check if this will use the correct author
+        author, was_in_db = self._add_to_db_collection(r_info, reddit_author)
+
+        # TODO get rid of RedditInfo entirely and add the columns (there's only one) to FileCollection
+        if not was_in_db:
+            c.execute("INSERT INTO RedditInfo(created_utc) VALUES (?)",
+                      (r_info.created_utc,))
+            r_info_id = c.lastrowid
+            # assign reddit info to collection
+            c.execute("UPDATE FileCollection SET reddit_info_id = ? WHERE id = ?",
+                      (r_info_id, r_info.id_in_db))
+
+        return cast(int, r_info.id_in_db), author if was_in_db else reddit_author
+
+    def _add_to_db(self, info: FileInfo, collection_id: Optional[int], filename: str) -> int:
         """
         Adds instance attributes and reddit_info values to the database using named SQL query
         parameters with a dictionary.
@@ -458,7 +501,6 @@ class GWARipper:
 
         reddit_author: Optional[str] = None
         if info.reddit_info:
-            assert collection_id is not None
             reddit_author = info.reddit_info.author
 
         c = self.db_con.execute(f"""
@@ -490,6 +532,8 @@ class GWARipper:
             :filename, :title, :url,
             (SELECT id FROM Alias WHERE name = :alias_name)
         )""", audio_file_dict)
+
+        return c.lastrowid
 
     def already_downloaded(self, info: FileInfo) -> bool:
         """

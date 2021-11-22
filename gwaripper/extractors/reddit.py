@@ -9,6 +9,7 @@ from typing import Optional, cast, Pattern, ClassVar, List, Tuple, Type, TypeVar
 from praw.models import Submission
 
 from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport, title_has_banned_tag
+from .soundgasm import SoundgasmUserExtractor
 # NOTE: IMPORTANT need to be imported as "import foo" rather than "from foo import bar"
 # see :GlobalConfigImport
 from .. import config
@@ -35,14 +36,6 @@ class RedditExtractor(BaseExtractor[Submission]):
     REDDIT_DOMAIN_RE: ClassVar[Pattern] = re.compile(
             r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/(\w+)", re.IGNORECASE)
 
-    FILTER_URLS_RE: ClassVar[List[Pattern]] = [
-            re.compile(r"^(?:https?://)?(?:www\.)?soundcloud\.com/", re.IGNORECASE),
-            re.compile(r"^(?:https?://)?(?:www\.)?clyp.it/", re.IGNORECASE),
-            re.compile(r"^(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/", re.IGNORECASE),
-            re.compile(r"^(?:https?://)?(?:www\.)?vocaroo\.com/", re.IGNORECASE),
-            re.compile(r"^(?:https?://)?(?:www\.)?sndup\.net/", re.IGNORECASE),
-            ]
-
     def __init__(self, url: str, init_from: Optional[Submission] = None):
         super().__init__(url)
         self.praw = reddit_praw()
@@ -55,12 +48,6 @@ class RedditExtractor(BaseExtractor[Submission]):
     @classmethod
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_REDDIT_URL_RE.match(url))
-
-    # TODO move to base or extractors
-    @classmethod
-    def is_unsupported_audio_url(cls, url: str) -> bool:
-        return any(filtered_re.match(url) for filtered_re in
-                   RedditExtractor.FILTER_URLS_RE)
 
     def _handle_praw_exc(self, exc: prawcore.exceptions.ResponseException) -> Tuple[
             None, ExtractorReport]:
@@ -156,8 +143,18 @@ class RedditExtractor(BaseExtractor[Submission]):
                 for link in links:
                     href = link["href"]
                     extractor = find_extractor(href)
-                    if extractor is type(self):
+                    # TODO skipping "recursive" FileCollections should be handled in gwaripper.py
+                    # NOTE: @Hack checking extractor types directly
+                    if extractor is type(self) or extractor is type(SoundgasmUserExtractor):
                         # disallow following refs into other reddit submissions
+                        logger.warning("Skipped supported %s url(%s) at %s, since it might lead to"
+                                       " downloading a lot of unwanted audios!",
+                                       cast(BaseExtractor, extractor).EXTRACTOR_NAME,
+                                       href, submission.shortlink)
+                        # NOTE: we don't change the error code of the parent here, this it not
+                        # technically regarded as an error
+                        report.children.append(
+                                ExtractorReport(href, ExtractorErrorCode.STOP_RECURSION))
                         continue
                     if extractor is not None:
                         logger.info("%s link found in selftext of: %s",
