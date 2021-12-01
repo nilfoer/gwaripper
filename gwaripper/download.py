@@ -3,6 +3,7 @@ import os
 import urllib.request
 import urllib.error
 import logging
+import subprocess
 
 from typing import Optional, Dict
 from urllib.error import ContentTooShortError
@@ -143,4 +144,17 @@ def prog_bar_dl(blocknum: int, blocksize: int, totalsize: int) -> None:
     # in the buffer to the terminal, even if normally it would wait before doing so.
     sys.stdout.flush()
 
+
+def download_hls_ffmpeg(m3u8_url, filename, prob_bar: bool = False) -> bool:
+    # -vn: no vieo; -acodec copy: copy audio codec
+    args = ['ffmpeg', '-hide_banner', '-i', m3u8_url, '-vn', '-acodec', 'copy', filename]
+    try:
+        proc = subprocess.run(args, capture_output=True, check=True)
+    except subprocess.CalledProcessError as err:
+        logger.error("HLS download FFmpeg error: %s", str(err))
+        logger.debug("FFmpeg stdout: %s", err.stdout)
+        logger.debug("FFmpeg stderr: %s", err.stderr)
+        return False
+    else:
+        return True
 

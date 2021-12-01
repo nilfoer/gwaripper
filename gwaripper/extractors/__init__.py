@@ -7,6 +7,7 @@ from .eraudica import EraudicaExtractor
 from .chirbit import ChirbitExtractor
 from .imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from .skittykat import SkittykatExtractor
+from .erocast import ErocastExtractor
 
 AVAILABLE_EXTRACTORS: Sequence[Type[BaseExtractor]] = (
         RedditExtractor,
@@ -16,7 +17,8 @@ AVAILABLE_EXTRACTORS: Sequence[Type[BaseExtractor]] = (
         ImgurImageExtractor,
         ImgurAlbumExtractor,
         SkittykatExtractor,
-        )
+        ErocastExtractor,
+    )
 
 
 def find_extractor(url: str) -> Optional[Type[BaseExtractor]]:

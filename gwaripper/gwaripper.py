@@ -18,7 +18,7 @@ from .extractors.base import ExtractorErrorCode, ExtractorReport
 from .extractors.reddit import RedditExtractor
 from .info import (
         FileInfo, FileCollection, RedditInfo, children_iter_dfs,
-        UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER
+        UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER, DownloadType
         )
 from . import download as dl
 from .reddit import reddit_praw
@@ -269,16 +269,6 @@ class GWARipper:
     def _download_file(self, info: FileInfo, author_name: Optional[str],
                        top_collection: Optional[FileCollection], file_index: int = 0,
                        dl_idx: int = 1, dl_max: int = 1) -> Tuple[Optional[str], Optional[int]]:
-        """
-        Will download the file to dl_root in a subfolder named like the reddit user name
-        if that one is not available the extracted (from the page) author of the file gets
-        used
-        Calls info.generate_filename to get a valid filename
-        Also calls method to add dl to db commits when download is successful, does a rollback
-        when not (exception raised).
-
-        :return subpath: Returns subpath to folder the file is located in relative to root_dir
-        """
         # TODO re-add request delay?
         already_downloaded = self.already_downloaded(info)
         if already_downloaded:
@@ -298,6 +288,30 @@ class GWARipper:
         logger.info("Downloading: %s..., File %d of %d", filename,
                     dl_idx, dl_max)
 
+        if info.download_type == DownloadType.HTTP:
+            return self._download_file_http(info, author_name, top_collection,
+                                            subpath, mypath, filename,
+                                            file_index, dl_idx, dl_max)
+        else:
+            return self._download_file_hls(info, author_name, top_collection,
+                                           subpath, mypath, filename,
+                                           file_index, dl_idx, dl_max)
+
+    def _download_file_http(
+        self, info: FileInfo, author_name: Optional[str],
+        top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
+        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1
+    ) -> Tuple[Optional[str], Optional[int]]:
+        """
+        Will download the file to dl_root in a subfolder named like the reddit user name
+        if that one is not available the extracted (from the page) author of the file gets
+        used
+        Calls info.generate_filename to get a valid filename
+        Also calls method to add dl to db commits when download is successful, does a rollback
+        when not (exception raised).
+
+        :return subpath: Returns subpath to folder the file is located in relative to root_dir
+        """
         file_info_id_in_db: Optional[int] = None
         # TODO retries etc. or use requests lib?
         try:
@@ -342,6 +356,23 @@ class GWARipper:
             return subpath, file_info_id_in_db
 
         return subpath, None
+
+    def _download_file_hls(
+        self, info: FileInfo, author_name: Optional[str],
+        top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
+        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1
+    ) -> Tuple[Optional[str], Optional[int]]:
+        file_info_id_in_db: Optional[int] = None
+
+        logger.info("Wating for ffmpeg to finish...")
+        success = dl.download_hls_ffmpeg(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
+        if success and info.is_audio:
+            file_info_id_in_db = self._add_to_db(info, None, filename)
+            self.db_con.commit()
+            info.downloaded = True
+            info.id_in_db = file_info_id_in_db
+
+        return subpath, file_info_id_in_db
 
     def _download_collection(self, info: FileCollection, top_collection: Optional[FileCollection],
                              dl_idx: int = 1):

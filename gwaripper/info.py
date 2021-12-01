@@ -2,28 +2,23 @@ import os
 import logging
 import re
 
-# https://www.stefaanlippens.net/circular-imports-type-hints-python.html
-# only reason for possible circular dependency here is because
-# of type hinting -> use a *conditional import* that is only active in
-# "type hinting mode"
-# from typing import TYPE_CHECKING
+from enum import Enum, auto, unique
+
 from typing import (
         Optional, Union, List, Type, Tuple, Iterator, Sequence,
         Deque, TYPE_CHECKING, cast, overload
         )
 from typing_extensions import Literal
 
-# instead of a conditional import we could use import gwaripper.extractors.base
-# and then use a string 'gwaripper.extractors.base.BaseExtractor'
-# or from .extractors import base with string 'base.BaseExtractor'
-#
-# ^ DOES NOT WORK!
-#
-# NOTE: was said to work on a mypy github issue but it doesn't seem to work here
-# and still results in a cricular dependency
+from collections import deque
+
+# https://www.stefaanlippens.net/circular-imports-type-hints-python.html
+# only reason for possible circular dependency here is because
+# of type hinting -> use a *conditional import* that is only active in
+# "type hinting mode"
+# from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .extractors.base import BaseExtractor, ExtractorReport
-from collections import deque
 
 
 logger = logging.getLogger(__name__)
@@ -238,6 +233,13 @@ def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
             enumerator += 1
 
 
+
+@unique
+class DownloadType(Enum):
+    HTTP = 0
+    HLS = auto()
+
+
 # from .extractors.base import BaseExtractor
 # does not work due to circular dependency
 # to use a forward reference (PEP484):
@@ -251,6 +253,7 @@ class FileInfo:
     def __init__(self, extractor: Type['BaseExtractor'], is_audio: bool, ext: str,
                  page_url: str, direct_url: str, _id: Optional[str],
                  title: Optional[str], descr: Optional[str], author: Optional[str],
+                 download_type: DownloadType = DownloadType.HTTP,
                  parent: Optional['FileCollection'] = None,
                  reddit_info: Optional['RedditInfo'] = None):
         self.extractor = extractor
@@ -270,6 +273,7 @@ class FileInfo:
         # already downloaded and in db; gets set by already_downloaded
         self.already_downloaded: bool = False
         self.id_in_db: Optional[int] = None
+        self.download_type = download_type
         self.report: Optional[ExtractorReport] = None
 
     def __str__(self):

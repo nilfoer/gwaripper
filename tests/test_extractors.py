@@ -11,18 +11,20 @@ import gwaripper.config as config
 from gwaripper.reddit import reddit_praw
 from gwaripper.extractors import find_extractor, AVAILABLE_EXTRACTORS
 from gwaripper.extractors.base import (
-        ExtractorReport, ExtractorErrorCode, BaseExtractor, title_has_banned_tag)
+        BaseExtractor, title_has_banned_tag, ExtractorReport, ExtractorErrorCode
+    )
 from gwaripper.extractors.soundgasm import SoundgasmExtractor, SoundgasmUserExtractor
 from gwaripper.extractors.eraudica import EraudicaExtractor
 from gwaripper.extractors.chirbit import ChirbitExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from gwaripper.extractors.reddit import RedditExtractor
 from gwaripper.extractors.skittykat import SkittykatExtractor
+from gwaripper.extractors.erocast import ErocastExtractor
 from gwaripper.exceptions import (
         NoAuthenticationError, InfoExtractingError,
         NoAPIResponseError, AuthenticationFailed
         )
-from gwaripper.info import FileInfo, FileCollection
+from gwaripper.info import FileInfo, FileCollection, DownloadType
 from utils import setup_tmpdir
 
 
@@ -66,6 +68,8 @@ from utils import setup_tmpdir
           '4_new_audios_scripts_by', RedditExtractor, {}),
          ('skittykat.cc/category/this-is-the-id', SkittykatExtractor, {}),
          ('https://skittykat.cc/category/the-title-or-id/', SkittykatExtractor, {}),
+         ('https://erocast.me/track/392/a-teachers-voice-a-naughty-boy', ErocastExtractor, {'id': '392'}),
+         ('erocast.me/track/198/', ErocastExtractor, {'id': '198'}),
          ('https://chirb.it/hnze3A/sdjkfas', None, None),
          ('https://youtube.com/watch?v=32ksdf83', None, None),
          ('http://reddit.com/r/gonewildaudio/', None, None),
@@ -1221,3 +1225,29 @@ def test_extractor_skittykat_embed(monkeypatch):
     assert report.children[0].url == "https://skittykat.cc/wp-content/uploads/2021/04/enno-secret-playtime-f4tf.mp3?_=1"
     assert report.children[1].err_code == ExtractorErrorCode.NO_ERRORS
     assert report.children[1].url == "https://skittykat.cc/wp-content/uploads/2021/06/enno-secret-playtime-f4m.mp3?_=2"
+
+
+erocast_expected = {
+    "id":392, "mp3":0, "waveform":0, "preview":0, "wav":0, "flac":0, "hd":0, "hls":1,
+    "title":"A Teacher's Voice - A Naughty Boy",
+    "description":"Our teacher comes up with a way to get back at the coach for his disobedience..\n\nScript u/StoryWeaver83",
+    "duration":645, "released_at":"11/22/2021",
+    "permalink_url":"https://erocast.me/track/392/a-teachers-voice-a-naughty-boy",
+    "stream_url":"https://erocast.me/stream/hls/392",
+    "streamable": True,
+    "user":{"id":83, "name":"Wkdfaerie", "username":"wkdfaerie", "artist_id":0}
+}
+
+def test_extractor_erocast():
+    extr = ErocastExtractor("https://erocast.me/track/392/a-teachers-voice-a-naughty-boy")
+    assert extr.id == str(erocast_expected['id'])
+
+    fi, report = extr._extract()
+
+    assert fi.title == erocast_expected['title']
+    assert fi.descr == erocast_expected['description']
+    assert fi.direct_url == erocast_expected['stream_url']
+    user = erocast_expected['user']
+    assert fi.author == user['name']
+    assert fi.download_type == DownloadType.HLS
+    assert fi.ext == "mp4"
