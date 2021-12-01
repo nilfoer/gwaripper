@@ -1,1 +1,1 @@
-pyinstaller gwaripper.spec
+.\venv\Scripts\pyinstaller.exe gwaripper.spec

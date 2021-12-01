@@ -2,10 +2,14 @@
 
 block_cipher = None
 
+# IMPORTANT: pyinstaller will apparently just bundle everything it finds in the current python
+# env so use a venv with only the required additional packages installed
+# pyinstaller needs to be installed in the venv as well and then started (on Win) using
+# Scripts\pyinstaller.exe
 a = Analysis(['gwaripper-runner.py'],
              # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see
              # https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows   
-             pathex=['D:\\SYNC\\coding\\_sgasm-repo',
+             pathex=['gwaripper', 'gwaripper_webGUI',
                      '..\\UniversalCRTDLLs\\x86', '..\\UniversalCRTDLLs\\x64'],
              binaries=[],
              # praw needs praw.ini (which it looks for in 3 places appdata etc. including cwd)
@@ -18,6 +22,7 @@ a = Analysis(['gwaripper-runner.py'],
                 ("gwaripper_webGUI/static", "static"),
                 ("gwaripper_webGUI/templates", "templates"),
                 ("gwaripper/migrations/*.py", "gwaripper/migrations"),
+                ("binary_deps/ffmpeg.exe", "./"),
              ],
              hiddenimports=[],
              hookspath=[],
