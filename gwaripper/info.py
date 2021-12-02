@@ -132,12 +132,12 @@ def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
         try:
             # ignoring type error by casting since we just assume it's a file collection
             # and except the error when it's not
-            assert cast(FileCollection, cur).children
+            children = cast(FileCollection, cur).children
             stack.append((i + 1, skipped_fcols + 1, cur_collection))
             if not file_info_only:
                 yield i if relative_enum else enumerator, cur
                 enumerator += 1
-            cur_collection = cast(FileCollection, cur).children
+            cur_collection = children
             i = 0
             skipped_fcols = 0
         except AttributeError:
@@ -211,18 +211,17 @@ def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
         try:
             # ignoring type error since we just assume it's a file collection
             # and except the error when it's not
-            assert cast(FileCollection, cur).children
-
+            children = cast(FileCollection, cur).children
             if file_info_only and relative_enum:
                 i = -1
-                for child in cast(FileCollection, cur).children:
+                for child in children:
                     if not hasattr(child, 'children'):
                         i += 1
                     q.append((i, child))
                 continue
 
             q.extend([(i, item) for i, item in
-                      enumerate(cast(FileCollection, cur).children)])
+                      enumerate(children)])
 
             if not file_info_only:
                 yield i if relative_enum else enumerator, cur
