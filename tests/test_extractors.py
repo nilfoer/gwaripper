@@ -1226,6 +1226,97 @@ def test_extractor_skittykat_embed(monkeypatch):
     assert report.children[1].err_code == ExtractorErrorCode.NO_ERRORS
     assert report.children[1].url == "https://skittykat.cc/wp-content/uploads/2021/06/enno-secret-playtime-f4m.mp3?_=2"
 
+SKITTY_U200B_HTML = """<div class="elementor-section-wrap">
+							<section class="elementor-section elementor-top-section elementor-element elementor-element-8827f48 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="8827f48" data-element_type="section">
+						<div class="elementor-container elementor-column-gap-default">
+							<div class="elementor-row">
+					<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-e041b51" data-id="e041b51" data-element_type="column">
+			<div class="elementor-column-wrap elementor-element-populated">
+							<div class="elementor-widget-wrap">
+						<div class="elementor-element elementor-element-457da81 elementor-widget elementor-widget-heading" data-id="457da81" data-element_type="widget" data-widget_type="heading.default">
+				<div class="elementor-widget-container">
+			<h2 class="elementor-heading-title elementor-size-default">Audio Title</h2>		</div>
+				</div>
+						</div>
+					</div>
+		</div>
+								</div>
+					</div>
+		</section>
+				<section class="elementor-section elementor-top-section elementor-element elementor-element-838cf02 elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="838cf02" data-element_type="section">
+						<div class="elementor-container elementor-column-gap-default">
+							<div class="elementor-row">
+					<div class="elementor-column elementor-col-50 elementor-top-column elementor-element elementor-element-c958111" data-id="c958111" data-element_type="column">
+			<div class="elementor-column-wrap elementor-element-populated">
+							<div class="elementor-widget-wrap">
+						<div class="elementor-element elementor-element-50bba9a elementor-widget elementor-widget-image" data-id="50bba9a" data-element_type="widget" data-widget_type="image.default">
+				<div class="elementor-widget-container">
+								<div class="elementor-image">
+												<img src="https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob-1024x576.png" class="attachment-large size-large" alt="" loading="lazy" srcset="https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob-1024x576.png 1024w, https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob-300x169.png 300w, https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob-768x432.png 768w, https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob-1536x864.png 1536w, https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob-533x300.png 533w, https://skittykat.cc/wp-content/uploads/2020/12/big-sis-blowjob.png 1920w" sizes="(max-width: 1024px) 100vw, 1024px" width="1024" height="576">														</div>
+						</div>
+				</div>
+						</div>
+					</div>
+		</div>
+				<div class="elementor-column elementor-col-50 elementor-top-column elementor-element elementor-element-b386d5f" data-id="b386d5f" data-element_type="column">
+			<div class="elementor-column-wrap elementor-element-populated">
+							<div class="elementor-widget-wrap">
+						<div class="elementor-element elementor-element-eb42f52 elementor-widget elementor-widget-wp-widget-media_audio" data-id="eb42f52" data-element_type="widget" data-widget_type="wp-widget-media_audio.default">
+				<div class="elementor-widget-container">
+			<!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+<span class="mejs-offscreen">Audio Player</span><div id="mep_0" class="mejs-container mejs-container-keyboard-inactive wp-audio-shortcode mejs-audio" tabindex="0" role="application" aria-label="Audio Player" style="width: 495.5px; height: 40px; min-width: 239px;"><div class="mejs-inner"><div class="mejs-mediaelement"><mediaelementwrapper id="audio-1920-1"><audio class="wp-audio-shortcode" id="audio-1920-1_html5" preload="none" style="width: 100%; height: 100%;" src="https://skittykat.cc/wp-content/uploads/2020/12/HBG_Audio-Title%E2%80%8B.mp3?_=1"><source type="audio/mpeg" src="https://skittykat.cc/wp-content/uploads/2020/12/HBG_Audio-Title​.mp3?_=1"><source type="audio/mpeg" src="https://skittykat.cc/wp-content/uploads/2020/12/HBG_Audio-Title​.mp3?_=1"><a href="https://skittykat.cc/wp-content/uploads/2020/12/HBG_Audio-Title​.mp3">https://skittykat.cc/wp-content/uploads/2020/12/HBG_Audio-Title​.mp3</a></audio></mediaelementwrapper></div><div class="mejs-layers"><div class="mejs-poster mejs-layer" style="display: none; width: 100%; height: 100%;"></div></div><div class="mejs-controls"><div class="mejs-button mejs-playpause-button mejs-play"><button type="button" aria-controls="mep_0" title="Play" aria-label="Play" tabindex="0"></button></div><div class="mejs-time mejs-currenttime-container" role="timer" aria-live="off"><span class="mejs-currenttime">00:00</span></div><div class="mejs-time-rail"><span class="mejs-time-total mejs-time-slider"><span class="mejs-time-buffering" style="display: none;"></span><span class="mejs-time-loaded"></span><span class="mejs-time-current"></span><span class="mejs-time-hovered no-hover"></span><span class="mejs-time-handle"><span class="mejs-time-handle-content"></span></span><span class="mejs-time-float" style="display: none; left: 0px;"><span class="mejs-time-float-current">00:00</span><span class="mejs-time-float-corner"></span></span></span></div><div class="mejs-time mejs-duration-container"><span class="mejs-duration">00:00</span></div><div class="mejs-button mejs-volume-button mejs-mute"><button type="button" aria-controls="mep_0" title="Mute" aria-label="Mute" tabindex="0"></button></div><a class="mejs-horizontal-volume-slider" href="javascript:void(0);" aria-label="Volume Slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" role="slider"><span class="mejs-offscreen">Use Up/Down Arrow keys to increase or decrease volume.</span><div class="mejs-horizontal-volume-total"><div class="mejs-horizontal-volume-current" style="left: 0px; width: 100%;"></div><div class="mejs-horizontal-volume-handle" style="left: 100%;"></div></div></a></div></div></div>		</div>
+				</div>
+				<div class="elementor-element elementor-element-cad082a elementor-widget elementor-widget-text-editor" data-id="cad082a" data-element_type="widget" data-widget_type="text-editor.default">
+				<div class="elementor-widget-container">
+								<div class="elementor-text-editor elementor-clearfix">
+				<blockquote class="_28lDeogZhLGXvE95QRPeDL"><p class="_1qeIAgB0cPwnLhDF9XSiJM"><span style="text-align: inherit;">Silly little brother! You don’t need the blue pill, you need a blowjob!</span></p></blockquote><p style="font-style: normal; font-variant-ligatures: normal; font-variant-caps: normal; font-weight: 400; font-size: 17px; font-family: 'System Fonts', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif; text-indent: 0px;"><span style="font-weight: bold;">Script:</span> HornyGoodBoy</p><p><b>Note:</b> This audio was originally on Pornhub prior to the Dec 2020 purge.</p>					</div>
+						</div>
+				</div>
+						</div>
+					</div>
+		</div>
+								</div>
+					</div>
+		</section>
+				<section class="elementor-section elementor-top-section elementor-element elementor-element-b142f1e elementor-section-boxed elementor-section-height-default elementor-section-height-default" data-id="b142f1e" data-element_type="section">
+						<div class="elementor-container elementor-column-gap-default">
+							<div class="elementor-row">
+					<div class="elementor-column elementor-col-100 elementor-top-column elementor-element elementor-element-be1e16f" data-id="be1e16f" data-element_type="column">
+			<div class="elementor-column-wrap elementor-element-populated">
+							<div class="elementor-widget-wrap">
+						<div class="elementor-element elementor-element-3ffba53 elementor-widget elementor-widget-wp-widget-tag_cloud" data-id="3ffba53" data-element_type="widget" data-widget_type="wp-widget-tag_cloud.default">
+				<div class="elementor-widget-container">
+			<h5>tags</h5><div class="tagcloud"><a href="https://skittykat.cc/tag/aftercare/" class="tag-cloud-link tag-link-120 tag-link-position-1" style="font-size: 9.7818181818182pt;" aria-label="aftercare (14 items)">aftercare</a>
+</div>
+		</div>
+				</div>
+						</div>
+					</div>
+		</div>
+								</div>
+					</div>
+		</section>
+						</div>"""
+
+
+def test_extractor_skittykat_unicode_url(monkeypatch):
+    # patch get_html to return site with embedded audio that has a zero width space
+    # inside the src url
+    mock_get_html = lambda cls, url, hdrs=None: (SKITTY_U200B_HTML, 200)
+    monkeypatch.setattr('gwaripper.extractors.skittykat.SkittykatExtractor.get_html',
+                        mock_get_html)
+    extr = SkittykatExtractor("https://skittykat.cc/gonewildaudio/fskdfal-fsdkfls/")
+    assert extr.content_category == 'gonewildaudio'
+
+    fc, report = extr._extract()
+
+    assert fc.title == "Audio Title"
+    assert fc.author == "skitty-gwa"
+    assert len(fc.children) == 1
+    # correctly escaped
+    assert fc.children[0].direct_url == (
+            "https://skittykat.cc/wp-content/uploads/2020/12/HBG_Audio-Title%E2%80%8B.mp3?_=1")
+
 
 erocast_expected = {
     "id":392, "mp3":0, "waveform":0, "preview":0, "wav":0, "flac":0, "hd":0, "hls":1,

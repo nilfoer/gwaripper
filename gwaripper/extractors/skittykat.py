@@ -118,7 +118,15 @@ class SkittykatExtractor(BaseExtractor):
         for container in audio_embed_containers:
             audio = container.select_one('audio source')
             audio_url = audio['src']
-            match = self.AUDIO_FN_RE.search(audio_url)
+            # we need to use the escaped path of the url for downloading otherwise
+            # run into encoding issues with the url
+            url_parsed = urllib.parse.urlparse(audio_url)
+            # ^ NamedTuple, _replace() will return new obj with changed attr
+            url_parsed = url_parsed._replace(path=urllib.parse.quote(url_parsed.path))
+            escaped_audio_url = url_parsed.geturl()
+
+            # replace \u200b zero-width space for filename
+            match = self.AUDIO_FN_RE.search(audio_url.replace('\u200b', ''))
             audio_fn = urllib.parse.unquote(cast(Match, match).group(1))
             base_fn, ext = audio_fn.rsplit('.', 1)
 
@@ -141,7 +149,7 @@ class SkittykatExtractor(BaseExtractor):
             # give wrong results, since here multiple files can be on the same page
             fi_page_url = audio_url if len(audio_embed_containers) > 1 else self.url
             fi = FileInfo(self.__class__, is_audio=True, ext=ext, page_url=fi_page_url,
-                          direct_url=audio_url, title=audio_title, _id = None,
+                          direct_url=escaped_audio_url, title=audio_title, _id = None,
                           descr=descr_text, author=self.author, parent=fc)
             fi_report = ExtractorReport(audio_url, ExtractorErrorCode.NO_ERRORS)
             # add to FileCollection
