@@ -490,7 +490,7 @@ class GWARipper:
             if isinstance(fi_or_fc, FileCollection) and fi_or_fc.id_in_db is not None:
                 c.execute("UPDATE FileCollection SET parent_id = ? WHERE id = ?",
                           (file_col.id_in_db, fi_or_fc.id_in_db))
-            elif cast(FileInfo, fi_or_fc).is_audio and cast(FileInfo, fi_or_fc).downloaded is True:
+            elif isinstance(fi_or_fc, FileInfo) and fi_or_fc.is_audio and fi_or_fc.downloaded is True:
                 c.execute("UPDATE AudioFile SET collection_id = ? WHERE id = ?",
                           (file_col.id_in_db, fi_or_fc.id_in_db))
 
