@@ -145,7 +145,7 @@ class RedditExtractor(BaseExtractor[Submission]):
                     extractor = find_extractor(href)
                     # TODO skipping "recursive" FileCollections should be handled in gwaripper.py
                     # NOTE: @Hack checking extractor types directly
-                    if extractor is type(self) or extractor is type(SoundgasmUserExtractor):
+                    if extractor is type(self) or extractor is SoundgasmUserExtractor:
                         # disallow following refs into other reddit submissions
                         logger.warning("Skipped supported %s url(%s) at %s, since it might lead to"
                                        " downloading a lot of unwanted audios!",
