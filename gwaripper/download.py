@@ -6,6 +6,7 @@ import logging
 import subprocess
 
 from typing import Optional, Dict
+from enum import Enum, auto, unique
 from urllib.error import ContentTooShortError
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,45 @@ DEFAULT_HEADERS = {
     'User-Agent':
     'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
     }
+
+
+@unique
+class DownloadErrorCode(Enum):
+    DOWNLOADED = 0
+    NOT_DOWNLOADED = auto()
+    SKIPPED_DUPLICATE = auto()
+    # ffmpeg etc.
+    EXTERNAL_ERROR = auto()
+
+    HTTP_ERR_UNAUTHORIZED = auto()
+    HTTP_ERR_FORBIDDEN = auto()
+    HTTP_ERR_NOT_FOUND = auto()
+    HTTP_ERR_GONE = auto()
+    HTTP_ERR_TOO_MANY_REQUESTS = auto()
+
+    HTTP_ERR_SERVER_ERROR = auto()
+    HTTP_ERR_BAD_GATEWAY = auto()
+    HTTP_ERR_SERVICE_UNAVAILABLE = auto()
+
+    HTTP_ERROR_OTHER = auto()
+
+    # collections
+    COLLECTION_COMPLETE = auto()
+    COLLECTION_INCOMPLETE = auto()
+
+
+HTTP_ERR_TO_DL_ERR: Dict[int, DownloadErrorCode] = {
+    401: DownloadErrorCode.HTTP_ERR_UNAUTHORIZED,
+    403: DownloadErrorCode.HTTP_ERR_FORBIDDEN,
+    404: DownloadErrorCode.HTTP_ERR_NOT_FOUND,
+    410: DownloadErrorCode.HTTP_ERR_GONE,
+    429: DownloadErrorCode.HTTP_ERR_TOO_MANY_REQUESTS,
+
+    500: DownloadErrorCode.HTTP_ERR_SERVER_ERROR,
+    502: DownloadErrorCode.HTTP_ERR_BAD_GATEWAY,
+    503: DownloadErrorCode.HTTP_ERR_SERVICE_UNAVAILABLE,
+}
+
 
 
 def download(url: str, dl_path: str):

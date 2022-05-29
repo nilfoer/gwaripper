@@ -19,7 +19,6 @@ def test_children_iter_dfs():
     lvl3d = ChildDummy()
     lvl3c = ChildDummy()
     lvl3b = ChildDummy()
-    # no children so assert triggers!
     lvl3a = ParentDummy([])
 
     lvl2d = ParentDummy([lvl3a])
@@ -34,8 +33,9 @@ def test_children_iter_dfs():
     lvl1a = ChildDummy()
     start = [lvl1a, lvl1b, lvl1c, lvl1d, lvl1e]
 
-    with pytest.raises(AssertionError):
-        fail = [x for x in children_iter_dfs(start, file_info_only=False)]
+    # ignoring empty collections now
+    # with pytest.raises(AssertionError):
+    #     fail = [x for x in children_iter_dfs(start, file_info_only=False)]
 
     lvl3a.children.append(lvl3e)
 
@@ -89,7 +89,6 @@ def test_children_iter_bfs():
     lvl3d = ChildDummy()
     lvl3c = ChildDummy()
     lvl3b = ChildDummy()
-    # no children so assert triggers!
     lvl3a = ParentDummy([])
 
     lvl2d = ParentDummy([lvl3a])
@@ -104,8 +103,9 @@ def test_children_iter_bfs():
     lvl1a = ChildDummy()
     start = [lvl1a, lvl1b, lvl1c, lvl1d, lvl1e]
 
-    with pytest.raises(AssertionError):
-        fail = [x for x in children_iter_bfs(start, file_info_only=False)]
+    # ignoring empty collections now
+    # with pytest.raises(AssertionError):
+    #     fail = [x for x in children_iter_bfs(start, file_info_only=False)]
 
     lvl3a.children.append(lvl3e)
 

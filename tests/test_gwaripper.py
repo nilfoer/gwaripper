@@ -12,6 +12,7 @@ import gwaripper.config as cfg
 from gwaripper.gwaripper import GWARipper, report_preamble
 from gwaripper.db import load_or_create_sql_db
 from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER, UNKNOWN_USR_FOLDER
+from gwaripper.download import DownloadErrorCode
 from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
 from gwaripper.extractors.reddit import RedditExtractor
@@ -50,7 +51,7 @@ def test_exit_context(setup_tmpdir, monkeypatch):
 
     write_report_called = False
 
-    reports = [ExtractorReport('url', ExtractorErrorCode.NO_EXTRACTOR)]
+    reports = [(ExtractorReport('url', ExtractorErrorCode.NO_EXTRACTOR), DownloadErrorCode.NOT_DOWNLOADED)]
 
     def patch_write_rep(self, reps):
         assert reps is reports
@@ -542,19 +543,19 @@ def test_already_downloaded(monkeypatch, setup_db_2col_5audio):
     # nothing should happen
     with GWARipper() as gwa:
         assert gwa.already_downloaded(fi1) is True
-        assert fi1.already_downloaded is True
+        assert fi1.downloaded is DownloadErrorCode.SKIPPED_DUPLICATE
 
         assert gwa.already_downloaded(fi2) is True
-        assert fi2.already_downloaded is True
+        assert fi2.downloaded is DownloadErrorCode.SKIPPED_DUPLICATE
 
         assert gwa.already_downloaded(fi3) is True
-        assert fi3.already_downloaded is True
+        assert fi3.downloaded is DownloadErrorCode.SKIPPED_DUPLICATE
 
         assert gwa.already_downloaded(fi4) is False
-        assert fi4.already_downloaded is False
+        assert fi4.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
         assert gwa.already_downloaded(fi5) is False
-        assert fi5.already_downloaded is False
+        assert fi5.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     #
     # check if set_missing_reddit is called correctly
@@ -615,6 +616,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     def patched_already_downloaded(self, *args, **kwargs):
         called_with['already_downloaded'] = (args, kwargs)
+        if already_downloaded:
+            args[0].downloaded = DownloadErrorCode.SKIPPED_DUPLICATE
         return already_downloaded
 
     monkeypatch.setattr("gwaripper.gwaripper.GWARipper.already_downloaded",
@@ -667,8 +670,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     # already downloaded file
     gwa = GWARipper()
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=0, dl_idx=3, dl_max=5) == (None, None)
-    assert fi.downloaded is False
+                              file_index=0, dl_idx=3, dl_max=5) is None
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.SKIPPED_DUPLICATE
 
     assert called_with == {
         'already_downloaded': ((fi,), {}),
@@ -678,6 +682,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     called_with.clear()
     caplog.clear()
+    fi.id_in_db = None
 
     #
     # normal audio download
@@ -688,8 +693,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     gwa = GWARipper()
     gwa.db_con = DummyCon()
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=3, dl_max=5) == (generate_filename_ret[0], ret_id_in_db) 
-    assert fi.downloaded is True
+                              file_index=2, dl_idx=3, dl_max=5) == generate_filename_ret[0]
+    assert fi.id_in_db == ret_id_in_db
+    assert fi.downloaded is DownloadErrorCode.DOWNLOADED
 
     abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
     fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
@@ -712,7 +718,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     # download logging call using dl_idx and dl_max
     assert f"Downloading: {fn}..., File 3 of 5" == (caplog.records[0].message)
 
-    fi.downloaded = False
+    fi.downloaded = DownloadErrorCode.NOT_DOWNLOADED
+    fi.id_in_db = None
     called_with.clear()
     caplog.clear()
 
@@ -723,8 +730,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     gwa = GWARipper()
     gwa.db_con = DummyCon()
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
-    assert fi.downloaded is True
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.DOWNLOADED
 
     abs_subpath = os.path.join(tmpdir, 'author_name', generate_filename_ret[0])
     fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
@@ -745,7 +753,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     assert f"Downloading: {fn}..., File 7 of 120" == (caplog.records[0].message)
 
     fi.is_audio = True
-    fi.downloaded = False
+    fi.id_in_db = None
+    fi.downloaded = DownloadErrorCode.NOT_DOWNLOADED
     called_with.clear()
     caplog.clear()
 
@@ -755,8 +764,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     gwa = GWARipper()
     gwa.db_con = DummyCon()
     assert gwa._download_file(fi, author_name=None, top_collection=None,
-                              file_index=2, dl_idx=3, dl_max=5) == (generate_filename_ret[0], ret_id_in_db)
-    assert fi.downloaded is True
+                              file_index=2, dl_idx=3, dl_max=5) == generate_filename_ret[0]
+    assert fi.id_in_db == ret_id_in_db
+    assert fi.downloaded is DownloadErrorCode.DOWNLOADED
 
     abs_subpath = os.path.join(tmpdir, UNKNOWN_USR_FOLDER, generate_filename_ret[0])
     fn = f"{pad_filename_ret}.{generate_filename_ret[2]}"
@@ -779,7 +789,8 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     # download logging call using dl_idx and dl_max
     assert f"Downloading: {fn}..., File 3 of 5" == (caplog.records[0].message)
 
-    fi.downloaded = False
+    fi.downloaded = DownloadErrorCode.NOT_DOWNLOADED
+    fi.id_in_db = None
     called_with.clear()
     caplog.clear()
 
@@ -804,6 +815,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
         'download_in_chunks': (
             (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
     }
+
     #
     # HTTPError
     #
@@ -812,8 +824,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     gwa = GWARipper()
     gwa.db_con = DummyCon()
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
-    assert fi.downloaded is False
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.HTTP_ERR_NOT_FOUND
 
     assert called_with == exc_tests_called_with
 
@@ -821,14 +834,18 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     called_with.clear()
     caplog.clear()
+    fi.id_in_db = None
+    # TODO this is so bad: use a fixture and sep functions or parametrize
+    fi.downloaded = DownloadErrorCode.NOT_DOWNLOADED
 
     #
     # ContentTooShortError
     #
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
-    assert fi.downloaded is False
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     assert called_with == exc_tests_called_with
 
@@ -837,6 +854,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     called_with.clear()
     caplog.clear()
+    fi.id_in_db = None
 
     #
     # ContentTooShortError WITH fc parent
@@ -845,8 +863,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.parent = fc
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120 == (generate_filename_ret[0], None))
-    assert fi.downloaded is False
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     assert called_with == exc_tests_called_with
 
@@ -856,6 +875,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     called_with.clear()
     caplog.clear()
+    fi.id_in_db = None
 
     #
     # ContentTooShortError WITH ri parent
@@ -864,8 +884,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.parent = ri
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120 == (generate_filename_ret[0], None))
-    assert fi.downloaded is False
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     assert called_with == exc_tests_called_with
 
@@ -875,6 +896,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     called_with.clear()
     caplog.clear()
+    fi.id_in_db = None
 
     #
     # URLError
@@ -883,8 +905,9 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.extractor = SoundgasmExtractor
     download_sould_raise = urllib.error.URLError("Reason for error!")
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == (generate_filename_ret[0], None)
-    assert fi.downloaded is False
+                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     assert called_with == exc_tests_called_with
 
@@ -930,16 +953,11 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
 
     def patched_download_file(self, info, auth, top_col, fi_idx, dl_idx, *args, **kwargs):
         called_with['download_file'].append(((info, auth, top_col, fi_idx, dl_idx) + args, kwargs))
-        info.downloaded = True if info in set_downloaded else False
+        info.downloaded = (
+            DownloadErrorCode.DOWNLOADED if info in set_downloaded else DownloadErrorCode.NOT_DOWNLOADED)
 
     monkeypatch.setattr("gwaripper.gwaripper.GWARipper._download_file",
                         patched_download_file)
-
-    def patched_update_downloaded(self, *args, **kwargs):
-        called_with['update_downloaded'] = (args, kwargs)
-
-    monkeypatch.setattr("gwaripper.info.FileCollection.update_downloaded",
-                        patched_update_downloaded)
 
     class DummyCon:
         lastrowid = id_in_db
@@ -955,6 +973,12 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
 
         def fetchone(self):
             return dict()
+        
+        def __enter__(*args):
+            pass
+
+        def __exit__(*args):
+            pass
 
 
     generate_filename_ret = ("subpath_test", "fi_ena_e", "txt")
@@ -973,23 +997,26 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
                         patched_write_selftext)
 
     #
-    # only add fcol to db if redditinfo
+    # also add fcol to db (not just reddit info)
     #
 
     fi1 = FileInfo(None, True, *([None] * 7))
     fc1 = FileCollection(None, 'fcol_url', *([None] * 3))
     fc1.add_file(fi1)
 
+    set_downloaded = {fi1}
+
     gwa = GWARipper()
     gwa.db_con = DummyCon()
     gwa._download_collection(fc1, None)
 
-    # downloaded is False so db would get rolled back if it were a RedditInfo
-    assert fi1.downloaded is False
+    assert fi1.downloaded is DownloadErrorCode.DOWNLOADED
+    assert fc1.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
 
     # checking the whole dict equals .. better than just checking specific items
     # or using ... in called_with
     assert called_with == {
+        'add_to_db_col': ((fc1, preferred_author_ret), {}),
         # no file_idx passed if only one file
         'download_file': [
             ((fi1, preferred_author_ret, fc1, 0, 1), {'dl_max': 1})
@@ -1018,9 +1045,11 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     gwa.db_con = DummyCon()
     gwa._download_collection(ri, None)
 
-    assert fi1.downloaded is True
+    assert ri.downloaded is DownloadErrorCode.COLLECTION_INCOMPLETE
+
+    assert fi1.downloaded is DownloadErrorCode.DOWNLOADED
     # downloaded on _only_ audio is False so db will get rolled back
-    assert fi2.downloaded is False
+    assert fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     assert called_with == {
         # file_idx passed if more than one file
@@ -1029,6 +1058,42 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
             ((fi2, preferred_author_ret, ri, 2, 2), {'dl_max': 2})
         ],
         'preferred_author': ((), {}),
+    }
+
+    called_with.clear()
+    called_with['download_file'] = []
+    caplog.clear()
+
+    #
+    # complete collection downloaded
+    #
+    fi1 = FileInfo(None, False, *([None] * 7))
+    fi2 = FileInfo(None, True, *([None] * 7))
+    ri = RedditInfo(None, 'reddit_url', *([None] * 6))
+    ri.add_file(fi1)
+    ri.add_file(fi2)
+
+    set_downloaded = {fi1, fi2}
+
+    gwa = GWARipper()
+    gwa.db_con = DummyCon()
+    gwa._download_collection(ri, None)
+
+    assert ri.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
+
+    assert fi1.downloaded is DownloadErrorCode.DOWNLOADED
+    assert fi2.downloaded is DownloadErrorCode.DOWNLOADED
+
+    assert called_with == {
+        'add_to_db_ri': ((ri,), {}),
+        # file_idx passed if more than one file
+        'download_file': [
+            ((fi1, preferred_author_ret, ri, 1, 1), {'dl_max': 2}),
+            ((fi2, preferred_author_ret, ri, 2, 2), {'dl_max': 2})
+        ],
+        'preferred_author': ((), {}),
+        'write_selftext': (
+            (cfg.get_root(), os.path.join(preferred_author_ret, "")), {})
     }
 
     called_with.clear()
@@ -1059,11 +1124,14 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     gwa.db_con = DummyCon()
     gwa._download_collection(ri, None)
 
-    assert fi1.downloaded is False
-    assert fi2.downloaded is False
-    assert fi3.downloaded is False
+    assert fc1.downloaded is DownloadErrorCode.COLLECTION_INCOMPLETE
+    assert ri.downloaded is DownloadErrorCode.COLLECTION_INCOMPLETE
+
+    assert fi1.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi3.downloaded is DownloadErrorCode.NOT_DOWNLOADED
     # downloaded on _only_ audio is True so selftext will be written
-    assert fi4.downloaded is True
+    assert fi4.downloaded is DownloadErrorCode.DOWNLOADED
 
     assert called_with == {
         # file_idx passed if more than one file
@@ -1074,7 +1142,6 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
             ((fi4, preferred_author_ret, ri, 2, 4), {'dl_max': 4}),
         ],
         'preferred_author': ((), {}),
-        'update_downloaded': ((), {}),
         'add_to_db_col': ((fc1, preferred_author_ret), {}),
         'add_to_db_ri': ((ri,), {}),
         'write_selftext': (
@@ -1170,7 +1237,10 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         assert fi is not None
         nonlocal download_called_with
         download_called_with = fi
-        fi.downloaded = True
+        if isinstance(fi, FileCollection):
+            fi.downloaded = DownloadErrorCode.COLLECTION_COMPLETE
+        else:
+            fi.downloaded = DownloadErrorCode.DOWNLOADED
 
     monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
 
@@ -1178,11 +1248,11 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         gwa.extract_and_download(urls[0])
         # extr report appended and downloaded set
         assert gwa.extractor_reports[0] is redditinforep
-        assert gwa.extractor_reports[0].downloaded is True
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.COLLECTION_COMPLETE
         assert len(gwa.extractor_reports) == 1
     # download called
     assert download_called_with is redditinfo
-    assert download_called_with.downloaded is True
+    assert download_called_with.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
 
     def patched_dl(self, fi):
         assert fi is not None
@@ -1195,11 +1265,11 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         gwa.extract_and_download(urls[1])
         # extr report appended and downloaded set
         assert gwa.extractor_reports[0] is soundgasmrep
-        assert gwa.extractor_reports[0].downloaded is False
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.NOT_DOWNLOADED
         assert len(gwa.extractor_reports) == 1
     # download called
     assert download_called_with is soundgasmfi
-    assert download_called_with.downloaded is False
+    assert download_called_with.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     #
     # no supported extr found
@@ -1213,7 +1283,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         assert len(gwa.extractor_reports) == 1
         assert gwa.extractor_reports[0].err_code == ExtractorErrorCode.NO_EXTRACTOR
         assert gwa.extractor_reports[0].url == urls[2]
-        assert gwa.extractor_reports[0].downloaded is False
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.NOT_DOWNLOADED
 
         # needs to be inside context otherwise db auto bu is run and logs msg
         assert len(caplog.records) == 1
@@ -1233,7 +1303,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         assert len(gwa.extractor_reports) == 1
         assert gwa.extractor_reports[0].err_code == ExtractorErrorCode.NO_RESPONSE
         assert gwa.extractor_reports[0].url == urls[3]
-        assert gwa.extractor_reports[0].downloaded is False
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.NOT_DOWNLOADED
 
         # needs to be inside context otherwise db auto bu is run and logs msg
         assert len(caplog.records) == 1
@@ -1256,7 +1326,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         assert len(gwa.extractor_reports) == 1
         assert gwa.extractor_reports[0].err_code == ExtractorErrorCode.BROKEN_EXTRACTOR
         assert gwa.extractor_reports[0].url == urls[4]
-        assert gwa.extractor_reports[0].downloaded is False
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.NOT_DOWNLOADED
         # download not called
         assert download_called_with is None
 
@@ -1278,7 +1348,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         assert len(gwa.extractor_reports) == 2
         assert gwa.extractor_reports[1].err_code == ExtractorErrorCode.BROKEN_EXTRACTOR
         assert gwa.extractor_reports[1].url == urls[4]
-        assert gwa.extractor_reports[1].downloaded is False
+        assert gwa.extractor_reports[1].download_error_code is DownloadErrorCode.NOT_DOWNLOADED
         # download not called
         assert download_called_with is None
 
@@ -1299,8 +1369,10 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
         assert fi is not None
         nonlocal download_called_with
         download_called_with = fi
-        fi.downloaded = True
-        fi.update_downloaded()  # normally called by _download_collection
+        if isinstance(fi, FileCollection):
+            fi.downloaded = DownloadErrorCode.COLLECTION_COMPLETE
+        else:
+            fi.downloaded = DownloadErrorCode.DOWNLOADED
 
     monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
 
@@ -1322,11 +1394,11 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
     with GWARipper() as gwa:
         gwa.parse_and_download_submission(sub)
         assert download_called_with is redditinfo
-        assert redditinfo.downloaded is True
+        assert redditinfo.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
 
         assert len(gwa.extractor_reports) == 1
         assert gwa.extractor_reports[0] is redditinforep
-        assert gwa.extractor_reports[0].downloaded is redditinfo.downloaded
+        assert gwa.extractor_reports[0].download_error_code is redditinfo.downloaded
 
     # TODO extr ret none
     download_called_with = None
@@ -1348,7 +1420,7 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
 
         assert len(gwa.extractor_reports) == 1
         assert gwa.extractor_reports[0] is redditinforep
-        assert gwa.extractor_reports[0].downloaded is False
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.NOT_DOWNLOADED
 
 
 def test_pad_filename(setup_tmpdir, caplog):
@@ -1381,42 +1453,33 @@ def test_write_report(setup_tmpdir):
 
     ecode = ExtractorErrorCode
     reports = [
-            ExtractorReport('url1', ecode.NO_ERRORS),
-            ExtractorReport('url2col', ecode.ERROR_IN_CHILDREN),
-            ExtractorReport('url3', ecode.BANNED_TAG),
-            ExtractorReport('url4col', ecode.NO_SUPPORTED_AUDIO_LINK)
+            ExtractorReport('url1', ecode.NO_ERRORS, DownloadErrorCode.DOWNLOADED),
+            ExtractorReport('url2col', ecode.ERROR_IN_CHILDREN, DownloadErrorCode.COLLECTION_INCOMPLETE),
+            ExtractorReport('url3', ecode.BANNED_TAG, DownloadErrorCode.NOT_DOWNLOADED),
+            ExtractorReport('url4col', ecode.NO_SUPPORTED_AUDIO_LINK, DownloadErrorCode.COLLECTION_INCOMPLETE),
+            ExtractorReport('url5col', ecode.NO_ERRORS, DownloadErrorCode.COLLECTION_COMPLETE)
             ]
-
-    reports[0].downloaded = True
-    reports[1].downloaded = False
-    reports[2].downloaded = False
-    reports[3].downloaded = False
 
     reports[1].children = [
-            ExtractorReport('url2colurl1', ecode.NO_RESPONSE),
-            ExtractorReport('url2colurl2', ecode.NO_EXTRACTOR),
-            ExtractorReport('url2colurl3col', ecode.ERROR_IN_CHILDREN),
+            ExtractorReport('url2colurl1', ecode.NO_RESPONSE, DownloadErrorCode.NOT_DOWNLOADED),
+            ExtractorReport('url2colurl2', ecode.NO_EXTRACTOR, DownloadErrorCode.NOT_DOWNLOADED),
+            ExtractorReport('url2colurl3col', ecode.ERROR_IN_CHILDREN, DownloadErrorCode.COLLECTION_INCOMPLETE),
             ]
-
-    reports[1].children[0].downloaded = False
-    reports[1].children[1].downloaded = False
-    reports[1].children[2].downloaded = False
 
     reports[1].children[2].children = [
-            ExtractorReport('url2colurl3colurl1', ecode.NO_AUTHENTICATION),
-            ExtractorReport('url2colurl3colurl2', ecode.NO_ERRORS),
+            ExtractorReport('url2colurl3colurl1', ecode.NO_AUTHENTICATION, DownloadErrorCode.NOT_DOWNLOADED),
+            ExtractorReport('url2colurl3colurl2', ecode.NO_ERRORS, DownloadErrorCode.HTTP_ERR_NOT_FOUND),
             ]
-
-    reports[1].children[2].children[0].downloaded = False
-    reports[1].children[2].children[1].downloaded = True
 
     reports[3].children = [
-            ExtractorReport('url4colurl1', ecode.NO_ERRORS),
-            ExtractorReport('url4colurl2', ecode.BANNED_TAG),
+            ExtractorReport('url4colurl1', ecode.NO_ERRORS, DownloadErrorCode.SKIPPED_DUPLICATE),
+            ExtractorReport('url4colurl2', ecode.BANNED_TAG, DownloadErrorCode.NOT_DOWNLOADED),
             ]
 
-    reports[3].children[0].downloaded = True
-    reports[3].children[1].downloaded = False
+    reports[4].children = [
+            ExtractorReport('url5colurl1', ecode.NO_ERRORS, DownloadErrorCode.SKIPPED_DUPLICATE),
+            ExtractorReport('url5colurl2', ecode.NO_ERRORS, DownloadErrorCode.DOWNLOADED),
+            ]
 
     expected = [
             report_preamble,
@@ -1428,53 +1491,68 @@ def test_write_report(setup_tmpdir):
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url2col\">url2col</a>",
             "<div class='info'><span class='error '>ERROR_IN_CHILDREN</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>COLLECTION_INCOMPLETE</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl1\">url2colurl1</a>",
             "<div class='info'><span class='error '>NO_RESPONSE</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl2\">url2colurl2</a>",
             "<div class='info'><span class='error '>NO_EXTRACTOR</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection indent \">",
             "<span>Collection: </span><a href=\"url2colurl3col\">url2colurl3col</a>",
             "<div class='info'><span class='error '>ERROR_IN_CHILDREN</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>COLLECTION_INCOMPLETE</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl1\">url2colurl3colurl1</a>",
             "<div class='info'><span class='error '>NO_AUTHENTICATION</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl2\">url2colurl3colurl2</a>",
             "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>HTTP_ERR_NOT_FOUND</span></div>",
             "</div>",
             "</div>",  # urlcol2url3col
             "</div>",  # url2col
             "<div class=\"block \">",
             "<a href=\"url3\">url3</a>",
             "<div class='info'><span class='error '>BANNED_TAG</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url4col\">url4col</a>",
             "<div class='info'><span class='error '>NO_SUPPORTED_AUDIO_LINK</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>COLLECTION_INCOMPLETE</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url4colurl1\">url4colurl1</a>",
             "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
+            "<div class='info'><span class='success '>SKIPPED_DUPLICATE</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url4colurl2\">url4colurl2</a>",
             "<div class='info'><span class='error '>BANNED_TAG</span></div>",
-            "<div class='info'><span class='error '>NOT DOWNLOADED</span></div>",
+            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # url4col
+            "<div class=\"collection \">",
+            "<span>Collection: </span><a href=\"url5col\">url5col</a>",
+            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'><span class='success '>COLLECTION_COMPLETE</span></div>",
+            "<div class=\"block indent \">",
+            "<a href=\"url5colurl1\">url5colurl1</a>",
+            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'><span class='success '>SKIPPED_DUPLICATE</span></div>",
+            "</div>",
+            "<div class=\"block indent \">",
+            "<a href=\"url5colurl2\">url5colurl2</a>",
+            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
+            "</div>",
+            "</div>",  # url5col
     ]
 
     # context manager writes reports on exit so use without it here

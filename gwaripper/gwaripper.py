@@ -6,6 +6,7 @@ import datetime
 import re
 import urllib.request
 import urllib.error
+import dataclasses
 
 import praw
 
@@ -85,6 +86,13 @@ report_preamble = r"""
    in this or any previous runs! Files on the other hand will only have the downloaded
    flag if they were downloaded _this_ run!</p><br/>
 """
+
+
+@dataclasses.dataclass
+class DownloadCollectionResult:
+    any_audio_downloads: bool
+    dl_idx: int
+    error_code: dl.DownloadErrorCode
 
 
 class GWARipper:
@@ -190,6 +198,10 @@ class GWARipper:
             report = cur_list[idx]
             is_collection = bool(report.children)
             success = True if report.err_code == ExtractorErrorCode.NO_ERRORS else False
+            dl_success = True if report.download_error_code in (
+                    dl.DownloadErrorCode.DOWNLOADED,
+                    dl.DownloadErrorCode.SKIPPED_DUPLICATE,
+                    dl.DownloadErrorCode.COLLECTION_COMPLETE) else False
 
             contents.append(
                 f"<div class=\"{'collection ' if is_collection else 'block '}"
@@ -203,8 +215,8 @@ class GWARipper:
                 f"</span></div>")
             contents.append(
                 f"<div class='info'><span class='"
-                f"{'success ' if report.downloaded else 'error '}'>"
-                f"{'DOWNLOADED' if report.downloaded else 'NOT DOWNLOADED'}</span></div>")
+                f"{'success ' if dl_success else 'error '}'>"
+                f"{report.download_error_code.name}</span></div>")
             if not is_collection:
                 contents.append('</div>')
 
@@ -268,12 +280,12 @@ class GWARipper:
 
     def _download_file(self, info: FileInfo, author_name: Optional[str],
                        top_collection: Optional[FileCollection], file_index: int = 0,
-                       dl_idx: int = 1, dl_max: int = 1) -> Tuple[Optional[str], Optional[int]]:
+                       dl_idx: int = 1, dl_max: int = 1) -> Optional[str]:
         # TODO re-add request delay?
         already_downloaded = self.already_downloaded(info)
         if already_downloaded:
             logger.info("File was already downloaded, skipped URL: %s", info.page_url)
-            return None, None
+            return None
 
         if not author_name:
             author_name = UNKNOWN_USR_FOLDER
@@ -301,7 +313,7 @@ class GWARipper:
         self, info: FileInfo, author_name: Optional[str],
         top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
         file_index: int = 0, dl_idx: int = 1, dl_max: int = 1
-    ) -> Tuple[Optional[str], Optional[int]]:
+    ) -> str:
         """
         Will download the file to dl_root in a subfolder named like the reddit user name
         if that one is not available the extracted (from the page) author of the file gets
@@ -335,6 +347,11 @@ class GWARipper:
                                       prog_bar=True)
         except urllib.error.HTTPError as err:
             logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
+
+            try:
+                info.downloaded = dl.HTTP_ERR_TO_DL_ERR[err.code]
+            except KeyError:
+                info.downloaded = dl.DownloadErrorCode.HTTP_ERROR_OTHER
         except urllib.error.ContentTooShortError as err:
             logger.warning(err.reason)
             logger.warning("File information was not added to DB! Reddit selftext might "
@@ -346,22 +363,23 @@ class GWARipper:
                         "Containing root collection: %s",
                         info.reddit_info.url if info.reddit_info is not None
                         else info.parent.url)
+
         except urllib.error.URLError as err:
             logger.error("URL Error for %s: %s\nExtractor %s is probably broken! "
                          "Please report this error on github!", info.direct_url,
                          str(err.reason).strip(), info.extractor)
         else:
-            info.downloaded = True
+            info.downloaded = dl.DownloadErrorCode.DOWNLOADED
             info.id_in_db = file_info_id_in_db
-            return subpath, file_info_id_in_db
+            return subpath
 
-        return subpath, None
+        return subpath
 
     def _download_file_hls(
         self, info: FileInfo, author_name: Optional[str],
         top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
         file_index: int = 0, dl_idx: int = 1, dl_max: int = 1
-    ) -> Tuple[Optional[str], Optional[int]]:
+    ) -> str:
         file_info_id_in_db: Optional[int] = None
 
         logger.info("Wating for ffmpeg to finish...")
@@ -369,13 +387,14 @@ class GWARipper:
         if success and info.is_audio:
             file_info_id_in_db = self._add_to_db(info, None, filename)
             self.db_con.commit()
-            info.downloaded = True
+            info.downloaded = (
+                dl.DownloadErrorCode.DOWNLOADED if success else dl.DownloadErrorCode.EXTERNAL_ERROR)
             info.id_in_db = file_info_id_in_db
 
-        return subpath, file_info_id_in_db
+        return subpath
 
     def _download_collection(self, info: FileCollection, top_collection: Optional[FileCollection],
-                             dl_idx: int = 1):
+                             dl_idx: int = 1) -> DownloadCollectionResult:
         logger.info("Starting download of collection: %s", info.url)
 
         if top_collection is None:
@@ -388,6 +407,7 @@ class GWARipper:
         # NOTE: this function needs to be recursive, since otherwise collections
         # that had no (successful) audio downloads will still be added to the DB
 
+        download_err_code = dl.DownloadErrorCode.COLLECTION_COMPLETE
         any_audio_downloads = False
         with_file_idx = info.nr_files > 1
         rel_idx = 1
@@ -395,8 +415,11 @@ class GWARipper:
             # add FileCollections to DB here
             if isinstance(fi_or_fc, FileCollection):
                 # recursive call
-                any_dl, dl_idx = self._download_collection(fi_or_fc, top_collection, dl_idx=dl_idx)
-                any_audio_downloads = any_audio_downloads or any_dl
+                dl_collection_result = self._download_collection(fi_or_fc, top_collection, dl_idx=dl_idx)
+                dl_idx = dl_collection_result.dl_idx
+                any_audio_downloads = any_audio_downloads or dl_collection_result.any_audio_downloads
+                if dl_collection_result.error_code != dl.DownloadErrorCode.COLLECTION_COMPLETE:
+                    download_err_code = dl.DownloadErrorCode.COLLECTION_INCOMPLETE
             else:
                 fi: FileInfo = fi_or_fc
                 # rel_idx is 0-based
@@ -404,10 +427,17 @@ class GWARipper:
                         fi, author_name, top_collection,
                         rel_idx if with_file_idx else 0,
                         dl_idx=dl_idx, dl_max=top_collection.nr_files)
-                if fi.is_audio and fi.downloaded:
+                if fi.is_audio and fi.downloaded is dl.DownloadErrorCode.DOWNLOADED:
                     any_audio_downloads = True
                 rel_idx += 1
                 dl_idx += 1
+
+                if fi.downloaded not in (
+                        dl.DownloadErrorCode.DOWNLOADED, dl.DownloadErrorCode.SKIPPED_DUPLICATE):
+                    download_err_code = dl.DownloadErrorCode.COLLECTION_INCOMPLETE
+
+        # set download status once a collection is finished
+        info.downloaded = download_err_code
 
         # only file collections containing audio files get added to db
         if any_audio_downloads:
@@ -423,10 +453,7 @@ class GWARipper:
                 with self.db_con:
                     self._add_to_db_collection(info, author_name)
 
-            # TODO add status codes for downloads
-            info.update_downloaded()
-
-        return any_audio_downloads, dl_idx
+        return DownloadCollectionResult(any_audio_downloads, dl_idx, download_err_code)
 
     # TODO: @CleanUp this RedditInfo stuff is clunky, generalize it to just be added metadata
     # like storing upvotes etc.
@@ -581,10 +608,9 @@ class GWARipper:
             self.set_missing_reddit_db(duplicate['id'], info)
 
         if duplicate:
-            info.already_downloaded = True
+            info.downloaded = dl.DownloadErrorCode.SKIPPED_DUPLICATE
             return True
         else:
-            info.already_downloaded = False
             return False
 
     def set_missing_reddit_db(self, audio_file_id: int, info: FileInfo) -> None:

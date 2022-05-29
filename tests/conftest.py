@@ -4,5 +4,10 @@ import pytest
 # pytest_configure is automatically called
 def pytest_configure(config):
     config.addinivalue_line(
-        "markers", "dltest: tests downloading audio files, which takes several minutes"
+        "markers",
+        "dltest: tests downloading audio files, which takes several minutes"
+    )
+    config.addinivalue_line(
+        "markers",
+        "sgasm: for disabling online sgasm tests if it is slow/offline"
     )

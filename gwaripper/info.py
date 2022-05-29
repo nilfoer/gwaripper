@@ -12,6 +12,8 @@ from typing_extensions import Literal
 
 from collections import deque
 
+from .download import DownloadErrorCode
+
 # https://www.stefaanlippens.net/circular-imports-type-hints-python.html
 # only reason for possible circular dependency here is because
 # of type hinting -> use a *conditional import* that is only active in
@@ -268,9 +270,7 @@ class FileInfo:
         self.parent = parent
         # NOTE: automatically set/reset when parent gets set
         self.reddit_info = reddit_info
-        self._downloaded: bool = False
-        # already downloaded and in db; gets set by already_downloaded
-        self.already_downloaded: bool = False
+        self._downloaded: DownloadErrorCode = DownloadErrorCode.NOT_DOWNLOADED
         self.id_in_db: Optional[int] = None
         self.download_type = download_type
         self.report: Optional[ExtractorReport] = None
@@ -283,10 +283,10 @@ class FileInfo:
         return self._downloaded
 
     @downloaded.setter
-    def downloaded(self, value: bool):
+    def downloaded(self, value: DownloadErrorCode):
         self._downloaded = value
         if self.report is not None:
-            self.report.downloaded = value
+            self.report.download_error_code = value
 
     @property
     def parent(self):
@@ -413,8 +413,9 @@ class FileCollection:
                                   children_iter_dfs(self._children, file_info_only=True))
 
         self._parent: Optional[FileCollection] = None
-        # NOTE: a collection only counts as downloaded if all of it's children are
-        self._downloaded: bool = False
+        # NOTE: a collection only counts as downloaded if all of it's children were downloaded
+        # (including previous runs/already downloaded children)
+        self._downloaded: DownloadErrorCode = DownloadErrorCode.COLLECTION_INCOMPLETE
         self.report: Optional[ExtractorReport] = None
 
     def __str__(self):
@@ -467,22 +468,6 @@ class FileCollection:
         collection.parent = self
         self.nr_files += collection.nr_files
 
-    # recursive!
-    # traverses children and children's children to get downloaded
-    def update_downloaded(self) -> bool:
-        all_downloaded = True
-        for child in self.children:
-            if isinstance(child, FileCollection):
-                downloaded = child.update_downloaded()
-            else:
-                # already_downloaded also counts as downloaded for collections
-                downloaded = child.downloaded or child.already_downloaded
-
-            all_downloaded = all_downloaded and downloaded
-
-        self.downloaded = all_downloaded
-        return all_downloaded
-
     @property
     def subpath(self) -> str:
         if self.nr_files >= 3:
@@ -500,10 +485,10 @@ class FileCollection:
         return self._downloaded
 
     @downloaded.setter
-    def downloaded(self, value: bool):
+    def downloaded(self, value: DownloadErrorCode):
         self._downloaded = value
         if self.report is not None:
-            self.report.downloaded = value
+            self.report.download_error_code = value
 
     @property
     def parent(self):

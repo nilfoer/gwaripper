@@ -15,6 +15,7 @@ from ..exceptions import (
         )
 from .. import config
 from ..info import FileInfo, FileCollection
+from ..download import DownloadErrorCode
 
 logger = logging.getLogger(__name__)
 
@@ -49,11 +50,13 @@ class ExtractorReport:
 
     children: List['ExtractorReport']
 
-    def __init__(self, url: str, err_code: ExtractorErrorCode):
+    def __init__(self, url: str, err_code: ExtractorErrorCode,
+                 download_error_code: DownloadErrorCode = DownloadErrorCode.NOT_DOWNLOADED):
         self.url = url
         self.err_code = err_code
+        # TODO make sure this uses COLLECTION_INCOMPLETE as default for collections?
+        self.download_error_code = download_error_code
         self.children = []
-        self.downloaded: bool = False
 
 
 T = TypeVar('T')

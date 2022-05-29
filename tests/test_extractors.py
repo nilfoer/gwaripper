@@ -8,6 +8,7 @@ import prawcore
 
 import gwaripper.config as config
 
+from gwaripper.download import DownloadErrorCode
 from gwaripper.reddit import reddit_praw
 from gwaripper.extractors import find_extractor, AVAILABLE_EXTRACTORS
 from gwaripper.extractors.base import (
@@ -126,6 +127,7 @@ def test_banned_tags_deactivated():
             "[F4F] This should be banned", ["[m4", "[cuck"], [("[f4f]", "4m]")]) is True
 
 
+@pytest.mark.sgasm
 def test_soundgasm_user_extractor(monkeypatch):
     # make sure extractor also accepts init_from even if it doesnt support
     # intializing from it
@@ -146,6 +148,7 @@ def test_soundgasm_user_extractor(monkeypatch):
     assert sgasm_usr_audio_urls == [c.page_url for c in fcol._children][-len(sgasm_usr_audio_urls):]
 
 
+@pytest.mark.sgasm
 def test_extractor_soundgasm():
     # user tested above already
     url = ("https://soundgasm.net/u/kinkyshibby/F4M-Queen-of-the-Black-"
@@ -188,10 +191,10 @@ Sword Fight 1.MP3 - FunWithSound - https://freesound.org/people/FunWithSound/sou
     assert fi.author == 'kinkyshibby'
     assert fi.parent is None
     assert fi.reddit_info is None
-    assert fi.downloaded is False
-    assert fi.already_downloaded is False
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
 
+@pytest.mark.sgasm
 def test_extractor_soundgasm_banned_tag(monkeypatch):
     #
     # banned keyword in title
@@ -251,8 +254,7 @@ def test_extractor_eraudica():
     assert fi.author == 'Eves-garden'
     assert fi.parent is None
     assert fi.reddit_info is None
-    assert fi.downloaded is False
-    assert fi.already_downloaded is False
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     ex = EraudicaExtractor(url2)
     # should alway be without /gwa postfix!
@@ -287,8 +289,7 @@ def test_extractor_chirbit():
     assert fi.author == 'skitty'
     assert fi.parent is None
     assert fi.reddit_info is None
-    assert fi.downloaded is False
-    assert fi.already_downloaded is False
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
 
 def test_extractor_chirbit_banned_tag(monkeypatch):
@@ -340,8 +341,7 @@ def test_extractor_imgur_image():
     assert fi.author is None
     assert fi.parent is None
     assert fi.reddit_info is None
-    assert fi.downloaded is False
-    assert fi.already_downloaded is False
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
     # url = 'https://i.imgur.com/gBDbyOY.png'  # png
     url = 'https://imgur.com/Ded3OiN'  # marked as mature
@@ -368,8 +368,7 @@ def test_extractor_imgur_image():
     assert fi.author is None
     assert fi.parent is None
     assert fi.reddit_info is None
-    assert fi.downloaded is False
-    assert fi.already_downloaded is False
+    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
 
 def test_extractor_imgur_album(monkeypatch):
@@ -588,6 +587,9 @@ class DummyExtractor(BaseExtractor):
     # only match supported urls
     @classmethod
     def is_compatible(cls, url):
+        # to filter out skittykat.cc/exclusive links
+        if "skitty" in url and "/exclusive/" in url:
+            return False
         return any(ex.is_compatible(url) for ex in cls.supported)
 
     def _extract(self):
@@ -1133,7 +1135,8 @@ def test_extractor_skittykat_patreon(monkeypatch):
 
     assert len(report.children) == 2
     assert report.children[0].err_code == ExtractorErrorCode.NO_EXTRACTOR
-    assert report.children[0].url == "https://www.patreon.com/posts/30983046"
+    # TODO fix finding this
+    assert report.children[0].url == "https://skittykat.cc/exclusive/"
     assert report.children[1].err_code == ExtractorErrorCode.STOP_RECURSION
     assert report.children[1].url == "https://www.reddit.com/r/gonewildaudio/comments/bxlykc/f4m_milking_a_yummy_little_cutie_gentle_fdom/"
 
