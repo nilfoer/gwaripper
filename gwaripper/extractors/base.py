@@ -121,6 +121,8 @@ class BaseExtractor(Generic[T]):
             re.compile(r"^(?:https?://)?(?:www\.)?patreon\.com/", re.IGNORECASE),
             re.compile(r"^(?:https?://)?(?:www\.)?psstaudio\.com/", re.IGNORECASE),
             re.compile(r"^(?:https?://)?(?:www\.)?erocast\.me/", re.IGNORECASE),
+            # NOTE: so users can see there should be an audio on patreon
+            re.compile(r"^(?:https?://)?(?:www\.)?skittykat\.cc/exclusive/$", re.IGNORECASE),
             ]
 
 
