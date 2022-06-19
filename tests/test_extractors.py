@@ -199,16 +199,15 @@ def test_extractor_soundgasm_banned_tag(monkeypatch):
     #
     # banned keyword in title
     #
-    def patched_banned_tag(title, keywordlist=['cheating]'], t12=[]):
+    def patched_banned_tag(title, keywordlist=['f4tf'], t12=[]):
         return title_has_banned_tag(title, keywordlist, t12)
 
     # patch imported name in reddit module instead of definition in base module
     monkeypatch.setattr('gwaripper.extractors.soundgasm.title_has_banned_tag', patched_banned_tag)
-    url = ("https://soundgasm.net/u/belle_in_the_woods/F4M-Using-the-Ass-For-Evil"
-           "-Part-1-JOEJOIcheatingteasingbitchystrippingspankingmasturbationperv-on-my-ass")
+    url = "https://soundgasm.net/u/skitty/Kidnapped-by-Your-Jealous-Little-Roommate-F4TF"
 
     ex = SoundgasmExtractor(url, init_from=None)
-    assert ex.author == "belle_in_the_woods"
+    assert ex.author == "skitty"
     fi, report = ex._extract()
     assert fi is None
     assert report.url == url
@@ -592,6 +591,10 @@ class DummyExtractor(BaseExtractor):
             return False
         return any(ex.is_compatible(url) for ex in cls.supported)
 
+    @property
+    def page_url(self):
+        return self.url
+
     def _extract(self):
         return (FileInfo(self.__class__, True, None, self.url,
                          None, None, None, None, None),
@@ -838,7 +841,8 @@ def test_base_extract(monkeypatch, caplog):
     # check that init_from correctly passed
     #
     # patch so we can inspect the extractor afterwards
-    DummyExtractor._extract = lambda x: (x, ExtractorReport('a', exerr.NO_ERRORS))
+    monkeypatch.setattr(
+        "test_extractors.DummyExtractor._extract", lambda x: (x, ExtractorReport('a', exerr.NO_ERRORS)))
     extr, _ = DummyExtractor.extract('url1234', init_from='foo34bar82')
     assert extr.url == 'url1234'
     assert extr.init_from == 'foo34bar82'
@@ -1144,7 +1148,7 @@ def test_extractor_skittykat_patreon(monkeypatch):
 def test_extractor_skittykat_sg_and_reddit(monkeypatch):
     # NOTE: use DummyExtractor since we only care about the extracted urls
     # but make sure to still return RedditExtractor since that is used
-    # to avoid extracting forther reddit submissions
+    # to avoid extracting further reddit submissions
     backup_find = find_extractor  # save orig func
     mock_findex = lambda x: (RedditExtractor if RedditExtractor.is_compatible(x)
                              else DummyExtractor if DummyExtractor.is_compatible(x) else
