@@ -514,12 +514,19 @@ class GWARipper:
 
         # update the parent ids of all our audio files or collections
         for fi_or_fc in file_col.children:
-            if isinstance(fi_or_fc, FileCollection) and fi_or_fc.id_in_db is not None:
-                c.execute("UPDATE FileCollection SET parent_id = ? WHERE id = ?",
-                          (file_col.id_in_db, fi_or_fc.id_in_db))
-            elif isinstance(fi_or_fc, FileInfo) and fi_or_fc.is_audio and fi_or_fc.downloaded is True:
-                c.execute("UPDATE AudioFile SET collection_id = ? WHERE id = ?",
-                          (file_col.id_in_db, fi_or_fc.id_in_db))
+            if isinstance(fi_or_fc, FileCollection):
+                fc: FileCollection = fi_or_fc
+                if fc.id_in_db is not None:
+                    c.execute("UPDATE FileCollection SET parent_id = ? WHERE id = ?",
+                              (file_col.id_in_db, fc.id_in_db))
+            elif isinstance(fi_or_fc, FileInfo):
+                fi: FileInfo = fi_or_fc
+                # mypy (0.8+0.961) does not detect the type error of the comparison between
+                # bool and DownloadErrorCode (fi.downloaded is True)
+                # needs --strict-equality to detect it
+                if fi.is_audio and fi.downloaded is dl.DownloadErrorCode.DOWNLOADED:
+                    c.execute("UPDATE AudioFile SET collection_id = ? WHERE id = ?",
+                              (file_col.id_in_db, fi.id_in_db))
 
         return author, False
 
@@ -591,7 +598,7 @@ class GWARipper:
             (SELECT id FROM Alias WHERE name = :alias_name)
         )""", audio_file_dict)
 
-        return c.lastrowid
+        return cast(int, c.lastrowid)
 
     def already_downloaded(self, info: FileInfo) -> bool:
         """

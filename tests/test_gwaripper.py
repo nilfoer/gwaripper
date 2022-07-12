@@ -508,6 +508,64 @@ def test_add_to_db_ri(setup_db_2col_5audio):
             test_db_fn,
             query_str.format(where_expression="WHERE fc.id > 2")) == [tuple(r) for r in expected]
 
+    #
+    # collection_id of all children that are AUDIOS and were DOWNLOADED are updated
+    #
+
+    ri.permalink = 'collection_id-set'
+    ri.title = "Collection id set test"
+    ri.author = "collection_id"
+
+    fi1 = FileInfo(object, True, "m4a",
+                   "url1",
+                   *([None] * 5))
+    fi1.id_in_db = 1
+    fi1.downloaded = DownloadErrorCode.DOWNLOADED
+    fi2 = FileInfo(object, True, "m4a",
+                   "url1",
+                   *([None] * 5))
+    fi2.id_in_db = 2
+    fi2.downloaded = DownloadErrorCode.DOWNLOADED
+    fi3 = FileInfo(object, True, "m4a",
+                   "url1",
+                   *([None] * 5))
+    fi3.id_in_db = 3
+    fi3.downloaded = DownloadErrorCode.EXTERNAL_ERROR
+    # collection_id will not be updated since not audio
+    fi4 = FileInfo(object, False, "jpg",
+                   "url1",
+                   *([None] * 5))
+    # NOTE: this would not have an entry in the db, just giving it one for testing
+    fi4.id_in_db = 4
+
+    # should still have parent_id set if it has a id_in_db
+    fc1 = FileCollection(object, "collection_id set test", None, None, None)
+    fc1.id_in_db = 1
+    fc1.downloaded = DownloadErrorCode.COLLECTION_INCOMPLETE
+
+    ri._children = [fc1, fi1, fi2, fi3, fi4]
+
+    with GWARipper() as gwa:
+        assert gwa._add_to_db_ri(ri) == (6, ri.author)
+        gwa.db_con.commit()  # force commit
+
+    # fc1 has collectin_id set to ri's id_in_db
+    assert get_all_rowtuples_db(
+        test_db_fn,
+        "SELECT id, parent_id FROM FileCollection WHERE id = 1") == [(1, 6)]
+    # fi1+2 have their collection_id set to ri's id_in_db 3+4 have their old collection_id value
+    assert get_all_rowtuples_db(
+        test_db_fn,
+        "SELECT id, collection_id FROM AudioFile ORDER BY id") == [
+                (1, 6),
+                (2, 6),
+                # file not downloaded
+                (3, 1),
+                (4, None),
+                (5, 2),
+                (6, None),
+                ]
+
 
 def test_already_downloaded(monkeypatch, setup_db_2col_5audio):
     tmpdir, test_db_fn = setup_db_2col_5audio

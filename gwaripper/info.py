@@ -279,7 +279,7 @@ class FileInfo:
         return f"FileInfo<{self.page_url}>"
 
     @property
-    def downloaded(self):
+    def downloaded(self) -> DownloadErrorCode:
         return self._downloaded
 
     @downloaded.setter
@@ -289,11 +289,11 @@ class FileInfo:
             self.report.download_error_code = value
 
     @property
-    def parent(self):
+    def parent(self) -> Optional['FileCollection']:
         return self._parent
 
     @parent.setter
-    def parent(self, parent: 'FileCollection'):
+    def parent(self, parent: Optional['FileCollection']):
         # NOTE: automatically sets/finds reddit_info if there is one!
         self._parent = parent
 
@@ -305,6 +305,9 @@ class FileInfo:
             parent = parent.parent
 
     def get_topmost_parent(self) -> Optional['FileCollection']:
+        if not self.parent:
+            return None
+
         p = self.parent
         while True:
             if not p.parent:
@@ -477,11 +480,11 @@ class FileCollection:
 
     # @CleanUp this is clunky
     @property
-    def full_url(self):
+    def full_url(self) -> str:
         return self.url
 
     @property
-    def downloaded(self):
+    def downloaded(self) -> DownloadErrorCode:
         return self._downloaded
 
     @downloaded.setter
@@ -491,7 +494,7 @@ class FileCollection:
             self.report.download_error_code = value
 
     @property
-    def parent(self):
+    def parent(self) -> Optional['FileCollection']:
         return self._parent
 
     @parent.setter
