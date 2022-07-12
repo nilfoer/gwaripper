@@ -718,6 +718,9 @@ def search_normal_columns(
     # build conditionals for select string
 
     if title_search_str:
+        # wrap search str in double quotes so "-" can be used inside it
+        title_search_str = " ".join(f'"{word}"' if "-" in word else word
+                                    for word in title_search_str.split(" "))
         # use full-text-search for titles
         cond_statements.append(
                 f"{'AND' if cond_statements else 'WHERE'} AudioFile.id IN "
