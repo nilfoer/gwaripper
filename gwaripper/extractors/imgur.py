@@ -30,7 +30,7 @@ class ImgurImageExtractor(BaseExtractor[Dict[str, Any]]):
     IMAGE_FILE_URL_RE: ClassVar[Pattern] = re.compile(
             r"(?:https?://)?i\.imgur\.com/(\w{5,7})\.(\w+)")
     IMAGE_URL_RE: ClassVar[Pattern] = re.compile(
-            r"^(?:https?://)?(?:www\.|m\.)?imgur\.com/(\w{5,7})$")
+            r"^(?:https?://)?(?:www\.|m\.)?imgur\.com/(\w{5,7})(?:\?.*)?$")
 
     IMAGE_FILE_URL_FORMAT: ClassVar[str] = "https://i.imgur.com/{image_hash}.{extension}"
 
