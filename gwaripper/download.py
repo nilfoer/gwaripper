@@ -247,7 +247,7 @@ def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
         time.sleep(time_to_sleep)
 
     if show_progress:
-        print("\nMerging parts with ffmpeg", end="")
+        print("\nMerging parts with ffmpeg")
 
     # write concatenation list for ffmpeg
     # passing it through stdin using -i pipe: is wonky
