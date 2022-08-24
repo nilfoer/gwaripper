@@ -382,7 +382,6 @@ class GWARipper:
     ) -> str:
         file_info_id_in_db: Optional[int] = None
 
-        logger.info("Wating for ffmpeg to finish...")
         success = dl.download_hls_ffmpeg(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
         if success and info.is_audio:
             file_info_id_in_db = self._add_to_db(info, None, filename)

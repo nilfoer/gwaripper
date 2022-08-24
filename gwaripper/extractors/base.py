@@ -15,7 +15,7 @@ from ..exceptions import (
         )
 from .. import config
 from ..info import FileInfo, FileCollection
-from ..download import DownloadErrorCode
+from ..download import DownloadErrorCode, download_text
 
 logger = logging.getLogger(__name__)
 
@@ -262,34 +262,7 @@ class BaseExtractor(Generic[T]):
     def get_html(cls, url: str,
                  additional_headers: Optional[Dict[str, str]] = None) -> Tuple[
                          Optional[str], Optional[int]]:
-        res: Optional[str] = None
-        http_code: Optional[int] = None
-
-        req = urllib.request.Request(url, headers=cls.headers)
-        if additional_headers is not None:
-            for k, v in additional_headers.items():
-                req.add_header(k, v)
-
-        try:
-            site = urllib.request.urlopen(req)
-        except urllib.error.HTTPError as err:
-            http_code = err.code
-            logger.warning("HTTP Error %s: %s: \"%s\"", err.code, err.reason, url)
-        except urllib.error.URLError as err:
-            # Often, URLError is raised because there is no network connection
-            # (no route to the specified server), or the specified server
-            # doesn’t exist
-            logger.warning("URL Error: %s (url: %s)", err.reason, url)
-        else:
-            response = site.read()
-            site.close()
-
-            # try to read encoding from headers otherwise use utf-8 as fallback
-            encoding = site.headers.get_content_charset()
-            res = response.decode(encoding.lower() if encoding else "utf-8")
-            logger.debug("Getting html done!")
-
-        return res, http_code
+        return download_text(cls.headers, url, additional_headers=additional_headers)
 
 
 def title_has_banned_tag(

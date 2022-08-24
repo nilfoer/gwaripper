@@ -4,10 +4,14 @@ import urllib.request
 import urllib.error
 import logging
 import subprocess
+import re
+import time
 
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 from enum import Enum, auto, unique
 from urllib.error import ContentTooShortError
+
+from . import config
 
 logger = logging.getLogger(__name__)
 
@@ -185,16 +189,127 @@ def prog_bar_dl(blocknum: int, blocksize: int, totalsize: int) -> None:
     sys.stdout.flush()
 
 
-def download_hls_ffmpeg(m3u8_url, filename, prob_bar: bool = False) -> bool:
+PARTS_RE = re.compile(r"^(https?://.*\.ts$)", re.MULTILINE)
+
+
+def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
+    # TODO: add max retries or timeout
+    res, err_code = download_text(DEFAULT_HEADERS, m3u8_url)
+    if not res:
+        logger.error("Failed to get m3u8 playlist")
+        return False
+
+    parts = PARTS_RE.findall(res)
+
+    i = 0
+    num_parts = len(parts)
+    # NOTE: default of 1 seems to work for erocast, which results in a default sleep time of 0.5s
+    # in seconds
+    backoff_factor = 1 
+    retries = 0
+    # in seconds
+    max_backoff = 64
+
+    tmp_dir = os.path.join(config.get_root(), "_tmp")
+    os.makedirs(tmp_dir, exist_ok=True)
+    ts_files = []
+
+    print("Downloading TS-parts of the m3u8 playlist:")
+    while i < num_parts:
+        url = parts[i]
+        rel_fn = url.rsplit("/", 1)[1]
+        full_fn = os.path.join(tmp_dir, rel_fn)
+
+        if show_progress:
+            print(f"\r{i + 1}/{num_parts}", end="")
+
+        try:
+            download_in_chunks(url, full_fn, headers=DEFAULT_HEADERS)
+        except ContentTooShortError:
+            # retry
+            retries += 1
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                logger.debug("Hit request limit while downloading... backing off...", )
+                # too many requests -> sleep more and retry
+                retries += 1
+            else:
+                raise e
+        else:
+            i += 1
+            # a successful attempt decrease the retries and thus the sleeping time
+            # otherwise we might be stuck at the max_backoff
+            retries = max(0, retries - 1)
+            # add to ts_files after successful download
+            ts_files.append(rel_fn)
+
+        time_to_sleep = min(max_backoff, backoff_factor * 2 ** (retries - 1))
+        time.sleep(time_to_sleep)
+
+    if show_progress:
+        print("\nMerging parts with ffmpeg", end="")
+
+    # write concatenation list for ffmpeg
+    # passing it through stdin using -i pipe: is wonky
+    # NOTE: we need to use paths relative to the concat file list, since / and \ etc.
+    # are not considered safe characters
+    concat_list_fn = os.path.join(tmp_dir, "parts_list.txt")
+    with open(concat_list_fn, "w", encoding="utf-8") as f:
+        f.write("\n".join(f"file '{ts}'" for ts in ts_files))
+
     # -vn: no vieo; -acodec copy: copy audio codec
-    args = ['ffmpeg', '-hide_banner', '-i', m3u8_url, '-vn', '-acodec', 'copy', filename]
+    # NOTE: the path to the concat file apparently needs to use all / even on Windows
+    args = ['ffmpeg', '-hide_banner', '-f', 'concat', '-i', concat_list_fn.replace("\\", "/"),
+            '-vn', '-acodec', 'copy', filename]
+    ffmpeg_success = False
     try:
         proc = subprocess.run(args, capture_output=True, check=True)
     except subprocess.CalledProcessError as err:
-        logger.error("HLS download FFmpeg error: %s", str(err))
+        logger.error("FFmpeg concatentation error: %s", str(err))
         logger.debug("FFmpeg stdout: %s", err.stdout)
         logger.debug("FFmpeg stderr: %s", err.stderr)
-        return False
     else:
-        return True
+        ffmpeg_success = True
 
+    # clean up
+    os.remove(concat_list_fn)
+    for ts in ts_files:
+        try:
+            os.remove(os.path.join(tmp_dir, ts))
+        except FileNotFoundError:
+            pass
+
+    return ffmpeg_success
+
+
+def download_text(headers, url: str,
+             additional_headers: Optional[Dict[str, str]] = None) -> Tuple[
+                     Optional[str], Optional[int]]:
+    res: Optional[str] = None
+    http_code: Optional[int] = None
+
+    req = urllib.request.Request(url, headers=headers)
+    if additional_headers is not None:
+        for k, v in additional_headers.items():
+            req.add_header(k, v)
+
+    try:
+        site = urllib.request.urlopen(req)
+    except urllib.error.HTTPError as err:
+        http_code = err.code
+        logger.warning("HTTP Error %s: %s: \"%s\"", err.code, err.reason, url)
+    except urllib.error.URLError as err:
+        # Often, URLError is raised because there is no network connection
+        # (no route to the specified server), or the specified server
+        # doesn’t exist
+        logger.warning("URL Error: %s (url: %s)", err.reason, url)
+    else:
+        response = site.read()
+        site.close()
+
+        # try to read encoding from headers otherwise use utf-8 as fallback
+        encoding = site.headers.get_content_charset()
+        res = response.decode(encoding.lower() if encoding else "utf-8")
+        logger.debug("Getting html done!")
+
+    return res, http_code
