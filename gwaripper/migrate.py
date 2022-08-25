@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # so we don't have to read all migration scripts every time
-LATEST_VERSION = 1
+LATEST_VERSION = 2
 VERSION_TABLE = 'GWAR_Version'
 MIGRATIONS_DIRNAME = 'migrations'
 # migrations dir has to be a sub-folder of the MODULE_DIR

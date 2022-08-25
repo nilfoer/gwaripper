@@ -157,8 +157,8 @@ def test_set_missing_reddit(setup_db_2col_5audio_without_reddit) -> None:
     fi.parent = ri
 
     expected = [
-        # id, col_id, downloaded_with_collection, date
-        (1, 1, 0, '2020-11-13',
+        # id, col_id, date
+        (1, 1, '2020-11-13',
          # descr
          '[F4M] [Gentle Fdom] [Size difference] [Thicc] [Monster Mommy] [Breast play] '
          '[Outercourse] [Handjob] [Cozy blanket] [Kissing] [Thighjob] [Pinning you '
@@ -203,7 +203,7 @@ def test_set_missing_reddit(setup_db_2col_5audio_without_reddit) -> None:
     # obv. not downloade as part of an collection
     with open(os.path.join(tmpdir, "skitty",
                            # AudioFile.filename
-                           expected[0][5] + ".txt"), "r") as f:
+                           expected[0][4] + ".txt"), "r") as f:
         assert f.read() == (f"Title: {ri.title}\nPermalink: {ri.permalink}\n"
                             f"Selftext:\n\n{ri.selftext}")
 
@@ -313,7 +313,7 @@ def test_add_to_db(setup_db_2col_5audio):
     expected = []
 
     expected.append(
-            [7, 1, 1, time.strftime("%Y-%m-%d"), "This is another description",
+            [7, 1, time.strftime("%Y-%m-%d"), "This is another description",
              "generated [file] [name].mp3",
              "Best title [SFW]", "https://soundgasm.net/testy_user/Best-title-SFW",
              # 6 = alias_id which was added
@@ -321,7 +321,7 @@ def test_add_to_db(setup_db_2col_5audio):
             )
 
     with GWARipper() as gwa:
-        # collection_id set -> in db + downloaded_with_collection set
+        # collection_id set -> in db
         # arist_id set on alias if info.reddit_info
         gwa._add_to_db(fi, 1, "generated [file] [name].mp3")
         gwa.db_con.commit()  # force commit
@@ -342,7 +342,7 @@ def test_add_to_db(setup_db_2col_5audio):
         gwa.db_con.commit()  # force commit
 
     expected.append(
-            [8, 2, 1, time.strftime("%Y-%m-%d"), "This is another description",
+            [8, 2, time.strftime("%Y-%m-%d"), "This is another description",
              "generated [file] [name].mp3",
              "Best title [SFW]", fi.page_url,
              7, None, 0, fi.author, None, None, None]
@@ -364,7 +364,7 @@ def test_add_to_db(setup_db_2col_5audio):
         gwa.db_con.commit()  # force commit
 
     expected.append(
-            [9, None, 0, time.strftime("%Y-%m-%d"), "This is another description",
+            [9, None, time.strftime("%Y-%m-%d"), "This is another description",
              "filename name ... [file] [name].mp3",
              "Best title [SFW]", fi.page_url,
              8, None, 0, fi.author, None, None, None]
@@ -387,7 +387,7 @@ def test_add_to_db(setup_db_2col_5audio):
         gwa.db_con.commit()  # force commit
 
     expected.append(
-            [10, None, 0, time.strftime("%Y-%m-%d"), "This is another description",
+            [10, None, time.strftime("%Y-%m-%d"), "This is another description",
              "filename name ... [file] [name].mp3",
              "Best title [SFW]", fi.page_url,
              5, None, 0, fi.author, 2, 2, fi.author]

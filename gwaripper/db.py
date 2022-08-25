@@ -45,9 +45,6 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 CREATE TABLE AudioFile(
                     id INTEGER PRIMARY KEY ASC,
                     collection_id INTEGER,
-                    -- whether the collection_id was present at the time
-                    -- of downloading the file (to figure out if to use collection's path)
-                    downloaded_with_collection INTEGER NOT NULL DEFAULT 0,
                     date DATE NOT NULL,
                     description TEXT,
                     filename TEXT NOT NULL,
@@ -126,7 +123,6 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 SELECT
                     AudioFile.id,
                     AudioFile.collection_id,
-                    AudioFile.downloaded_with_collection,
                     AudioFile.date,
                     AudioFile.description,
                     AudioFile.filename,
@@ -317,6 +313,9 @@ def convert_or_escape_to_str(column_value):
 
 
 def export_to_sql(filename, db_con):
+    # NOTE: does not support contentless or external content FTS tables
+    # NOTE: official iterdump() also breaks when using fts table with
+    #       contentless or external content table
     row_fac_bu = db_con.row_factory
     db_con.row_factory = sqlite3.Row
 
@@ -327,8 +326,8 @@ def export_to_sql(filename, db_con):
     # store all full text search names here so we can later filter out
     # shadow tables that automatically get created when creating the
     # fts table
-    omit_shadow_tables = [r['name'] for r in sql_master
-                          if re.search(r'using fts\d\(', r['sql'], re.IGNORECASE)]
+    fts_table_names = [r['name'] for r in sql_master
+                       if r['sql'] and re.search(r'using fts\d\(', r['sql'], re.IGNORECASE)]
 
     # sql statement is exactly the same as when table/index/trigger was
     # created, including comments
@@ -350,13 +349,15 @@ def export_to_sql(filename, db_con):
             # NOTE: maybe we omit some configuration by not copying values from _config?
             prefix = row['name'].rsplit('_', 1)[0]
             # compare length so we don't omit the fts table itself
-            if any(1 for tbl_name in omit_shadow_tables
+            if any(1 for tbl_name in fts_table_names
                    if len(row['name']) > len(tbl_name) and tbl_name == prefix):
                 continue
 
             # filter shadow tables created automatically by fts tables
             table_names.append(row['name'])
             # create all tables first
+            result.append(f"{row['sql']};")
+        elif type_name == 'view':
             result.append(f"{row['sql']};")
         else:
             assert 0
@@ -382,6 +383,48 @@ def export_to_sql(filename, db_con):
         f.write("\n".join(result))
 
     db_con.row_factory = row_fac_bu
+
+
+def db_to_sql_insert_only(db_con: sqlite3.Connection) -> str:
+    # NOTE: will not collect insert statements from external content FTS tables
+    row_fac_bu = db_con.row_factory
+    db_con.row_factory = sqlite3.Row
+
+    c = db_con.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name")
+    sql_master = c.fetchall()
+
+    fts_tables = [r['name'] for r in sql_master
+                  if re.search(r'using fts\d\(', r['sql'], re.IGNORECASE)]
+
+    result: List[str] = ["PRAGMA foreign_keys=off;", "BEGIN TRANSACTION;"]
+    # insert all the values
+    for r in sql_master:
+        tbl_name = r['name']
+        # filter out contentless and external content fts tables
+        if tbl_name in fts_tables and "content=" in r['sql']:
+            continue
+        # fts shadow have name of the form: f'{fts_table_name}_{subtable}'
+        # where subtable can be data, config, docsize and more
+        prefix = tbl_name.rsplit('_', 1)[0]
+        # compare length so we don't omit the fts table itself
+        if any(1 for fts_name in fts_tables
+               if len(r['name']) > len(fts_name) and fts_name == prefix):
+            continue
+
+        table_rows = c.execute(f"SELECT * FROM {tbl_name}").fetchall()
+        if len(table_rows) > 0:
+            result.append(f"INSERT INTO \"{tbl_name}\" VALUES")
+        for i, tr in enumerate(table_rows):
+            result.append(f"({','.join(convert_or_escape_to_str(c) for c in tr)})"
+                          f"{';' if i == len(table_rows)-1 else ','}")
+
+    result.append("COMMIT;")
+    result.append("PRAGMA foreign_keys=on;")
+
+    db_con.row_factory = row_fac_bu
+
+    return "\n".join(result)
 
 
 def backup_db(db_path: str, bu_dir: str,

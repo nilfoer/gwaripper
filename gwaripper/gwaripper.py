@@ -577,7 +577,6 @@ class GWARipper:
         # set vals contained in reddit_info to None(Python -> SQLITE: NULL)
         audio_file_dict: Dict[str, Optional[Union[str, int, datetime.date]]] = {
             "collection_id": collection_id,
-            "downloaded_with_collection": 1 if collection_id is not None else 0,
             "date": datetime.datetime.now().date(),
             "description": info.descr,
             "filename": filename,
@@ -588,11 +587,11 @@ class GWARipper:
 
         c.execute("""
         INSERT INTO AudioFile(
-            collection_id, downloaded_with_collection, date, description,
+            collection_id, date, description,
             filename, title, url,
             alias_id
         ) VALUES (
-            :collection_id, :downloaded_with_collection, :date, :description,
+            :collection_id, :date, :description,
             :filename, :title, :url,
             (SELECT id FROM Alias WHERE name = :alias_name)
         )""", audio_file_dict)

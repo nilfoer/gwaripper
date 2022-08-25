@@ -185,7 +185,7 @@ def get_entries(query: Optional[str] = None) -> Tuple[
         for entry in entries:
             selftext_filename: Optional[str] = None
 
-            if entry.downloaded_with_collection:
+            if entry.collection_id is not None:
                 author_subdir = entry.fcol_alias_name
                 subpath = entry.fcol_subpath
             else:
