@@ -54,7 +54,7 @@ class ExtractorReport:
                  download_error_code: DownloadErrorCode = DownloadErrorCode.NOT_DOWNLOADED):
         self.url = url
         self.err_code = err_code
-        # TODO make sure this uses COLLECTION_INCOMPLETE as default for collections?
+        # TODO make sure this uses ERROR_IN_CHILDREN as default for collections?
         self.download_error_code = download_error_code
         self.children = []
 

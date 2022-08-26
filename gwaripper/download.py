@@ -42,8 +42,8 @@ class DownloadErrorCode(Enum):
     HTTP_ERROR_OTHER = auto()
 
     # collections
-    COLLECTION_COMPLETE = auto()
-    COLLECTION_INCOMPLETE = auto()
+    NO_ERRORS = auto()
+    ERROR_IN_CHILDREN = auto()
 
 
 HTTP_ERR_TO_DL_ERR: Dict[int, DownloadErrorCode] = {

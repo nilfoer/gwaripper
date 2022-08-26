@@ -418,7 +418,7 @@ class FileCollection:
         self._parent: Optional[FileCollection] = None
         # NOTE: a collection only counts as downloaded if all of it's children were downloaded
         # (including previous runs/already downloaded children)
-        self._downloaded: DownloadErrorCode = DownloadErrorCode.COLLECTION_INCOMPLETE
+        self._downloaded: DownloadErrorCode = DownloadErrorCode.ERROR_IN_CHILDREN
         self.report: Optional[ExtractorReport] = None
 
     def __str__(self):

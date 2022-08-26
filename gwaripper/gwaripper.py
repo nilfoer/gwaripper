@@ -201,7 +201,7 @@ class GWARipper:
             dl_success = True if report.download_error_code in (
                     dl.DownloadErrorCode.DOWNLOADED,
                     dl.DownloadErrorCode.SKIPPED_DUPLICATE,
-                    dl.DownloadErrorCode.COLLECTION_COMPLETE) else False
+                    dl.DownloadErrorCode.NO_ERRORS) else False
 
             contents.append(
                 f"<div class=\"{'collection ' if is_collection else 'block '}"
@@ -210,11 +210,11 @@ class GWARipper:
                 f"{'<span>Collection: </span>' if is_collection else ''}<a href=\""
                 f"{report.url}\">{report.url}</a>")
             contents.append(
-                f"<div class='info'><span class='"
+                f"<div class='info'>EXTRACT: <span class='"
                 f"{'success ' if success else 'error '}'>{report.err_code.name}"
                 f"</span></div>")
             contents.append(
-                f"<div class='info'><span class='"
+                f"<div class='info'>DOWNLOAD: <span class='"
                 f"{'success ' if dl_success else 'error '}'>"
                 f"{report.download_error_code.name}</span></div>")
             if not is_collection:
@@ -406,7 +406,7 @@ class GWARipper:
         # NOTE: this function needs to be recursive, since otherwise collections
         # that had no (successful) audio downloads will still be added to the DB
 
-        download_err_code = dl.DownloadErrorCode.COLLECTION_COMPLETE
+        download_err_code = dl.DownloadErrorCode.NO_ERRORS
         any_audio_downloads = False
         with_file_idx = info.nr_files > 1
         rel_idx = 1
@@ -417,8 +417,8 @@ class GWARipper:
                 dl_collection_result = self._download_collection(fi_or_fc, top_collection, dl_idx=dl_idx)
                 dl_idx = dl_collection_result.dl_idx
                 any_audio_downloads = any_audio_downloads or dl_collection_result.any_audio_downloads
-                if dl_collection_result.error_code != dl.DownloadErrorCode.COLLECTION_COMPLETE:
-                    download_err_code = dl.DownloadErrorCode.COLLECTION_INCOMPLETE
+                if dl_collection_result.error_code != dl.DownloadErrorCode.NO_ERRORS:
+                    download_err_code = dl.DownloadErrorCode.ERROR_IN_CHILDREN
             else:
                 fi: FileInfo = fi_or_fc
                 # rel_idx is 0-based
@@ -433,7 +433,7 @@ class GWARipper:
 
                 if fi.downloaded not in (
                         dl.DownloadErrorCode.DOWNLOADED, dl.DownloadErrorCode.SKIPPED_DUPLICATE):
-                    download_err_code = dl.DownloadErrorCode.COLLECTION_INCOMPLETE
+                    download_err_code = dl.DownloadErrorCode.ERROR_IN_CHILDREN
 
         # set download status once a collection is finished
         info.downloaded = download_err_code

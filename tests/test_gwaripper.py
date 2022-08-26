@@ -541,7 +541,7 @@ def test_add_to_db_ri(setup_db_2col_5audio):
     # should still have parent_id set if it has a id_in_db
     fc1 = FileCollection(object, "collection_id set test", None, None, None)
     fc1.id_in_db = 1
-    fc1.downloaded = DownloadErrorCode.COLLECTION_INCOMPLETE
+    fc1.downloaded = DownloadErrorCode.ERROR_IN_CHILDREN
 
     ri._children = [fc1, fi1, fi2, fi3, fi4]
 
@@ -1069,7 +1069,7 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     gwa._download_collection(fc1, None)
 
     assert fi1.downloaded is DownloadErrorCode.DOWNLOADED
-    assert fc1.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
+    assert fc1.downloaded is DownloadErrorCode.NO_ERRORS
 
     # checking the whole dict equals .. better than just checking specific items
     # or using ... in called_with
@@ -1103,7 +1103,7 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     gwa.db_con = DummyCon()
     gwa._download_collection(ri, None)
 
-    assert ri.downloaded is DownloadErrorCode.COLLECTION_INCOMPLETE
+    assert ri.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
 
     assert fi1.downloaded is DownloadErrorCode.DOWNLOADED
     # downloaded on _only_ audio is False so db will get rolled back
@@ -1137,7 +1137,7 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     gwa.db_con = DummyCon()
     gwa._download_collection(ri, None)
 
-    assert ri.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
+    assert ri.downloaded is DownloadErrorCode.NO_ERRORS
 
     assert fi1.downloaded is DownloadErrorCode.DOWNLOADED
     assert fi2.downloaded is DownloadErrorCode.DOWNLOADED
@@ -1182,8 +1182,8 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     gwa.db_con = DummyCon()
     gwa._download_collection(ri, None)
 
-    assert fc1.downloaded is DownloadErrorCode.COLLECTION_INCOMPLETE
-    assert ri.downloaded is DownloadErrorCode.COLLECTION_INCOMPLETE
+    assert fc1.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+    assert ri.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
 
     assert fi1.downloaded is DownloadErrorCode.NOT_DOWNLOADED
     assert fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
@@ -1296,7 +1296,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         nonlocal download_called_with
         download_called_with = fi
         if isinstance(fi, FileCollection):
-            fi.downloaded = DownloadErrorCode.COLLECTION_COMPLETE
+            fi.downloaded = DownloadErrorCode.NO_ERRORS
         else:
             fi.downloaded = DownloadErrorCode.DOWNLOADED
 
@@ -1306,11 +1306,11 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
         gwa.extract_and_download(urls[0])
         # extr report appended and downloaded set
         assert gwa.extractor_reports[0] is redditinforep
-        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.COLLECTION_COMPLETE
+        assert gwa.extractor_reports[0].download_error_code is DownloadErrorCode.NO_ERRORS
         assert len(gwa.extractor_reports) == 1
     # download called
     assert download_called_with is redditinfo
-    assert download_called_with.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
+    assert download_called_with.downloaded is DownloadErrorCode.NO_ERRORS
 
     def patched_dl(self, fi):
         assert fi is not None
@@ -1428,7 +1428,7 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
         nonlocal download_called_with
         download_called_with = fi
         if isinstance(fi, FileCollection):
-            fi.downloaded = DownloadErrorCode.COLLECTION_COMPLETE
+            fi.downloaded = DownloadErrorCode.NO_ERRORS
         else:
             fi.downloaded = DownloadErrorCode.DOWNLOADED
 
@@ -1452,7 +1452,7 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
     with GWARipper() as gwa:
         gwa.parse_and_download_submission(sub)
         assert download_called_with is redditinfo
-        assert redditinfo.downloaded is DownloadErrorCode.COLLECTION_COMPLETE
+        assert redditinfo.downloaded is DownloadErrorCode.NO_ERRORS
 
         assert len(gwa.extractor_reports) == 1
         assert gwa.extractor_reports[0] is redditinforep
@@ -1512,16 +1512,16 @@ def test_write_report(setup_tmpdir):
     ecode = ExtractorErrorCode
     reports = [
             ExtractorReport('url1', ecode.NO_ERRORS, DownloadErrorCode.DOWNLOADED),
-            ExtractorReport('url2col', ecode.ERROR_IN_CHILDREN, DownloadErrorCode.COLLECTION_INCOMPLETE),
+            ExtractorReport('url2col', ecode.ERROR_IN_CHILDREN, DownloadErrorCode.ERROR_IN_CHILDREN),
             ExtractorReport('url3', ecode.BANNED_TAG, DownloadErrorCode.NOT_DOWNLOADED),
-            ExtractorReport('url4col', ecode.NO_SUPPORTED_AUDIO_LINK, DownloadErrorCode.COLLECTION_INCOMPLETE),
-            ExtractorReport('url5col', ecode.NO_ERRORS, DownloadErrorCode.COLLECTION_COMPLETE)
+            ExtractorReport('url4col', ecode.NO_SUPPORTED_AUDIO_LINK, DownloadErrorCode.ERROR_IN_CHILDREN),
+            ExtractorReport('url5col', ecode.NO_ERRORS, DownloadErrorCode.NO_ERRORS)
             ]
 
     reports[1].children = [
             ExtractorReport('url2colurl1', ecode.NO_RESPONSE, DownloadErrorCode.NOT_DOWNLOADED),
             ExtractorReport('url2colurl2', ecode.NO_EXTRACTOR, DownloadErrorCode.NOT_DOWNLOADED),
-            ExtractorReport('url2colurl3col', ecode.ERROR_IN_CHILDREN, DownloadErrorCode.COLLECTION_INCOMPLETE),
+            ExtractorReport('url2colurl3col', ecode.ERROR_IN_CHILDREN, DownloadErrorCode.ERROR_IN_CHILDREN),
             ]
 
     reports[1].children[2].children = [
@@ -1543,72 +1543,72 @@ def test_write_report(setup_tmpdir):
             report_preamble,
             "<div class=\"block \">",
             "<a href=\"url1\">url1</a>",
-            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success '>DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url2col\">url2col</a>",
-            "<div class='info'><span class='error '>ERROR_IN_CHILDREN</span></div>",
-            "<div class='info'><span class='error '>COLLECTION_INCOMPLETE</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>ERROR_IN_CHILDREN</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl1\">url2colurl1</a>",
-            "<div class='info'><span class='error '>NO_RESPONSE</span></div>",
-            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>NO_RESPONSE</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl2\">url2colurl2</a>",
-            "<div class='info'><span class='error '>NO_EXTRACTOR</span></div>",
-            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>NO_EXTRACTOR</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection indent \">",
             "<span>Collection: </span><a href=\"url2colurl3col\">url2colurl3col</a>",
-            "<div class='info'><span class='error '>ERROR_IN_CHILDREN</span></div>",
-            "<div class='info'><span class='error '>COLLECTION_INCOMPLETE</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>ERROR_IN_CHILDREN</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl1\">url2colurl3colurl1</a>",
-            "<div class='info'><span class='error '>NO_AUTHENTICATION</span></div>",
-            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>NO_AUTHENTICATION</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl2\">url2colurl3colurl2</a>",
-            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='error '>HTTP_ERR_NOT_FOUND</span></div>",
+            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>HTTP_ERR_NOT_FOUND</span></div>",
             "</div>",
             "</div>",  # urlcol2url3col
             "</div>",  # url2col
             "<div class=\"block \">",
             "<a href=\"url3\">url3</a>",
-            "<div class='info'><span class='error '>BANNED_TAG</span></div>",
-            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>BANNED_TAG</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url4col\">url4col</a>",
-            "<div class='info'><span class='error '>NO_SUPPORTED_AUDIO_LINK</span></div>",
-            "<div class='info'><span class='error '>COLLECTION_INCOMPLETE</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>NO_SUPPORTED_AUDIO_LINK</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>ERROR_IN_CHILDREN</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url4colurl1\">url4colurl1</a>",
-            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>SKIPPED_DUPLICATE</span></div>",
+            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success '>SKIPPED_DUPLICATE</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url4colurl2\">url4colurl2</a>",
-            "<div class='info'><span class='error '>BANNED_TAG</span></div>",
-            "<div class='info'><span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error '>BANNED_TAG</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # url4col
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url5col\">url5col</a>",
-            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>COLLECTION_COMPLETE</span></div>",
+            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success '>NO_ERRORS</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url5colurl1\">url5colurl1</a>",
-            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>SKIPPED_DUPLICATE</span></div>",
+            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success '>SKIPPED_DUPLICATE</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url5colurl2\">url5colurl2</a>",
-            "<div class='info'><span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'><span class='success '>DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success '>DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # url5col
     ]
