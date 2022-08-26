@@ -626,6 +626,16 @@ class GWARipper:
         """
         if not info.reddit_info:
             return
+        # NOTE: only set missing reddit info for the first FileInfo per url
+        # otherwise we might set it on a file that was downloaded for the first time
+        # we know there is a parent otherwise we wouldn't have reddit info
+        # and that there are children
+        same_url_fi = [fi for fi in cast(List[Union[FileInfo, FileCollection]], 
+                                         cast(FileCollection, info.parent).children)
+                       if type(fi) is FileInfo and fi.page_url == info.page_url]
+        own_index = next(i for i in range(len(same_url_fi)) if same_url_fi[i] is info)
+        if own_index != 0:
+            return
 
         with self.db_con:
             collection_id, reddit_author = self._add_to_db_ri(info.reddit_info)
