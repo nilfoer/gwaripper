@@ -3,6 +3,7 @@ import logging
 import os
 import time
 import shutil
+import json
 
 import prawcore
 
@@ -21,6 +22,7 @@ from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from gwaripper.extractors.reddit import RedditExtractor
 from gwaripper.extractors.skittykat import SkittykatExtractor
 from gwaripper.extractors.erocast import ErocastExtractor
+from gwaripper.extractors.whyp import WhypExtractor
 from gwaripper.exceptions import (
         NoAuthenticationError, InfoExtractingError,
         NoAPIResponseError, AuthenticationFailed
@@ -87,6 +89,8 @@ from utils import setup_tmpdir
          ('https://youtube.com/watch?v=32ksdf83', None, None),
          ('http://reddit.com/r/gonewildaudio/', None, None),
          ('http://reddit.com/user/gwarip/', None, None),
+         ('https://whyp.it/tracks/38357/your-big-sisters-hot-roommate-seduces-you-and-takes-your-virginity?token=I3Eo3', WhypExtractor, {'id': '38357'}),
+         ('whyp.it/tracks/39107/f4m-youre-my-heart-band-aid-wet-sounds-version?token=JOoL1', WhypExtractor, {'id': '39107'}),
          ])
 def test_find_extractor_and_init(url, expected, attr_val):
     assert find_extractor(url) is expected
@@ -1361,3 +1365,88 @@ def test_extractor_erocast():
     assert fi.author == user['name']
     assert fi.download_type == DownloadType.HLS
     assert fi.ext == "mp4"
+
+whyp_private_expected = {
+    "id":38334,
+    "title":"Power Bottom Girlfriend Wants You for Breakfast",
+    "slug":"power-bottom-girlfriend-wants-you-for-breakfast",
+    "descr":"[F4M] Power Bottom Girlfriend Wants You for Breakfast [Wholesome] [Morning!] [Rape] cuz [Sleep play BJ] [Edging] [Needy] [Cowgirl] [Pls don’t cum inside] [Begging] [Brat actually wants your cum] [Wet sounds] [Leg locked] [Creampie] [Cuddles] [How ‘bout them pancakes?] [Script fill]: aurallyinclined\n\nSocials:\nhttps://www.youtube.com/c/skittykat\nhttps://twitter.com/SkittyKatVA\nhttps://www.patreon.com/skittykat\nhttps://www.skittykat.cc",
+    "duration":1040.56,
+    "direct_url":"https://cdn.whyp.it/dbcc9d2c-2ce8-486b-bf98-48ef48505e07.mp3",
+    "artwork_url":"https://cdn.whyp.it/79855dfd-435a-45ee-9de0-9fc9d42cb8bb.png",
+    "created_at":"2022-08-25T18:45:52+00:00",
+    "user_id":4384,
+    "tags":[],
+    "token":"yAtIM",
+    "public": False,
+    "allow_downloads": False,
+    "settings_comments":"users",
+    "nsfw": True,
+    "author":"skittykat",
+    "avatar":"https://cdn.whyp.it/f713e761-d9f4-4e2b-bf43-8eafc6713b7b.png",
+    "cover":"https://cdn.whyp.it/a68db4ae-7447-4aa0-8a12-58fdbcb7d9ed.png",
+}
+
+def test_extractor_whyp_private_no_token(caplog):
+    extr = WhypExtractor("https://whyp.it/tracks/38334/power-bottom-girlfriend-wants-you-for-breakfast")
+    assert extr.id == str(whyp_private_expected['id'])
+    assert extr.token is None
+
+    caplog.clear()
+    caplog.set_level(logging.WARNING)
+    fi, report = extr._extract()
+    assert report.err_code is ExtractorErrorCode.NO_RESPONSE
+    assert "missing the token" in caplog.text
+    assert fi is None
+
+def test_extractor_whyp_private():
+    url = "https://whyp.it/tracks/38334/power-bottom-girlfriend-wants-you-for-breakfast?token=yAtIM"
+    extr = WhypExtractor(url)
+    assert extr.id == str(whyp_private_expected['id'])
+    assert extr.token == whyp_private_expected['token']
+
+    fi, report = extr._extract()
+    assert report.err_code is ExtractorErrorCode.NO_ERRORS
+    assert fi is not None
+
+    assert fi.page_url == url
+    assert fi.ext == "mp3"
+    assert fi.download_type is DownloadType.HTTP
+
+    for k in ("title", "descr", "direct_url", "author"):
+        assert getattr(fi, k) == whyp_private_expected[k]
+
+whyp_public_expected = {
+        "id":38357,
+        "title":"Your Big Sister's Hot Roommate Seduces You And Takes Your Virginity",
+        "descr": json.loads(r'["Original Script by u/ScriptsFromaSub\n\nBecome a Patron to access my full library of original, high quality audios: patreon.com/SooJeong\n\n\u1d1b\u029c\u026a\ua731 \u1d00\u1d1c\u1d05\u026a\u1d0f \u1d0d\u1d00\u028f \u1d04\u1d0f\u0274\u1d1b\u1d00\u026a\u0274 \u1d04\u1d0f\u1d18\u028f\u0280\u026a\u0262\u029c\u1d1b \u1d0d\u1d1c\ua731\u026a\u1d04 \u1d00\u0274\u1d05 \ua731\ua730x \u1d21\u029c\u026a\u1d04\u029c \u026a, \u1d1b\u029c\u1d07 \u1d18\u1d07\u0280\ua730\u1d0f\u0280\u1d0d\u1d07\u0280 (\ua731\u1d0f\u1d0f\u1d0a\u1d07\u1d0f\u0274\u0262), \u1d00\u1d0d \u029f\u1d07\u0262\u1d00\u029f\u029f\u028f \u1d00\u1d1c\u1d1b\u029c\u1d0f\u0280\u026a\u1d22\u1d07\u1d05 \u1d1b\u1d0f \u1d1c\ua731\u1d07. \u1d05\u1d0f \u0274\u1d0f\u1d1b \u1d04\u1d0f\u1d18\u028f, \u1d07\u1d05\u026a\u1d1b, \u1d0f\u0280 \u0280\u1d07\u1d1c\u1d18\u029f\u1d0f\u1d00\u1d05 \u1d0d\u028f \u1d04\u1d0f\u0274\u1d1b\u1d07\u0274\u1d1b \u1d21\u026a\u1d1b\u029c\u1d0f\u1d1c\u1d1b \u1d07x\u1d18\u029f\u026a\u1d04\u026a\u1d1b \u1d04\u1d0f\u0274\ua731\u1d07\u0274\u1d1b."]')[0],
+        "duration":1619.98,
+        "direct_url":"https://cdn.whyp.it/e2c8515a-bc1e-4613-886a-6b2d89f4c56f.mp3",
+        "artwork_url":"https://cdn.whyp.it/cd530d16-d734-4222-b0f9-86164bfa55a3.jpg",
+        "created_at":"2022-08-25T21:04:02+00:00",
+        "user_id":4497,
+        "tags":[],
+        "token":"I3Eo3",
+        "public":True,
+        "author":"SooJeong",
+        "avatar":"https://cdn.whyp.it/4b1a5fe6-834f-4bf9-9a91-9a7b338733c3.jpg",
+        "cover":"https://cdn.whyp.it/177b90b0-56a9-4d7b-9cd8-f8fd5770bbc5.jpg"
+}
+
+def test_extractor_whyp_public():
+    url = "https://whyp.it/tracks/38357/your-big-sisters-hot-roommate-seduces-you-and-takes-your-virginity"
+    extr = WhypExtractor(url)
+    assert extr.id == str(whyp_public_expected['id'])
+    assert extr.token is None
+
+    fi, report = extr._extract()
+    assert report.err_code is ExtractorErrorCode.NO_ERRORS
+    assert fi is not None
+
+    assert fi.page_url == url
+    assert fi.ext == "mp3"
+    assert fi.download_type is DownloadType.HTTP
+
+    for k in ("title", "descr", "direct_url", "author"):
+        assert getattr(fi, k) == whyp_public_expected[k]
+

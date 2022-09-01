@@ -8,6 +8,7 @@ from .chirbit import ChirbitExtractor
 from .imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from .skittykat import SkittykatExtractor
 from .erocast import ErocastExtractor
+from .whyp import WhypExtractor
 
 AVAILABLE_EXTRACTORS: Sequence[Type[BaseExtractor]] = (
         RedditExtractor,
@@ -18,6 +19,7 @@ AVAILABLE_EXTRACTORS: Sequence[Type[BaseExtractor]] = (
         ImgurAlbumExtractor,
         SkittykatExtractor,
         ErocastExtractor,
+        WhypExtractor,
     )
 
 
