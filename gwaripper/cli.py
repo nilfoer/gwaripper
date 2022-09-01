@@ -36,6 +36,8 @@ def main():
 
     parser.add_argument('--ignore-banned', action='store_true',
                         help="Ignores banned tags in titles and in link text!")
+    parser.add_argument('--download-duplicates', action='store_true',
+                        help="Downloads files even if they're already in the DB!")
 
     # support sub-commands like svn checkout which require different kinds of
     # command-line arguments
@@ -243,14 +245,14 @@ def main():
               "'C:\\absolute\\path' to specify where the files will be downloaded to")
 
 
-def download_all_links(urls: List[str]) -> None:
-    with GWARipper() as gw:
+def download_all_links(urls: List[str], args: argparse.Namespace) -> None:
+    with GWARipper(download_duplicates=args.download_duplicates) as gw:
         gw.set_urls(urls)
         gw.download_all()
 
 
 def _cl_link(args: argparse.Namespace) -> None:
-    download_all_links(args.links)
+    download_all_links(args.links, args)
 
 
 def _cl_fromtxt(args):
@@ -260,16 +262,16 @@ def _cl_fromtxt(args):
         logger.error("Couldn't open file %s", args.filename)
         return
 
-    download_all_links(url_list)
+    download_all_links(url_list, args)
 
 
 def _cl_watch(args):
     found = watch_clip()
-    download_all_links(found)
+    download_all_links(found, args)
 
 
-def download_all_subs(sublist: List[praw.models.Submission]) -> None:
-    with GWARipper() as gw:
+def download_all_subs(sublist: List[praw.models.Submission], args: argparse.Namespace) -> None:
+    with GWARipper(download_duplicates=args.download_duplicates) as gw:
         gw.download_all(sublist)
 
 
@@ -290,7 +292,7 @@ def _cl_redditor(args):
             logger.info("No subs recieved from user %s with time_filter %s", usr, args.timefilter)
             return
 
-        download_all_subs(sublist)
+        download_all_subs(sublist, args)
 
 
 def _cl_sub(args):
@@ -304,7 +306,7 @@ def _cl_sub(args):
         # new and hot dont use time_filter
         sublist = list(parse_subreddit(args.sub, sort, limit))
 
-    download_all_subs(sublist)
+    download_all_subs(sublist, args)
 
 
 def _cl_search(args):
@@ -314,7 +316,7 @@ def _cl_search(args):
 
     found_subs = search_subreddit(args.subname, args.sstr, limit=limit, time_filter=time_filter,
                                   sort=sort)
-    download_all_subs(found_subs)
+    download_all_subs(found_subs, args)
 
 
 def _cl_config(args) -> None:

@@ -107,12 +107,13 @@ class GWARipper:
 
     # we can only omit -> None if at least one arg is typed otherwise it is
     # considered an untyped method
-    def __init__(self) -> None:
+    def __init__(self, download_duplicates: bool = False) -> None:
         self.db_con, _ = load_or_create_sql_db(
                 os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.urls: List[str] = []
         self.nr_urls: int = 0
         self.extractor_reports: List[ExtractorReport] = []
+        self.download_duplicates = download_duplicates
 
     # return type needed otherwise we don't get type checking if used in with..as
     def __enter__(self) -> 'GWARipper':
@@ -283,7 +284,7 @@ class GWARipper:
                        dl_idx: int = 1, dl_max: int = 1) -> Optional[str]:
         # TODO re-add request delay?
         already_downloaded = self.already_downloaded(info)
-        if already_downloaded:
+        if already_downloaded and not self.download_duplicates:
             logger.info("File was already downloaded, skipped URL: %s", info.page_url)
             return None
 
@@ -303,16 +304,18 @@ class GWARipper:
         if info.download_type == DownloadType.HTTP:
             return self._download_file_http(info, author_name, top_collection,
                                             subpath, mypath, filename,
-                                            file_index, dl_idx, dl_max)
+                                            file_index, dl_idx, dl_max,
+                                            re_dl = already_downloaded)
         else:
             return self._download_file_hls(info, author_name, top_collection,
                                            subpath, mypath, filename,
-                                           file_index, dl_idx, dl_max)
+                                           file_index, dl_idx, dl_max,
+                                           re_dl = already_downloaded)
 
     def _download_file_http(
         self, info: FileInfo, author_name: Optional[str],
         top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
-        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1
+        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1, re_dl: bool = False
     ) -> str:
         """
         Will download the file to dl_root in a subfolder named like the reddit user name
@@ -327,7 +330,8 @@ class GWARipper:
         file_info_id_in_db: Optional[int] = None
         # TODO retries etc. or use requests lib?
         try:
-            if info.is_audio:
+            # don't add to db if it's a redownload
+            if info.is_audio and not re_dl:
                 # automatically commits changes to db_con if everything succeeds or does a rollback
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
@@ -378,12 +382,12 @@ class GWARipper:
     def _download_file_hls(
         self, info: FileInfo, author_name: Optional[str],
         top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
-        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1
+        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1, re_dl: bool = False
     ) -> str:
         file_info_id_in_db: Optional[int] = None
 
         success = dl.download_hls_ffmpeg(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
-        if success and info.is_audio:
+        if success and info.is_audio and not re_dl:
             file_info_id_in_db = self._add_to_db(info, None, filename)
             self.db_con.commit()
             info.downloaded = (
