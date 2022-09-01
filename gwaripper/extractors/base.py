@@ -120,7 +120,8 @@ class BaseExtractor(Generic[T]):
             re.compile(r"^(?:https?://)?(?:www\.)?sndup\.net/", re.IGNORECASE),
             re.compile(r"^(?:https?://)?(?:www\.)?patreon\.com/", re.IGNORECASE),
             re.compile(r"^(?:https?://)?(?:www\.)?psstaudio\.com/", re.IGNORECASE),
-            re.compile(r"^(?:https?://)?(?:www\.)?erocast\.me/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?literotica\.com/", re.IGNORECASE),
+            re.compile(r"^(?:https?://)?(?:www\.)?newgrounds\.com/audio/", re.IGNORECASE),
             # NOTE: so users can see there should be an audio on patreon
             re.compile(r"^(?:https?://)?(?:www\.)?skittykat\.cc/exclusive/$", re.IGNORECASE),
             ]
