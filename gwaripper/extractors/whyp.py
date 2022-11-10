@@ -76,6 +76,8 @@ class WhypExtractor(BaseExtractor):
         result = FileInfo(WhypExtractor, True, "mp3", self.url, data['audio_url'],
                           self.id, title = data.get('title', None), descr=data.get('description', None),
                           author=user.get('username', None))
+        # NOTE: we need to set Referer header otherwise get a 403 error
+        result.additional_headers["Referer"] = "https://www.whyp.it/"
         report = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
 
         return result, report

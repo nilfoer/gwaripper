@@ -6,7 +6,7 @@ from enum import Enum, auto, unique
 
 from typing import (
         Optional, Union, List, Type, Tuple, Iterator, Sequence,
-        Deque, TYPE_CHECKING, cast, overload
+        Deque, TYPE_CHECKING, cast, overload, Dict
         )
 from typing_extensions import Literal
 
@@ -251,6 +251,9 @@ class DownloadType(Enum):
 # -> and all the type hints will become strings implicitly
 # Type[C] refers to subclasses of C instead of instances
 class FileInfo:
+
+    additional_headers: Dict[str, str]
+
     def __init__(self, extractor: Type['BaseExtractor'], is_audio: bool, ext: str,
                  page_url: str, direct_url: str, _id: Optional[str],
                  title: Optional[str], descr: Optional[str], author: Optional[str],
@@ -274,6 +277,7 @@ class FileInfo:
         self.id_in_db: Optional[int] = None
         self.download_type = download_type
         self.report: Optional[ExtractorReport] = None
+        self.additional_headers = {}
 
     def __str__(self):
         return f"FileInfo<{self.page_url}>"

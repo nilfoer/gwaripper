@@ -344,11 +344,13 @@ class GWARipper:
                     # total size is -1 if unknown
                     dl.download_in_chunks(info.direct_url,
                                           os.path.abspath(os.path.join(mypath, filename)),
-                                          prog_bar=True)
+                                          prog_bar=True,
+                                          headers=info.additional_headers)
             else:
                 dl.download_in_chunks(info.direct_url,
                                       os.path.abspath(os.path.join(mypath, filename)),
-                                      prog_bar=True)
+                                      prog_bar=True,
+                                      headers=info.additional_headers)
         except urllib.error.HTTPError as err:
             logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
 

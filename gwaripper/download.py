@@ -96,7 +96,9 @@ def download_in_chunks(url: str, filename: str,
     if dirpath:
         os.makedirs(dirpath, exist_ok=True)
 
-    req = urllib.request.Request(url, headers=DEFAULT_HEADERS if headers is None else headers)
+    # merge headers
+    headers = {**DEFAULT_HEADERS, **headers} if headers else DEFAULT_HEADERS
+    req = urllib.request.Request(url, headers=headers)
     # urlretrieve uses block-size of 8192
     # Before response.read() is called, the contents are not downloaded.
     with urllib.request.urlopen(req) as response:
