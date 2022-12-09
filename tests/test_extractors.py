@@ -4,6 +4,7 @@ import os
 import time
 import shutil
 import json
+import re
 
 import prawcore
 
@@ -1347,7 +1348,6 @@ erocast_expected = {
     "description":"Our teacher comes up with a way to get back at the coach for his disobedience..\n\nScript u/StoryWeaver83",
     "duration":645, "released_at":"11/22/2021",
     "permalink_url":"https://erocast.me/track/392/a-teachers-voice-a-naughty-boy",
-    "stream_url":"https://erocast.me/stream/hls/392",
     "streamable": True,
     "user":{"id":83, "name":"Wkdfaerie", "username":"wkdfaerie", "artist_id":0}
 }
@@ -1360,7 +1360,7 @@ def test_extractor_erocast():
 
     assert fi.title == erocast_expected['title']
     assert fi.descr == erocast_expected['description']
-    assert fi.direct_url == erocast_expected['stream_url']
+    assert re.match(r"https://erocast\..*/555083/track.m3u8", fi.direct_url)
     user = erocast_expected['user']
     assert fi.author == user['name']
     assert fi.download_type == DownloadType.HLS

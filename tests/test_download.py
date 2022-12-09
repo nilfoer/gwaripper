@@ -10,6 +10,7 @@ class ArgsDummy:
     def __init__(self, links):
         assert(type(links) is list)
         self.links = links
+        self.download_duplicates = True
 
 @pytest.mark.dltest
 def test_download_hls(setup_tmpdir_param):

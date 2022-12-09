@@ -770,7 +770,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
         'db_con__exit__': True,
         'add_to_db': ((fi, None, fn), {}),
         'download_in_chunks': (
-            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'headers': {}, 'prog_bar': True}),
     }
 
     # download logging call using dl_idx and dl_max
@@ -804,7 +804,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
         'pad_filename': (
             (abs_subpath, generate_filename_ret[1], generate_filename_ret[2]), {}),
         'download_in_chunks': (
-            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'headers': {}, 'prog_bar': True}),
     }
 
     # download logging call using dl_idx and dl_max
@@ -841,7 +841,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
         'db_con__exit__': True,
         'add_to_db': ((fi, None, fn), {}),
         'download_in_chunks': (
-            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'headers': {}, 'prog_bar': True}),
     }
 
     # download logging call using dl_idx and dl_max
@@ -871,7 +871,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
         'db_con__exit__': True,
         'add_to_db': ((fi, None, fn), {}),
         'download_in_chunks': (
-            (fi.direct_url, os.path.join(abs_subpath, fn)), {'prog_bar': True}),
+            (fi.direct_url, os.path.join(abs_subpath, fn)), {'headers': {}, 'prog_bar': True}),
     }
 
     #
