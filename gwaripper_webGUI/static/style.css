@@ -487,3 +487,9 @@ input[type=submit] {
                   font-family: 'Open Sans',sans-serif;
                   font-size: 14px; }
 .error          { background: #f0d6d6; padding: 0.5em; }
+
+.edit-audio-line {
+    margin: 1rem 0;
+    display: flex;
+    align-items: center;
+}

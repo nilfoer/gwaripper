@@ -1,4 +1,5 @@
 <!doctype html>
+{% block head %}
 <title>GWARipper</title>
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='fontawesome-all.min.css') }}">
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='bootstrap.min.css') }}">
@@ -24,6 +25,7 @@
         }
     });
 </script>
+{% endblock %}
 <nav class="navbar navbar-expand mdb-nav dark-color">
     <a class="mdb-navbar-brand" href="/">GWARipper</a>
 
@@ -50,6 +52,9 @@
       </li>
     </ul>
     <div class="mdb-nav-right">
+        <a href="{{ url_for('main.show_add_audio') }}" style="margin-right: .75em;">
+            <i class="fas fa-plus"></i>
+        </a>
         {% if "authenticated" in session %}
         <a href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i></a>
         {% else %}

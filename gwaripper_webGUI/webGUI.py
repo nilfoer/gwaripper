@@ -1,9 +1,9 @@
 """
 File: webGUI.py
-Description: Creates webGUI for GWARipper using flask
+Description: Creates a webGUI for GWARipper using flask
 """
 
-import os.path
+import os
 import re
 import datetime
 
@@ -14,13 +14,17 @@ from flask import (
         render_template, flash, send_from_directory,
         jsonify, send_file, session, g, Response, abort
 )
+from werkzeug.utils import secure_filename
 
+from gwaripper.gwaripper import GWARipper
+from gwaripper import config
 from gwaripper.db import (
         get_x_entries, validate_order_by_str, search,
         remove_entry as gwa_remove_entry, set_favorite_entry,
         set_rating, RowData
 )
-from gwaripper.info import sanitize_filename
+from gwaripper.info import sanitize_filename, FileInfo, FileCollection
+from gwaripper.extractors.base import BaseExtractor
 
 from .gwaripper_db import get_db
 
@@ -30,6 +34,8 @@ ENTRIES_PER_PAGE = 30
 main_bp = Blueprint("main", __name__)
 
 URL_RE = re.compile(r"(?:https?://)?(?:\w+\.)?(\w+\.\w+)/")
+ALLOWED_EXTENSIONS = {"m4a", "mp4", "webm", "aac", "mp3", "flv", "avi", "mpeg", "mkv", "ogg",
+                      "oga", "mogg", "act", "flac", "mpc", "opus", "wav", "wma"}
 
 
 def init_app(app):
@@ -364,3 +370,69 @@ def remove_entry():
         return jsonify({"error": "Missing entry id from data!"})
     gwa_remove_entry(get_db(), entry_id, current_app.instance_path)
     return jsonify({"removed": True})
+
+
+@main_bp.route("/entry/add")
+def show_add_audio():
+    new_info = FileInfo(BaseExtractor, True, "", "", "", None, "New Audio", None, None)
+    db = get_db()
+    c = db.execute("SELECT name FROM Artist")
+    artists = [r['name'] for r in c.fetchall()]
+
+    return render_template(
+        'edit_audio.html',
+        artists=artists,
+        file_info=new_info)
+
+
+@main_bp.route("/entry/add/submit", methods=("POST",))
+def add_audio():
+    # check if the post request has the file part
+    if 'file' not in request.files:
+        flash("Missing file")
+        return redirect(url_for('main.show_entries'))
+    file_data = request.files['file']
+    # if user does not select file, browser also
+    # submit an empty part without filename
+    if file_data.filename == '':
+        flash("Missing file")
+        return redirect(url_for('main.show_entries'))
+
+    try:
+        extension = file_data.filename.rsplit(".", 1)[1]
+    except (IndexError, AttributeError):
+        flash("Could not parse file extension from uploaded file!")
+        return redirect(url_for('main.show_add_audio'))
+    else:
+        if extension not in ALLOWED_EXTENSIONS:
+            flash("Upload of files with this extension is not allowed!")
+            return redirect(url_for('main.show_add_audio'))
+
+    new_info = FileInfo(BaseExtractor, True, extension, request.form['page_url'], '', request.form.get('id'),
+                        request.form['title'], request.form.get('description'), request.form['artist'])
+    subpath, filename, extension = new_info.generate_filename(None)
+    # NOTE: !IMPORTANT! since we use the title, which is passed in as user input, to compute
+    # the filename, we should use sth. like werkzeug.utils.secure_filename
+    # HOWEVER since we sanitize the filename in generate_filename anyway (only allowing
+    # alphanum, -_.,[] and spaces) it shouldn't be necessary here
+    # using it anyway to be safe
+    filename = secure_filename(f"{filename}.{extension}")
+    filename, extension = filename.rsplit(".", 1)
+
+    mypath = os.path.join(config.get_root(), new_info.author, subpath)
+    os.makedirs(mypath, exist_ok=True)
+    filename = GWARipper._pad_filename_if_exists(mypath, filename, extension)
+    filename = f"{filename}.{extension}"
+
+    file_data.save(os.path.join(mypath, filename))
+
+    flash("File imported successfully!")
+
+    db = get_db()
+    with db:
+        # since manually added files currently don't have a FileCollection
+        # we need to add the associated artist manually
+        GWARipper.add_artist(db, new_info.author)
+        GWARipper.add_to_db(db, new_info, None, filename, file_author_is_artist=True)
+
+    return redirect(url_for('main.show_entries'))

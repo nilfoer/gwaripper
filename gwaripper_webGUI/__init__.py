@@ -47,10 +47,10 @@ def create_app(test_config=None, **kwargs):
     app.config.from_mapping(
         # unsafe key for dev purposes otherwise use true random bytes like:
         # python -c "import os; print(os.urandom(24))"
-        SECRET_KEY='mangadb dev',
+        SECRET_KEY='gwaripper dev',
         DATABASE_PATH=os.path.join(app.instance_path, 'gwarip_db.sqlite'),
-        # limit upload size to 0,5MB
-        MAX_CONTENT_LENGTH=0.5 * 1024 * 1024
+        # limit upload size to 500MiB
+        MAX_CONTENT_LENGTH=500 * 1024 * 1024
     )
 
     if test_config is None:

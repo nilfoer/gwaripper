@@ -7,6 +7,7 @@ import re
 import urllib.request
 import urllib.error
 import dataclasses
+import sqlite3
 
 import praw
 
@@ -262,7 +263,8 @@ class GWARipper:
         else:
             self._download_collection(info, None)
 
-    def _pad_filename_if_exists(self, dirpath: str, filename: str, ext: str):
+    @staticmethod
+    def _pad_filename_if_exists(dirpath: str, filename: str, ext: str):
         filename_old = filename
         i = 1
 
@@ -460,6 +462,17 @@ class GWARipper:
 
         return DownloadCollectionResult(any_audio_downloads, dl_idx, download_err_code)
 
+    @staticmethod
+    def add_artist(db_con: sqlite3.Connection, artist: str):
+        c = db_con.execute("INSERT OR IGNORE INTO Artist(name) VALUES (?)",
+                  (artist,))
+        c.execute("""
+        INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
+            ?,
+            (SELECT id FROM Artist WHERE name = ?)
+        )""", (artist, artist))
+
+
     # TODO: @CleanUp this RedditInfo stuff is clunky, generalize it to just be added metadata
     # like storing upvotes etc.
     def _add_to_db_collection(self, file_col: FileCollection, author: str) -> Tuple[str, bool]:
@@ -490,13 +503,7 @@ class GWARipper:
             file_col.id_in_db = existing_collection['collection_id']
             return existing_collection['alias_name'], True
 
-        c.execute("INSERT OR IGNORE INTO Artist(name) VALUES (?)",
-                  (author,))
-        c.execute("""
-        INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
-            ?,
-            (SELECT id FROM Artist WHERE name = ?)
-        )""", (author, author))
+        self.add_artist(self.db_con, author)
 
         filecol_dict: Dict[str, Optional[Union[str, int]]] = {
             "url": file_col.full_url,
@@ -558,22 +565,34 @@ class GWARipper:
         return cast(int, r_info.id_in_db), author if was_in_db else reddit_author
 
     def _add_to_db(self, info: FileInfo, collection_id: Optional[int], filename: str) -> int:
+        return self.add_to_db(self.db_con, info, collection_id, filename)
+
+    @staticmethod
+    def add_to_db(
+        db_con: sqlite3.Connection,
+        info: FileInfo,
+        collection_id: Optional[int],
+        filename: str,
+        file_author_is_artist: bool = False
+    ) -> int:
         """
         Adds instance attributes and reddit_info values to the database using named SQL query
         parameters with a dictionary.
-        DOESN'T COMMIT the transaction, since the context manager in self.download() needs to be
+        DOESN'T COMMIT the transaction, since the context manager in GWARipper.download() needs to be
         able to do a rollback if the dl fails
 
+        :param file_author_is_artist: True if the info.author should be treated as an artist name
+                                      instead of just as an alias with a possibly unkown artist
         :return: None
         """
-
-        c = self.db_con.cursor()
 
         reddit_author: Optional[str] = None
         if info.reddit_info:
             reddit_author = info.reddit_info.author
+        elif file_author_is_artist:
+            reddit_author = info.author
 
-        c = self.db_con.execute(f"""
+        c = db_con.execute(f"""
         INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
             ?,
             {'(SELECT id FROM Artist WHERE Artist.name = ?)' if reddit_author else 'NULL'}
