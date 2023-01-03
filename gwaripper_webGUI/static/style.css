@@ -156,6 +156,7 @@ hr {
     padding: .5em;
     flex-shrink: 1;
     flex-grow: 1;
+    word-wrap: anywhere;
 }
 .entry-expand-inner {
     width: 100%;
