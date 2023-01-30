@@ -277,6 +277,7 @@ def test_extractor_eraudica():
     assert ex.url == url1
 
 
+@pytest.mark.broken_sites
 def test_extractor_chirbit():
     url = "https://chirb.it/F5hInh"
 
@@ -308,6 +309,7 @@ def test_extractor_chirbit():
     assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
 
+@pytest.mark.broken_sites
 def test_extractor_chirbit_banned_tag(monkeypatch):
     #
     # banned keyword in title

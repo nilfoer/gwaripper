@@ -11,10 +11,12 @@ import gwaripper.config as cfg
 
 from gwaripper.gwaripper import GWARipper, report_preamble
 from gwaripper.db import load_or_create_sql_db
+from gwaripper import exceptions
 from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER, UNKNOWN_USR_FOLDER
 from gwaripper.download import DownloadErrorCode
 from gwaripper.extractors.base import ExtractorReport, ExtractorErrorCode
 from gwaripper.extractors.soundgasm import SoundgasmExtractor
+from gwaripper.extractors.erocast import ErocastExtractor
 from gwaripper.extractors.reddit import RedditExtractor
 from gwaripper.extractors.imgur import ImgurImageExtractor, ImgurAlbumExtractor
 from gwaripper.exceptions import InfoExtractingError
@@ -882,7 +884,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     gwa = GWARipper()
     gwa.db_con = DummyCon()
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+                              file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
     assert fi.downloaded is DownloadErrorCode.HTTP_ERR_NOT_FOUND
 
@@ -901,7 +903,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     #
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+                              file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
     assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
@@ -921,7 +923,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.parent = fc
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+                              file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
     assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
@@ -942,7 +944,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.parent = ri
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+                              file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
     assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
@@ -963,7 +965,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     fi.extractor = SoundgasmExtractor
     download_sould_raise = urllib.error.URLError("Reason for error!")
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
-                              file_index=2, dl_idx=7, dl_max=120) == generate_filename_ret[0]
+                              file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
     assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
 
@@ -971,6 +973,19 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
 
     assert (f"URL Error for {fi.direct_url}: Reason for error!\nExtractor "
             f"{fi.extractor} is probably broken!") in caplog.records[1].message
+
+    #
+    # ExternalError
+    #
+    fi.parent = None
+    fi.extractor = ErocastExtractor
+    download_sould_raise = exceptions.ExternalError("FFmpeg concat error!")
+    assert gwa._download_file(fi, author_name='author_name', top_collection=None,
+                              file_index=2, dl_idx=7, dl_max=120) is None
+    assert fi.id_in_db is None
+    assert fi.downloaded is DownloadErrorCode.EXTERNAL_ERROR
+
+    assert called_with == exc_tests_called_with
 
 
 def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):

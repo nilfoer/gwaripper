@@ -23,6 +23,7 @@ from .info import (
         UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER, DownloadType
         )
 from . import download as dl
+from . import exceptions
 from .reddit import reddit_praw
 from .db import load_or_create_sql_db, export_table_to_csv, backup_db
 
@@ -284,6 +285,17 @@ class GWARipper:
     def _download_file(self, info: FileInfo, author_name: Optional[str],
                        top_collection: Optional[FileCollection], file_index: int = 0,
                        dl_idx: int = 1, dl_max: int = 1) -> Optional[str]:
+        """
+        Will download the file to dl_root in a subfolder named like the reddit user name
+        if that one is not available the extracted (from the page) author of the file gets
+        used
+        Calls info.generate_filename to get a valid filename
+        Also calls method to add dl to db commits when download is successful, does a rollback
+        when not (exception raised).
+
+        :return subpath: Returns subpath to folder the file is located in relative to root_dir
+                         None for unsuccessful downloads
+        """
         # TODO re-add request delay?
         already_downloaded = self.already_downloaded(info)
         if already_downloaded and not self.download_duplicates:
@@ -303,56 +315,20 @@ class GWARipper:
         logger.info("Downloading: %s..., File %d of %d", filename,
                     dl_idx, dl_max)
 
-        if info.download_type == DownloadType.HTTP:
-            return self._download_file_http(info, author_name, top_collection,
-                                            subpath, mypath, filename,
-                                            file_index, dl_idx, dl_max,
-                                            re_dl = already_downloaded)
-        else:
-            return self._download_file_hls(info, author_name, top_collection,
-                                           subpath, mypath, filename,
-                                           file_index, dl_idx, dl_max,
-                                           re_dl = already_downloaded)
-
-    def _download_file_http(
-        self, info: FileInfo, author_name: Optional[str],
-        top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
-        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1, re_dl: bool = False
-    ) -> str:
-        """
-        Will download the file to dl_root in a subfolder named like the reddit user name
-        if that one is not available the extracted (from the page) author of the file gets
-        used
-        Calls info.generate_filename to get a valid filename
-        Also calls method to add dl to db commits when download is successful, does a rollback
-        when not (exception raised).
-
-        :return subpath: Returns subpath to folder the file is located in relative to root_dir
-        """
+        dl_function = (self._download_file_http if info.download_type == DownloadType.HTTP
+                       else self._download_file_hls)
         file_info_id_in_db: Optional[int] = None
-        # TODO retries etc. or use requests lib?
         try:
             # don't add to db if it's a redownload
-            if info.is_audio and not re_dl:
+            if info.is_audio and not already_downloaded:
                 # automatically commits changes to db_con if everything succeeds or does a rollback
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
                     # executes the SQL query but leaves commiting it to context manager
                     file_info_id_in_db = self._add_to_db(info, None, filename)
-                    # func passed as kwarg reporthook gets called once on establishment
-                    # of the network connection and once after each block read thereafter.
-                    # The hook will be passed three arguments; a count of blocks transferred
-                    # so far, a block size in bytes, and the total size of the file
-                    # total size is -1 if unknown
-                    dl.download_in_chunks(info.direct_url,
-                                          os.path.abspath(os.path.join(mypath, filename)),
-                                          prog_bar=True,
-                                          headers=info.additional_headers)
+                    dl_function(info, mypath, filename, re_dl = already_downloaded)
             else:
-                dl.download_in_chunks(info.direct_url,
-                                      os.path.abspath(os.path.join(mypath, filename)),
-                                      prog_bar=True,
-                                      headers=info.additional_headers)
+                dl_function(info, mypath, filename, re_dl = already_downloaded)
         except urllib.error.HTTPError as err:
             logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
 
@@ -376,29 +352,31 @@ class GWARipper:
             logger.error("URL Error for %s: %s\nExtractor %s is probably broken! "
                          "Please report this error on github!", info.direct_url,
                          str(err.reason).strip(), info.extractor)
+        except exceptions.ExternalError:
+            info.downloaded = dl.DownloadErrorCode.EXTERNAL_ERROR
         else:
             info.downloaded = dl.DownloadErrorCode.DOWNLOADED
             info.id_in_db = file_info_id_in_db
             return subpath
+        
+        return None
 
-        return subpath
+    def _download_file_http(self, info: FileInfo, mypath: str, filename: str, re_dl: bool = False):
+        # TODO retries etc. or use requests lib?
+        # func passed as kwarg reporthook gets called once on establishment
+        # of the network connection and once after each block read thereafter.
+        # The hook will be passed three arguments; a count of blocks transferred
+        # so far, a block size in bytes, and the total size of the file
+        # total size is -1 if unknown
+        dl.download_in_chunks(info.direct_url,
+                              os.path.abspath(os.path.join(mypath, filename)),
+                              prog_bar=True,
+                              headers=info.additional_headers)
 
-    def _download_file_hls(
-        self, info: FileInfo, author_name: Optional[str],
-        top_collection: Optional[FileCollection], subpath: str, mypath: str, filename: str,
-        file_index: int = 0, dl_idx: int = 1, dl_max: int = 1, re_dl: bool = False
-    ) -> str:
-        file_info_id_in_db: Optional[int] = None
+    def _download_file_hls(self, info: FileInfo, mypath: str, filename: str, re_dl: bool = False):
 
-        success = dl.download_hls_ffmpeg(info.direct_url, os.path.abspath(os.path.join(mypath, filename)))
-        if success and info.is_audio and not re_dl:
-            file_info_id_in_db = self._add_to_db(info, None, filename)
-            self.db_con.commit()
-            info.downloaded = (
-                dl.DownloadErrorCode.DOWNLOADED if success else dl.DownloadErrorCode.EXTERNAL_ERROR)
-            info.id_in_db = file_info_id_in_db
-
-        return subpath
+        if not dl.download_hls_ffmpeg(info.direct_url, os.path.abspath(os.path.join(mypath, filename))):
+            raise exceptions.ExternalError("FFmpeg concatenation failed!")
 
     def _download_collection(self, info: FileCollection, top_collection: Optional[FileCollection],
                              dl_idx: int = 1) -> DownloadCollectionResult:

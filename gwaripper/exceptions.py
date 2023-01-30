@@ -25,3 +25,7 @@ class NoAPIResponseError(InfoExtractingError):
 class AuthenticationFailed(InfoExtractingError):
     def __init__(self, m: str, url: str):
         super().__init__(m, url)
+
+class ExternalError(GWARipperError):
+    def __init__(self, msg: str):
+        super().__init__(msg)
