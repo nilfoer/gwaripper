@@ -32,7 +32,9 @@ if root_dir and os.path.isdir(root_dir):
 def main():
     parser = argparse.ArgumentParser(
             description="Script to download audios from supported hosts or extract them from "
-                        "reddit submissions the kind of which are found on subreddits like gonewildaudio")
+                        "reddit submissions the kind of which are found on subreddits like gonewildaudio",
+            epilog="NOTE: arguments that are shared over all subcommands need to be put in front of the "
+                 "subcommand itself: e.g. gwaripper --ignore-banned links URL URL ...")
 
     parser.add_argument('--ignore-banned', action='store_true',
                         help="Ignores banned tags in titles and in link text!")
@@ -42,6 +44,11 @@ def main():
     parser.add_argument('--skip-non-audio', action='store_true',
                         help="Only download audio files (e.g. this would mean skipping images found "
                              "in a reddit submission)")
+    parser.add_argument('--dont-write-selftext', action='store_true',
+                        help="Don't write selftext of reddit submissions to "
+                             "disk! WARNING: They are not stored in the DB at the "
+                             "moment, so the selftext will not be available - even in "
+                             "the webGUI")
 
     # support sub-commands like svn checkout which require different kinds of
     # command-line arguments
@@ -277,7 +284,10 @@ def main():
 
 
 def download_all_links(urls: List[str], args: argparse.Namespace) -> None:
-    with GWARipper(download_duplicates=args.download_duplicates, skip_non_audio=args.skip_non_audio) as gw:
+    with GWARipper(
+            download_duplicates=args.download_duplicates,
+            skip_non_audio=args.skip_non_audio,
+            dont_write_selftext=args.dont_write_selftext) as gw:
         gw.set_urls(urls)
         gw.download_all()
 
@@ -302,7 +312,10 @@ def _cl_watch(args):
 
 
 def download_all_subs(sublist: List[praw.models.Submission], args: argparse.Namespace) -> None:
-    with GWARipper(download_duplicates=args.download_duplicates, skip_non_audio=args.skip_non_audio) as gw:
+    with GWARipper(
+            download_duplicates=args.download_duplicates,
+            skip_non_audio=args.skip_non_audio,
+            dont_write_selftext=args.dont_write_selftext) as gw:
         gw.download_all(sublist)
 
 

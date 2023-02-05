@@ -109,7 +109,10 @@ class GWARipper:
 
     # we can only omit -> None if at least one arg is typed otherwise it is
     # considered an untyped method
-    def __init__(self, download_duplicates: bool = False, skip_non_audio: bool = False) -> None:
+    def __init__(self,
+                 download_duplicates: bool = False,
+                 skip_non_audio: bool = False,
+                 dont_write_selftext: bool = False) -> None:
         self.db_con, _ = load_or_create_sql_db(
                 os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.urls: List[str] = []
@@ -117,6 +120,8 @@ class GWARipper:
         self.extractor_reports: List[ExtractorReport] = []
         self.download_duplicates = download_duplicates
         self.skip_non_audio = skip_non_audio
+        # TODO no tests available
+        self.dont_write_selftext = dont_write_selftext
 
     # return type needed otherwise we don't get type checking if used in with..as
     def __enter__(self) -> 'GWARipper':
@@ -444,8 +449,9 @@ class GWARipper:
 
                 subpath = top_collection.subpath if top_collection is not None else ""
                 # :PassSubpathSelftext
-                cast(RedditInfo, info).write_selftext_file(
-                        config.get_root(), os.path.join(author_name, subpath))
+                if not self.dont_write_selftext:
+                    cast(RedditInfo, info).write_selftext_file(
+                            config.get_root(), os.path.join(author_name, subpath))
             else:
                 with self.db_con:
                     self._add_to_db_collection(info, author_name)
@@ -699,5 +705,6 @@ class GWARipper:
             # intentionally don't write into subpath that might get used
             # by RedditInfo since this file was downloaded without it
             file_path = os.path.join(author_subdir, filename_local)
-            info.reddit_info.write_selftext_file(
-                    config.get_root(), file_path, force_path=True)
+            if not self.dont_write_selftext:
+                info.reddit_info.write_selftext_file(
+                        config.get_root(), file_path, force_path=True)
