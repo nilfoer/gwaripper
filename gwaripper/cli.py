@@ -31,13 +31,14 @@ if root_dir and os.path.isdir(root_dir):
 
 def main():
     parser = argparse.ArgumentParser(
-            description="Script to download gonewildaudio/pta posts from either reddit "
-                        "or soundgasm.net directly.")
+            description="Script to download audios from supported hosts or extract them from "
+                        "reddit submissions the kind of which are found on subreddits like gonewildaudio")
 
     parser.add_argument('--ignore-banned', action='store_true',
                         help="Ignores banned tags in titles and in link text!")
     parser.add_argument('--download-duplicates', action='store_true',
-                        help="Downloads files even if they're already in the DB!")
+                        help="Downloads files even if they're already in the "
+                             "DB/have been downloaded before!")
 
     # support sub-commands like svn checkout which require different kinds of
     # command-line arguments
@@ -52,8 +53,19 @@ def main():
     # !! -> doesnt work since we need to specify a subcommand since they work
     # like positional arguements and providing a default subcommand isnt supported atm
     # create the parser for the "links" subcommand
-    parser_lnk = subparsers.add_parser('links', help='Process single link/s')
-    parser_lnk.add_argument("links", help="Links to process.", nargs="+", metavar='URL')
+    parser_lnk = subparsers.add_parser(
+        'links',
+        help='Download all links passed in as positional command line '
+             'arguments. URLs to reddit submissions will be searched for supported '
+             'audio hosts and then these will be downloaded informing you about '
+             'known, but unsupported audio hosts. Links to other reddit submissions '
+             'inside another reddit submission will not be processed, but you will '
+             'also be informed about them in the report '
+             '(found in {gwaripper root}/_reports after the download is done)')
+    parser_lnk.add_argument(
+        "links",
+        help="Links to process (reddit submissions or supported audio hosts).",
+        nargs="+", metavar='URL')
     # set funct to call when subcommand is used
     parser_lnk.set_defaults(func=_cl_link)
 
@@ -63,16 +75,28 @@ def main():
     #
     # PARSE LINKS FROM TXT FILE
     #
-    parser_txt = subparsers.add_parser('fromtxt', help='Process links in txt file')
-    parser_txt.add_argument("filename", help="Filename of txt file")
+    parser_txt = subparsers.add_parser(
+        'fromtxt',
+        help='Specify a path to a text file where each line is a separate URL '
+             'to a reddit submission or to a supported audio host. For more '
+             'information see the helptext of links: `links -h`')
+    parser_txt.add_argument(
+        "filename",
+        help="Path to the text file containing one reddit submission URL or one supported "
+             "audio host URL per line")
     parser_txt.set_defaults(func=_cl_fromtxt)
 
     #
     # WATCH CLIPBOARD
     #
     parser_clip = subparsers.add_parser(
-            'watch', help='Watch clipboard for sgasm/reddit links and save them to txt;'
-                          ' option to process them immediately')
+        'watch',
+        help='Starts watching the system clipboard for copied text. If the text '
+             'is matched by one of the supported extractors (e.g. reddit submissions '
+             'or a soundgasm.net link) it is copied to memory and also appended to a '
+             'text file in {gwaripper root}/_linkcol/{YYYY}-{MM}-{DD}_{HH}h.txt '
+             'Pressing Ctrl+C will stop watching the clibpoard and will prompt you if '
+             'all the URLs should be downloaded immediately.')
     parser_clip.set_defaults(func=_cl_watch)
 
     # add parser that is used as parent parser for all subcmd parsers so they can have common
@@ -80,32 +104,36 @@ def main():
     parent_parser = argparse.ArgumentParser(add_help=False)
     # all subcmd parsers will have options added here (as long as they have this parser as
     # parent)
-    parent_parser.add_argument("limit", type=int, help="How many posts to download"
-                               "when ripping redditor", metavar='POST_LIMIT')
+    parent_parser.add_argument("limit", type=int,
+                               help="Maximum number of reddit submissions", metavar='POST_LIMIT')
     parent_parser.add_argument("-s", "--sort", choices=("hot", "top", "new"), default="top",
-                               help="Reddit post sorting method (default: top)",
+                               help="Reddit submission sorting method (default: top; choices: hot, top, new)",
                                metavar='SORTBY')
-    parent_parser.add_argument("-t", "--timefilter",
-                               help="Value for time filter (default: all)", default="all",
-                               choices=("all", "day", "hour", "month", "week", "year"),
-                               metavar='TIME_FRAME')
+    parent_parser.add_argument(
+        "-t", "--timefilter",
+        help="Value for time filter (default: all; choices: all, day, hour, month, week, year)",
+        default="all", choices=("all", "day", "hour", "month", "week", "year"),
+        metavar='TIME_FRAME')
 
     #
     # RIP REDDITORS
     #
-    parser_rusr = subparsers.add_parser('redditor', help='Rip redditor/s',
-                                        parents=[parent_parser])
-    parser_rusr.add_argument("names", help="Names of users to rip.", nargs="+")
+    parser_rusr = subparsers.add_parser(
+        'redditor',
+        help='Process a maximun of {POST_LIMIT} submissions of the specified redditor.',
+        parents=[parent_parser])
+    parser_rusr.add_argument("names", help="Reddit user name", nargs="+", metavar='USERNAME')
     parser_rusr.set_defaults(func=_cl_redditor)
 
     #
     # SUBREDDIT
     #
     # provide shorthands or alt names with aliases
-    parser_sub = subparsers.add_parser('subreddit', aliases=["sub"],
-                                       parents=[parent_parser],
-                                       help='Parse subreddit and download supported links')
-    parser_sub.add_argument("sub", help="Name of subreddit")
+    parser_sub = subparsers.add_parser(
+        'subreddit', aliases=["sub"],
+        parents=[parent_parser],
+        help='Process {POST_LIMIT} of reddit submissions sorted by {SORTBY} from the specified subreddit')
+    parser_sub.add_argument("sub", help="Name of subreddit", metavar='SUBREDDIT')
     # nargs=? One argument will be consumed from the command line if possible
     # no command-line argument -> default
     # optional arguments -> option string is present but not followed by a
@@ -121,25 +149,25 @@ def main():
     # REDDIT SEARCH
     #
     parser_se = subparsers.add_parser(
-            'search', help='Search subreddit and download supported links',
+            'search', help='Search subreddit and process at most {POST_LIMIT} matching submissions',
             parents=[parent_parser])
     # parser normally uses name of dest=name (which u use to access value with args.name)
     # var for refering to argument -> --subreddit SUBREDDIT; can be different from option
     # string e.g. -user, dest="name" can be changed with metavar, when
     # nargs=n -> tuple with n elements
-    parser_se.add_argument("subname", help="Name of subreddit")
+    parser_se.add_argument("subname", help="Name of subreddit to search", metavar='SUBREDDIT')
     parser_se.add_argument("sstr", help=("Searchstring in lucene syntax (see: "
                                          "https://www.reddit.com/wiki/search)"),
-                           metavar="searchstring")
+                           metavar="LUCENE_SEARCH_STRING")
     parser_se.set_defaults(func=_cl_search)
 
     parser_cfg = subparsers.add_parser("config", help="Configure GWARipper: save location etc.")
-    parser_cfg.add_argument("-p", "--path", help="Set path to root directory, "
+    parser_cfg.add_argument("-p", "--path", help="Set path to gwaripper's root directory, "
                                                  "where all the files will be downloaded to")
     parser_cfg.add_argument("-bf", "--backup-freq", metavar="FREQUENCY", type=float,
-                            help="Set auto backup frequency in days")
+                            help="Set auto backup frequency of the DB in days")
     parser_cfg.add_argument("-bn", "--backup-nr", metavar="N-BACKUPS", type=int,
-                            help="Set max. number of backups to keep")
+                            help="Set max. number of DB backups to keep")
     parser_cfg.add_argument("-tf", "--tagfilter",
                             help="Set banned strings/tags in reddit title", nargs="+",
                             metavar="TAG")
@@ -151,7 +179,7 @@ def main():
     parser_cfg.add_argument("-smr", "--set-missing-reddit", type=int, choices=(0, 1),
                             help="Should gwaripper get the info of soundgasm.net-files "
                                  "when coming from reddit even thouth they already have "
-                                 "been downloaded, so missing info can be fille into the DB")
+                                 "been downloaded, so missing reddit info can be filled in")
     parser_cfg.add_argument("-rci", "--reddit-client-id", metavar="client_id", type=str,
                             help="Set reddit client_id which is needed to use reddit functions")
     parser_cfg.add_argument("-rcs", "--reddit-client-secret", metavar="client_secret", type=str,
@@ -163,7 +191,7 @@ def main():
                                  "imgur images and albumus (but not direct imgur links)")
     parser_cfg.set_defaults(func=_cl_config)
 
-    parser.add_argument("-te", "--test", action="store_true")
+    parser.add_argument("-te", "--test", action="store_true", help=argparse.SUPPRESS)
 
     # check with: if not len(sys.argv) > 1
     # if no arguments were passed and call our old input main func; or use
@@ -242,7 +270,7 @@ def main():
         _cl_config(args)
     else:
         print("root_path not set in gwaripper_config.ini, use command config -p "
-              "'C:\\absolute\\path' to specify where the files will be downloaded to")
+              "\"C:\\absolute\\path\" to specify where the files will be downloaded to")
 
 
 def download_all_links(urls: List[str], args: argparse.Namespace) -> None:
