@@ -39,6 +39,9 @@ def main():
     parser.add_argument('--download-duplicates', action='store_true',
                         help="Downloads files even if they're already in the "
                              "DB/have been downloaded before!")
+    parser.add_argument('--skip-non-audio', action='store_true',
+                        help="Only download audio files (e.g. this would mean skipping images found "
+                             "in a reddit submission)")
 
     # support sub-commands like svn checkout which require different kinds of
     # command-line arguments
@@ -274,7 +277,7 @@ def main():
 
 
 def download_all_links(urls: List[str], args: argparse.Namespace) -> None:
-    with GWARipper(download_duplicates=args.download_duplicates) as gw:
+    with GWARipper(download_duplicates=args.download_duplicates, skip_non_audio=args.skip_non_audio) as gw:
         gw.set_urls(urls)
         gw.download_all()
 
@@ -299,7 +302,7 @@ def _cl_watch(args):
 
 
 def download_all_subs(sublist: List[praw.models.Submission], args: argparse.Namespace) -> None:
-    with GWARipper(download_duplicates=args.download_duplicates) as gw:
+    with GWARipper(download_duplicates=args.download_duplicates, skip_non_audio=args.skip_non_audio) as gw:
         gw.download_all(sublist)
 
 

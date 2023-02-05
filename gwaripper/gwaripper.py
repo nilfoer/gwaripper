@@ -109,13 +109,14 @@ class GWARipper:
 
     # we can only omit -> None if at least one arg is typed otherwise it is
     # considered an untyped method
-    def __init__(self, download_duplicates: bool = False) -> None:
+    def __init__(self, download_duplicates: bool = False, skip_non_audio: bool = False) -> None:
         self.db_con, _ = load_or_create_sql_db(
                 os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.urls: List[str] = []
         self.nr_urls: int = 0
         self.extractor_reports: List[ExtractorReport] = []
         self.download_duplicates = download_duplicates
+        self.skip_non_audio = skip_non_audio
 
     # return type needed otherwise we don't get type checking if used in with..as
     def __enter__(self) -> 'GWARipper':
@@ -301,6 +302,9 @@ class GWARipper:
         if already_downloaded and not self.download_duplicates:
             logger.info("File was already downloaded, skipped URL: %s", info.page_url)
             return None
+        elif not info.is_audio and self.skip_non_audio:
+            logger.info("Non-audio file was skipped! URL: %s", info.page_url)
+            return None
 
         if not author_name:
             author_name = UNKNOWN_USR_FOLDER
@@ -318,17 +322,21 @@ class GWARipper:
         dl_function = (self._download_file_http if info.download_type == DownloadType.HTTP
                        else self._download_file_hls)
         file_info_id_in_db: Optional[int] = None
+        # NOTE: we already skipped duplicate files if self.download_duplicates wasn't set as
+        # well as non-audio files if self.skip_non_audio was True
+        # -> this just needs to branch on audio vs non-audio with regards to adding it to the DB
         try:
-            # don't add to db if it's a redownload
             if info.is_audio and not already_downloaded:
                 # automatically commits changes to db_con if everything succeeds or does a rollback
                 # if an exception is raised; exception is still raised and must be caught
                 with self.db_con:
                     # executes the SQL query but leaves commiting it to context manager
                     file_info_id_in_db = self._add_to_db(info, None, filename)
-                    dl_function(info, mypath, filename, re_dl = already_downloaded)
+                    dl_function(info, mypath, filename)
             else:
-                dl_function(info, mypath, filename, re_dl = already_downloaded)
+                # don't add to db if it's a redownload or non-audio
+                # NOTE: we already skip duplicate audios up top if download_duplicates isn't set
+                dl_function(info, mypath, filename)
         except urllib.error.HTTPError as err:
             logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
 
@@ -342,6 +350,8 @@ class GWARipper:
                            "not be written if this was the only file! "
                            "It's recommended to manually delete and re-download the file "
                            "using GWARipper!")
+            info.downloaded = dl.DownloadErrorCode.HTTP_ERROR_OTHER
+
             if info.parent:
                 logger.warning(
                         "Containing root collection: %s",
@@ -352,6 +362,8 @@ class GWARipper:
             logger.error("URL Error for %s: %s\nExtractor %s is probably broken! "
                          "Please report this error on github!", info.direct_url,
                          str(err.reason).strip(), info.extractor)
+            # TODO inaccurate
+            info.downloaded = dl.DownloadErrorCode.HTTP_ERROR_OTHER
         except exceptions.ExternalError:
             info.downloaded = dl.DownloadErrorCode.EXTERNAL_ERROR
         else:
@@ -361,7 +373,7 @@ class GWARipper:
         
         return None
 
-    def _download_file_http(self, info: FileInfo, mypath: str, filename: str, re_dl: bool = False):
+    def _download_file_http(self, info: FileInfo, mypath: str, filename: str):
         # TODO retries etc. or use requests lib?
         # func passed as kwarg reporthook gets called once on establishment
         # of the network connection and once after each block read thereafter.
@@ -373,7 +385,7 @@ class GWARipper:
                               prog_bar=True,
                               headers=info.additional_headers)
 
-    def _download_file_hls(self, info: FileInfo, mypath: str, filename: str, re_dl: bool = False):
+    def _download_file_hls(self, info: FileInfo, mypath: str, filename: str):
 
         if not dl.download_hls_ffmpeg(info.direct_url, os.path.abspath(os.path.join(mypath, filename))):
             raise exceptions.ExternalError("FFmpeg concatenation failed!")
