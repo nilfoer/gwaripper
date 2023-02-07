@@ -13,7 +13,7 @@ from ..exceptions import (
         InfoExtractingError, NoAPIResponseError,
         NoAuthenticationError, AuthenticationFailed
         )
-from .. import config
+from gwaripper import config
 # import whole module instead of individual symbols (import FileCollection,..)
 # to avoid circular import problems
 from gwaripper import info

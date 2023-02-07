@@ -5,7 +5,10 @@ import os.path
 import time
 import configparser
 
-from typing import cast, List, Optional, Tuple
+from typing import cast, List, Optional, Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gwaripper import extractors
 
 # NOTE: pyinstaller single folder dist and one-file exe
 # sys.frozen -> packaged inside executable -> need to figure out our path
@@ -102,7 +105,10 @@ def get_root() -> str:
 
 
 def set_root(root_path: str) -> None:
-    config["Settings"]["root_path"] = root_path
+    try:
+        config["Settings"]["root_path"] = root_path
+    except KeyError:
+        config["Settings"] = {"root_path": root_path}
 
 
 def reload_config() -> None:
@@ -125,3 +131,31 @@ def write_config_module() -> None:
               "w", encoding="UTF-8") as config_file:
         # configparser doesnt preserve comments when writing
         config.write(config_file)
+
+
+def print_host_options():
+    # import in function due to circular imports.. yuck
+    from gwaripper import extractors
+    for h in extractors.AudioHost:
+        print(f"{h.value} = {h.name}")
+
+
+def get_host_priorities() -> List['extractors.AudioHost']:
+    # import in function due to circular imports.. yuck
+    from gwaripper import extractors
+    result = []
+    try:
+        for number_str in config["Settings"]["host_priority"].split(","):
+            number = int(number_str.strip())
+            result.append(extractors.AudioHost(number))
+    except (KeyError, ValueError):
+        print("WARNING: Malformed host_priority setting!")
+
+    return result
+
+def set_host_priorities(host_priority_str: str):
+    try:
+        config["Settings"]["host_priority"] = host_priority_str
+    except KeyError:
+        config["Settings"] = {"host_priority": host_priority_str}
+

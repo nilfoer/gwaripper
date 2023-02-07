@@ -11,7 +11,7 @@ from typing import List, Optional
 
 from . import utils
 from . import clipwatcher_single
-from . import config
+from gwaripper import config
 from .gwaripper import GWARipper
 from .reddit import reddit_praw, parse_subreddit, search_subreddit
 from .logging_setup import configure_logging
@@ -171,7 +171,9 @@ def main():
                            metavar="LUCENE_SEARCH_STRING")
     parser_se.set_defaults(func=_cl_search)
 
-    parser_cfg = subparsers.add_parser("config", help="Configure GWARipper: save location etc.")
+    parser_cfg = subparsers.add_parser("config",
+        help="Configure GWARipper: save location etc.",
+        epilog="Calling config without any argument will output all current settings!")
     parser_cfg.add_argument("-p", "--path", help="Set path to gwaripper's root directory, "
                                                  "where all the files will be downloaded to")
     parser_cfg.add_argument("-bf", "--backup-freq", metavar="FREQUENCY", type=float,
@@ -199,6 +201,15 @@ def main():
     parser_cfg.add_argument("-ici", "--imgur-client-id", metavar="imgur_client_id", type=str,
                             help="Set client_id for imgur which is needed to download "
                                  "imgur images and albumus (but not direct imgur links)")
+    parser_cfg.add_argument(
+            "--only-one-mirror", metavar="ZERO_OR_ONE", type=str,
+            help="Activate (1: on; 0: off) only downloading the audios from one of the mirrors."
+                 "The mirror that's chosen depends on the host priority list, which can "
+                 "be set with --host-priority. If there are no entries in the priority "
+                 "list an arbitrary host will be picked!")
+    parser_cfg.add_argument("--host-priority", action="store_true",
+                            help="Set the host priority list that determines which hosts are chosen in "
+                                 "what order when only_one_mirror is activated.")
     parser_cfg.set_defaults(func=_cl_config)
 
     parser.add_argument("-te", "--test", action="store_true", help=argparse.SUPPRESS)
@@ -287,7 +298,9 @@ def download_all_links(urls: List[str], args: argparse.Namespace) -> None:
     with GWARipper(
             download_duplicates=args.download_duplicates,
             skip_non_audio=args.skip_non_audio,
-            dont_write_selftext=args.dont_write_selftext) as gw:
+            dont_write_selftext=args.dont_write_selftext,
+            only_one_mirror=config.config.getboolean("Settings", "only_one_mirror", fallback=False),
+            host_priority=config.get_host_priorities()) as gw:
         gw.set_urls(urls)
         gw.download_all()
 
@@ -315,7 +328,9 @@ def download_all_subs(sublist: List[praw.models.Submission], args: argparse.Name
     with GWARipper(
             download_duplicates=args.download_duplicates,
             skip_non_audio=args.skip_non_audio,
-            dont_write_selftext=args.dont_write_selftext) as gw:
+            dont_write_selftext=args.dont_write_selftext,
+            only_one_mirror=config.config.getboolean("Settings", "only_one_mirror", fallback=False),
+            host_priority=config.get_host_priorities()) as gw:
         gw.download_all(sublist)
 
 
@@ -453,6 +468,22 @@ def _cl_config(args) -> None:
             config.config["Imgur"] = {"client_id": str(args.imgur_client_id)}
         changed = True
         print("Successfully set Imgur Client ID")
+    if args.only_one_mirror:
+        activated = "True" if args.only_one_mirror == "1" else "False"
+        try:
+            config.config["Settings"]["only_one_mirror"] = activated
+        except KeyError:
+            config.config["Settings"] = {"only_one_mirror": activated}
+        changed = True
+        print("Successfully set only_one_mirror to", activated)
+    if args.host_priority:
+        config.print_host_options()
+        ans = input("Enter the order of hosts by using their __number__ separated by commas. "
+                    "The order is highest priority to lowest:\n")
+        config.set_host_priorities(ans)
+        changed = True
+        hosts = ",".join(x.name for x in config.get_host_priorities())
+        print("Successfully set host_priority to", hosts)
     if not changed:
         # print current cfg
         for sec in config.config.sections():
