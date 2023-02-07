@@ -6,13 +6,14 @@ from typing import Optional, Match, cast, Pattern, ClassVar, Tuple, Any
 from urllib.parse import quote as url_quote
 
 from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport
-from ..info import FileInfo
+from gwaripper import info
 from ..exceptions import InfoExtractingError
 
 
 class EraudicaExtractor(BaseExtractor):
 
     EXTRACTOR_NAME: ClassVar[str] = "Eraudica"
+    EXTRACTOR_ID: ClassVar[int] = 4
     BASE_URL: ClassVar[str] = "eraudica.com"
 
     VALID_ERAUDICA_URL_RE: ClassVar[Pattern] = re.compile(
@@ -34,7 +35,7 @@ class EraudicaExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_ERAUDICA_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileInfo'], ExtractorReport]:
         html, http_code = EraudicaExtractor.get_html(self.url)
         if not html:
             if self.http_code_is_extractor_broken(http_code):
@@ -93,6 +94,6 @@ class EraudicaExtractor(BaseExtractor):
         descr = "\n\n".join([p.get_text() for p in soup.select('div.description > p')][1:])
 
         # hardcoded author name
-        return (FileInfo(self.__class__, True, ext, self.url,
+        return (info.FileInfo(self.__class__, True, ext, self.url,
                          direct_url, None, title, descr, "Eves-garden"),
                 ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS))

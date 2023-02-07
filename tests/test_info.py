@@ -8,7 +8,9 @@ from gwaripper.info import (
         )
 # from gwaripper.extractors.base import BaseExtractor
 # doesn't work since it leads to circ dep
-from gwaripper.extractors import base
+from gwaripper.extractors import base, AudioHost
+from gwaripper import extractors
+from gwaripper.download import DownloadErrorCode
 
 
 def test_fc_add_file_collection():
@@ -515,3 +517,110 @@ def test_sanitize_filename_asserts():
             "assert fires assert fires assert fires assert fires assert fires "
             "assert fires assert fires assert fires assert fires assert fires "
             "assert fires assert fires assert fires assert fires ", "test")
+
+
+def test_choose_mirrors_only_one_host():
+    fc = FileCollection(None, "url", *[None]*3)
+    fi1 = FileInfo(extractors.SoundgasmExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi2 = FileInfo(extractors.ImgurImageExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fc1 = FileCollection(extractors.SoundgasmUserExtractor, "url", *[None]*3)
+    fc2 = FileCollection(extractors.ImgurAlbumExtractor, "url", *[None]*3)
+
+    fc.add_file(fi1)
+    fc.add_file(fi2)
+    fc.add_collection(fc1)
+    fc.add_collection(fc2)
+
+    fc.choose_mirrors([AudioHost.EROCAST])
+
+    # should still have default, since there's only one host
+    assert fi1.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fc1.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+    assert fc2.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+
+
+def test_choose_mirrors_imbalanced_files():
+    fc = FileCollection(None, "url", *[None]*3)
+    fi1 = FileInfo(extractors.SoundgasmExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi2 = FileInfo(extractors.ImgurImageExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi3 = FileInfo(extractors.ErocastExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fc1 = FileCollection(extractors.SoundgasmUserExtractor, "url", *[None]*3)
+    fc2 = FileCollection(extractors.ImgurAlbumExtractor, "url", *[None]*3)
+
+    fc.add_file(fi1)
+    fc.add_file(fi2)
+    fc.add_file(fi3)
+    fc.add_collection(fc1)
+    fc.add_collection(fc2)
+
+    fc.choose_mirrors([AudioHost.EROCAST])
+
+    # should still have default, since not all files were present on all mirrors
+    assert fi1.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi3.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fc1.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+    assert fc2.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+
+def test_choose_mirrors_pick_highest():
+    fc = FileCollection(None, "url", *[None]*3)
+    fi1 = FileInfo(extractors.SoundgasmExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi2 = FileInfo(extractors.ImgurImageExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi3 = FileInfo(extractors.ErocastExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi4 = FileInfo(extractors.ErocastExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fc1 = FileCollection(extractors.SoundgasmUserExtractor, "url", *[None]*3)
+    fc2 = FileCollection(extractors.ImgurAlbumExtractor, "url", *[None]*3)
+
+    fc.add_file(fi1)
+    fc.add_file(fi2)
+    fc.add_file(fi3)
+    fc.add_file(fi4)
+    fc.add_collection(fc1)
+    fc.add_collection(fc2)
+
+    fc.choose_mirrors([AudioHost.EROCAST, AudioHost.SOUNDGASM, AudioHost.WHYP])
+
+    # should skip Soundgasm links
+    assert fi1.downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+    assert fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi3.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi4.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fc1.downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+    assert fc2.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+
+
+def test_choose_mirrors_not_in_prio_list():
+    fc = FileCollection(None, "url", *[None]*3)
+    fi1 = FileInfo(extractors.SoundgasmExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi2 = FileInfo(extractors.ImgurImageExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi3 = FileInfo(extractors.ErocastExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fi4 = FileInfo(extractors.ErocastExtractor, True, "m4a", "pgurl", "url", *[None]*4)
+    fc1 = FileCollection(extractors.SoundgasmUserExtractor, "url", *[None]*3)
+    fc2 = FileCollection(extractors.ImgurAlbumExtractor, "url", *[None]*3)
+
+    fc.add_file(fi1)
+    fc.add_file(fi2)
+    fc.add_file(fi3)
+    fc.add_file(fi4)
+    fc.add_collection(fc1)
+    fc.add_collection(fc2)
+
+    fc.choose_mirrors([])
+
+    # should skip ONE of the hosts
+    assert (
+        (fi1.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+            and fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+            and fi3.downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+            and fi4.downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+            and fc1.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN
+            and fc2.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN)
+        or
+        (fi1.downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+            and fi2.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+            and fi3.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+            and fi4.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+            and fc1.downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+            and fc2.downloaded is DownloadErrorCode.ERROR_IN_CHILDREN)
+    )

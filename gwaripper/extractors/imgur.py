@@ -11,7 +11,7 @@ from ..config import config
 from ..exceptions import NoAPIResponseError, NoAuthenticationError
 
 from .base import BaseExtractor, ExtractorReport, ExtractorErrorCode
-from ..info import FileInfo, FileCollection
+from gwaripper import info
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ class ImgurImageExtractor(BaseExtractor[Dict[str, Any]]):
     image file but to the image page"""
 
     EXTRACTOR_NAME: ClassVar[str] = "ImgurImage"
+    EXTRACTOR_ID: ClassVar[int] = 6
     BASE_URL: ClassVar[str] = "imgur.com"
 
     IMAGE_FILE_URL_RE: ClassVar[Pattern] = re.compile(
@@ -69,7 +70,7 @@ class ImgurImageExtractor(BaseExtractor[Dict[str, Any]]):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.IMAGE_FILE_URL_RE.match(url) or cls.IMAGE_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileInfo'], ExtractorReport]:
         # TODO: get image title etc. (for direct link as well using hash)
         direct_url = self.direct_url
         if not self.is_direct:
@@ -88,7 +89,7 @@ class ImgurImageExtractor(BaseExtractor[Dict[str, Any]]):
                 direct_url = self.api_response["data"]["link"]
                 self.ext = direct_url.rsplit('.', 1)[1]  # type: ignore
 
-        return (FileInfo(self.__class__, False, cast(str, self.ext), self.url,
+        return (info.FileInfo(self.__class__, False, cast(str, self.ext), self.url,
                          cast(str, direct_url), self.image_hash, self.image_hash, None, None),
                 ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS))
 
@@ -98,6 +99,7 @@ class ImgurAlbumExtractor(BaseExtractor):
     ALBUM_URL_RE = re.compile(r"(?:https?://)?(?:www\.|m\.)?imgur\.com/(?:a|gallery)/(\w{5,7})")
 
     EXTRACTOR_NAME: ClassVar[str] = "ImgurAlbum"
+    EXTRACTOR_ID: ClassVar[int] = 7
     BASE_URL: ClassVar[str] = "imgur.com"
 
     headers = {
@@ -122,7 +124,7 @@ class ImgurAlbumExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.ALBUM_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileCollection], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileCollection'], ExtractorReport]:
         api_response, http_code = ImgurAlbumExtractor.get_html(self.api_url)
 
         if not api_response:
@@ -141,7 +143,7 @@ class ImgurAlbumExtractor(BaseExtractor):
             logger.warning("No images in album: %s", self.album_hash)
             return None, ExtractorReport(self.url, ExtractorErrorCode.EMPTY_COLLECTION)
 
-        fcol = FileCollection(self.__class__, self.url, self.album_hash,
+        fcol = info.FileCollection(self.__class__, self.url, self.album_hash,
                               self.title if self.title else self.album_hash,
                               None)
 

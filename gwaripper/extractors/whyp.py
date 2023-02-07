@@ -8,7 +8,7 @@ from .base import (
     BaseExtractor, ExtractorReport, ExtractorErrorCode,
     title_has_banned_tag
 )
-from ..info import FileInfo, FileCollection, DownloadType
+from gwaripper import info
 from ..exceptions import InfoExtractingError
 
 
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class WhypExtractor(BaseExtractor):
     EXTRACTOR_NAME: ClassVar[str] = "Whyp"
+    EXTRACTOR_ID: ClassVar[int] = 10
     BASE_URL: ClassVar[str] = "whyp.it"
 
     # grp1: id, grp2: slug, grp3: token
@@ -44,7 +45,7 @@ class WhypExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_WHYP_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileInfo'], ExtractorReport]:
         if self.token is not None:
             api_req_url = WhypExtractor.API_FORMAT_PRIVATE.format(id = self.id, token = self.token)
         else:
@@ -73,7 +74,7 @@ class WhypExtractor(BaseExtractor):
         user = data.get('user', {})
 
         # TODO download artwork by returning a FileCollection
-        result = FileInfo(WhypExtractor, True, "mp3", self.url, data['audio_url'],
+        result = info.FileInfo(WhypExtractor, True, "mp3", self.url, data['audio_url'],
                           self.id, title = data.get('title', None), descr=data.get('description', None),
                           author=user.get('username', None))
         # NOTE: we need to set Referer header otherwise get a 403 error

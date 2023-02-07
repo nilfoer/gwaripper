@@ -6,13 +6,14 @@ import bs4
 from typing import Optional, ClassVar, Pattern, Match, cast, Tuple, Any
 
 from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport, title_has_banned_tag
-from ..info import FileInfo
+from gwaripper import info
 from ..exceptions import InfoExtractingError
 
 
 class ChirbitExtractor(BaseExtractor):
 
     EXTRACTOR_NAME: ClassVar[str] = "Chirbit"
+    EXTRACTOR_ID: ClassVar[int] = 5
     BASE_URL: ClassVar[str] = "chirb.it"
 
     VALID_CHIRBIT_URL_RE: ClassVar[Pattern] = re.compile(
@@ -28,7 +29,7 @@ class ChirbitExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_CHIRBIT_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileInfo'], ExtractorReport]:
         """
         Use bs4 to get a reversed base64 encoded string from <i> tag's data-fd attribute
         Reverse it with a slice and decode it with base64.b64decode
@@ -65,6 +66,6 @@ class ChirbitExtractor(BaseExtractor):
         ext = direct_url.split("?")[0].rsplit(".", 1)[1]
         author = soup.select_one('#chirbit-username').text
 
-        return (FileInfo(self.__class__, True, ext, self.url,
+        return (info.FileInfo(self.__class__, True, ext, self.url,
                          direct_url, self.id, title, None, author),
                 ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS))

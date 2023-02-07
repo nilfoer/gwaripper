@@ -68,7 +68,9 @@ if not config.sections():
             "tag1_in_but_not_tag2": "[script offer];[script fill]",
             "db_bu_freq": "5",
             "max_db_bu": "5",
-            "set_missing_reddit": "True"
+            "set_missing_reddit": "True",
+            "only_one_mirror": "False",
+            "host_priority": "0,5,4",
         },
         "Time": {
             "last_db_bu": str(time.time()),

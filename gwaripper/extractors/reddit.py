@@ -13,7 +13,7 @@ from .soundgasm import SoundgasmUserExtractor
 # NOTE: IMPORTANT need to be imported as "import foo" rather than "from foo import bar"
 # see :GlobalConfigImport
 from .. import config
-from ..info import RedditInfo, children_iter_dfs
+from gwaripper import info
 from ..reddit import reddit_praw, redirect_xpost
 from ..exceptions import InfoExtractingError
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 class RedditExtractor(BaseExtractor[Submission]):
 
     EXTRACTOR_NAME: ClassVar[str] = "Reddit"
+    EXTRACTOR_ID: ClassVar[int] = 1
     BASE_URL: ClassVar[str] = "reddit.com"
 
     # grp1: subreddit, grp2: reddit id, grp3: title
@@ -60,7 +61,7 @@ class RedditExtractor(BaseExtractor[Submission]):
         else:
             return None, ExtractorReport(self.url, ExtractorErrorCode.NO_RESPONSE)
 
-    def _extract(self) -> Tuple[Optional[RedditInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.RedditInfo'], ExtractorReport]:
         """
         Searches .url and .selftext_html of a reddit submission for supported urls.
 
@@ -74,7 +75,7 @@ class RedditExtractor(BaseExtractor[Submission]):
         # TODO do the equivalent of the time check code using praw when searching
         # for submissions etc. since that is the only place it was being used at
 
-        ri: Optional[RedditInfo] = None
+        ri: Optional['info.RedditInfo'] = None
         report: ExtractorReport = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
 
         if self.submission is None:
@@ -97,7 +98,7 @@ class RedditExtractor(BaseExtractor[Submission]):
 
             # rebuild subs url to account for redirection
             redirected_url: str = f"{self.praw.config.reddit_url}{submission.permalink}"
-            ri = RedditInfo(self.__class__, redirected_url, submission.id, submission.title,
+            ri = info.RedditInfo(self.__class__, redirected_url, submission.id, submission.title,
                             None, submission.subreddit.display_name, str(submission.permalink),
                             submission.created_utc)
             ri.r_post_url = sub_url
@@ -110,6 +111,8 @@ class RedditExtractor(BaseExtractor[Submission]):
 
             # sub url not pointing to itself
             if not submission.is_self:
+                # TODO @Refactor change this so that the base class takes care of finding extractors
+                # mb this would only return a list of found links?
                 extractor: Optional[Type[BaseExtractor]] = find_extractor(sub_url)
 
                 if extractor is not None:
@@ -175,7 +178,7 @@ class RedditExtractor(BaseExtractor[Submission]):
                                 ExtractorReport(href, ExtractorErrorCode.NO_EXTRACTOR))
 
             if ri:
-                if not (any(c.is_audio for _, c in children_iter_dfs(
+                if not (any(c.is_audio for _, c in info.children_iter_dfs(
                                ri.children, file_info_only=True))):
                     if config.config.getboolean('Settings', 'skip_reddit_without_audio',
                                                 fallback=False):
@@ -185,7 +188,7 @@ class RedditExtractor(BaseExtractor[Submission]):
                         report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
                     logger.warning("No supported audio link in \"%s\"", submission.shortlink)
 
-                if not cast(RedditInfo, ri).children:
+                if not cast(info.RedditInfo, ri).children:
                     report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
 
         else:

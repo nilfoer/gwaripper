@@ -4,9 +4,10 @@ import os
 import gwaripper.config as cfg
 
 from gwaripper.gwaripper import GWARipper
-from gwaripper.info import FileInfo
+from gwaripper.info import FileInfo, FileCollection
 from gwaripper.cli import _cl_link
 from gwaripper.download import DownloadErrorCode
+from gwaripper import extractors
 from utils import TESTS_DIR, setup_tmpdir_param, gen_hash_from_file
 
 class ArgsDummy:
@@ -64,3 +65,75 @@ def test_skip_non_audio(monkeypatch, setup_tmpdir_param):
             assert f.downloaded is DownloadErrorCode.DOWNLOADED
         else:
             assert f.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+
+
+def test_dont_skip_non_prio_hosts(monkeypatch, setup_tmpdir_param):
+    testpath = setup_tmpdir_param
+
+    gwa = GWARipper(only_one_mirror=False,
+                    host_priority=[extractors.AudioHost.WHYP, extractors.AudioHost.EROCAST])
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._download_file_http", lambda *args: None)
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db", lambda *args: 13)
+    files = [
+        FileInfo(extractors.SoundgasmExtractor, True, "mp3", "ksdjfks", "sfdkfs", *[None]*4),
+        FileInfo(extractors.ImgurImageExtractor, False, "jpg", "ksdjfks", "sfdkfs", *[None]*4),
+        FileInfo(extractors.WhypExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+        FileCollection(extractors.SoundgasmUserExtractor, "url", *[None]*3),
+        FileInfo(extractors.WhypExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+        FileInfo(extractors.ErocastExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+        FileCollection(extractors.ImgurAlbumExtractor, "url", *[None]*3),
+        FileInfo(extractors.ErocastExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+    ]
+    fc = FileCollection(None, "url", *[None]*3)
+    for f in files:
+        if isinstance(f, FileInfo):
+            fc.add_file(f)
+        else:
+            fc.add_collection(f)
+
+    gwa.download(fc)
+
+    assert files[0].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[1].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[2].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[3].downloaded is DownloadErrorCode.NO_ERRORS
+    assert files[4].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[5].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[6].downloaded is DownloadErrorCode.NO_ERRORS
+    assert files[7].downloaded is DownloadErrorCode.DOWNLOADED
+
+
+def test_skip_non_prio_hosts(monkeypatch, setup_tmpdir_param):
+    testpath = setup_tmpdir_param
+
+    gwa = GWARipper(only_one_mirror=True,
+                    host_priority=[extractors.AudioHost.WHYP, extractors.AudioHost.EROCAST])
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._download_file_http", lambda *args: None)
+    monkeypatch.setattr("gwaripper.gwaripper.GWARipper._add_to_db", lambda *args: 13)
+    files = [
+        FileInfo(extractors.SoundgasmExtractor, True, "mp3", "ksdjfks", "sfdkfs", *[None]*4),
+        FileInfo(extractors.ImgurImageExtractor, False, "jpg", "ksdjfks", "sfdkfs", *[None]*4),
+        FileInfo(extractors.WhypExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+        FileCollection(extractors.SoundgasmUserExtractor, "url", *[None]*3),
+        FileInfo(extractors.WhypExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+        FileInfo(extractors.ErocastExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+        FileCollection(extractors.ImgurAlbumExtractor, "url", *[None]*3),
+        FileInfo(extractors.ErocastExtractor, True, "m4a", "ksdjfks", "sfdkfs", *[None]*4),
+    ]
+    fc = FileCollection(None, "url", *[None]*3)
+    for f in files:
+        if isinstance(f, FileInfo):
+            fc.add_file(f)
+        else:
+            fc.add_collection(f)
+
+    gwa.download(fc)
+
+    assert files[0].downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+    assert files[1].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[2].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[3].downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+    assert files[4].downloaded is DownloadErrorCode.DOWNLOADED
+    assert files[5].downloaded is DownloadErrorCode.CHOSE_OTHER_HOST
+    assert files[6].downloaded is DownloadErrorCode.NO_ERRORS
+    assert files[7].downloaded is DownloadErrorCode.CHOSE_OTHER_HOST

@@ -7,12 +7,13 @@ from .base import (
     BaseExtractor, ExtractorReport, ExtractorErrorCode,
     title_has_banned_tag
 )
-from ..info import FileInfo, FileCollection, DownloadType
+from gwaripper import info
 from ..exceptions import InfoExtractingError
 
 
 class ErocastExtractor(BaseExtractor):
     EXTRACTOR_NAME: ClassVar[str] = "Erocast"
+    EXTRACTOR_ID: ClassVar[int] = 9
     BASE_URL: ClassVar[str] = "erocast.me"
 
     # grp1: sgasm username, grp2: title
@@ -33,7 +34,7 @@ class ErocastExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_EROCAST_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileInfo'], ExtractorReport]:
         html, http_code = ErocastExtractor.get_html(self.url)
         if not html:
             if self.http_code_is_extractor_broken(http_code):
@@ -51,9 +52,9 @@ class ErocastExtractor(BaseExtractor):
         data = json.loads(html[start + len(search_str):end])
         user = data.get('user', {})
 
-        result = FileInfo(ErocastExtractor, True, "mp4", self.url, data['stream_url'],
+        result = info.FileInfo(ErocastExtractor, True, "mp4", self.url, data['stream_url'],
                           self.id, title = data.get('title', None), descr=data.get('description', None),
-                          author=user.get('name', None), download_type=DownloadType.HLS)
+                          author=user.get('name', None), download_type=info.DownloadType.HLS)
         report = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
 
         return result, report

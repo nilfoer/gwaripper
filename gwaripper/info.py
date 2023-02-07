@@ -6,13 +6,14 @@ from enum import Enum, auto, unique
 
 from typing import (
         Optional, Union, List, Type, Tuple, Iterator, Sequence,
-        Deque, TYPE_CHECKING, cast, overload, Dict
+        Deque, TYPE_CHECKING, cast, overload, Dict, Set
         )
 from typing_extensions import Literal
 
 from collections import deque
 
 from .download import DownloadErrorCode
+from gwaripper import extractors as extr
 
 # https://www.stefaanlippens.net/circular-imports-type-hints-python.html
 # only reason for possible circular dependency here is because
@@ -536,6 +537,20 @@ class FileCollection:
         # no reddit_info and no known author -> unkown user
         return [n for n in names if n][0]
 
+    def choose_mirrors(self, host_priority: List['extr.AudioHost']):
+        available_hosts = {
+                extr.EXTRACTOR_TO_HOST[i.extractor] for i in self.children
+                if i.extractor in extr.EXTRACTOR_TO_HOST}
+        if len(available_hosts) > 1:
+            direct_audio_children = [i for i in self.children if i.extractor in extr.EXTRACTOR_TO_HOST]
+            if len(direct_audio_children) % len(available_hosts) == 0:
+                # divides evenly -> just mirrors
+                only_host = pick_host_based_on_priority_list(available_hosts, host_priority)
+                # mark other mirrors so that they will be skipped
+                for i in direct_audio_children:
+                    if extr.EXTRACTOR_TO_HOST[i.extractor] is not only_host:
+                        i.downloaded = DownloadErrorCode.CHOSE_OTHER_HOST
+
 
 class RedditInfo(FileCollection):
 
@@ -615,3 +630,14 @@ class RedditInfo(FileCollection):
             with open(selftext_fn, "w", encoding="UTF-8") as w:
                 w.write(f"Title: {self.title}\nPermalink: {self.permalink}\n"
                         f"Selftext:\n\n{self.selftext}")
+
+
+def pick_host_based_on_priority_list(
+    available_hosts: Set['extr.AudioHost'],
+    priority_list: List['extr.AudioHost']
+) -> 'extr.AudioHost':
+    for e in priority_list:
+        if e in available_hosts:
+            return e
+    # use first as default
+    return next(iter(available_hosts))

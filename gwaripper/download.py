@@ -41,9 +41,32 @@ class DownloadErrorCode(Enum):
 
     HTTP_ERROR_OTHER = auto()
 
+    CHOSE_OTHER_HOST = auto()
+
     # collections
     NO_ERRORS = auto()
     ERROR_IN_CHILDREN = auto()
+
+    @classmethod
+    def is_error(cls, x: 'DownloadErrorCode') -> bool:
+        if not DownloadErrorCode.is_warning(x) and not DownloadErrorCode.is_ok(x):
+            return True
+        else:
+            return False
+
+    @classmethod
+    def is_warning(cls, x: 'DownloadErrorCode') -> bool:
+        if x in (cls.NOT_DOWNLOADED, cls.CHOSE_OTHER_HOST):
+            return True
+        else:
+            return False
+
+    @classmethod
+    def is_ok(cls, x: 'DownloadErrorCode') -> bool:
+        if x in (cls.DOWNLOADED, cls.NO_ERRORS, cls.SKIPPED_DUPLICATE):
+            return True
+        else:
+            return False
 
 
 HTTP_ERR_TO_DL_ERR: Dict[int, DownloadErrorCode] = {

@@ -5,12 +5,13 @@ import bs4
 from typing import Optional, Union, cast, Match, ClassVar, Pattern, Tuple, Any
 
 from .base import BaseExtractor, ExtractorReport, ExtractorErrorCode, title_has_banned_tag
-from ..info import FileInfo, FileCollection
+from gwaripper import info
 from ..exceptions import InfoExtractingError
 
 
 class SoundgasmExtractor(BaseExtractor):
     EXTRACTOR_NAME: ClassVar[str] = "Soundgasm"
+    EXTRACTOR_ID: ClassVar[int] = 2
     BASE_URL: ClassVar[str] = "soundgasm.net"
 
     # grp1: sgasm username, grp2: title
@@ -31,7 +32,7 @@ class SoundgasmExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(cls.VALID_SGASM_FILE_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileInfo], ExtractorReport]:
+    def _extract(self) -> Tuple[Optional['info.FileInfo'], ExtractorReport]:
         html, http_code = SoundgasmExtractor.get_html(self.url)
         if not html:
             if self.http_code_is_extractor_broken(http_code):
@@ -53,7 +54,7 @@ class SoundgasmExtractor(BaseExtractor):
         ext = direct_url.rsplit('.', 1)[1]
         descr = soup.select_one("div.jp-description > p").text
 
-        return (FileInfo(self.__class__, True, ext, self.url,
+        return (info.FileInfo(self.__class__, True, ext, self.url,
                          # use cast supress type checker warning, since we just assume it's
                          # a str and not None because otherwise we would've gotten an Exception
                          # NOTE: cast actually doesn't perform any runtime checks it's
@@ -64,6 +65,7 @@ class SoundgasmExtractor(BaseExtractor):
 
 class SoundgasmUserExtractor(BaseExtractor):
     EXTRACTOR_NAME: ClassVar[str] = "SoundgasmUser"
+    EXTRACTOR_ID: ClassVar[int] = 3
     BASE_URL: ClassVar[str] = "soundgasm.net/u/"
 
     VALID_SGASM_USER_URL_RE: ClassVar[Pattern] = re.compile(
@@ -82,7 +84,7 @@ class SoundgasmUserExtractor(BaseExtractor):
 
     # @Refactor should an extractor just return a FileCollection with a list of urls
     # or should it resolve all these links and include a list of FileInfo_s?
-    def _extract(self) -> Tuple[Optional[FileCollection],
+    def _extract(self) -> Tuple[Optional['info.FileCollection'],
                                      ExtractorReport]:
         """
         Gets all the links to soundgasm.net posts of the user/at user url and returns
@@ -110,7 +112,7 @@ class SoundgasmUserExtractor(BaseExtractor):
         user_files = [a["href"] for a in anchs]
 
         report = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
-        fcol = FileCollection(self.__class__, self.url, self.author, self.author, self.author)
+        fcol = info.FileCollection(self.__class__, self.url, self.author, self.author, self.author)
         for url in user_files:
             fi, extr_report = SoundgasmExtractor.extract(url, parent=fcol,
                                                          parent_report=report)

@@ -10,7 +10,7 @@ from typing import Optional, cast, Pattern, Match, ClassVar, List, Tuple, Type, 
 from .base import BaseExtractor, ExtractorErrorCode, ExtractorReport, title_has_banned_tag
 from .soundgasm import SoundgasmUserExtractor
 from ..exceptions import InfoExtractingError
-from ..info import FileInfo, FileCollection
+from gwaripper import info
 from .reddit import RedditExtractor
 
 logger = logging.getLogger(__name__)
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class SkittykatExtractor(BaseExtractor):
     # these need to be re-defined by sub-classes!!
     EXTRACTOR_NAME: ClassVar[str] = "Skittkat"
+    EXTRACTOR_ID: ClassVar[int] = 8
     BASE_URL: ClassVar[str] = "skittykat.cc"
 
     SKITTYKAT_URL_RE: ClassVar[Pattern] = re.compile(
@@ -38,7 +39,7 @@ class SkittykatExtractor(BaseExtractor):
     def is_compatible(cls, url: str) -> bool:
         return bool(SkittykatExtractor.SKITTYKAT_URL_RE.match(url))
 
-    def _extract(self) -> Tuple[Optional[FileCollection],
+    def _extract(self) -> Tuple[Optional['info.FileCollection'],
                                 ExtractorReport]:
         # @Hack needed since we directly parse and extract found links in the submission
         # but can't import at module level (absolute import also doesn't work since it's
@@ -74,7 +75,7 @@ class SkittykatExtractor(BaseExtractor):
         report = ExtractorReport(self.url, ExtractorErrorCode.NO_ERRORS)
         # TODO: add a description to FileCollection
         # NOTE: hard-coded author 'skitty-gwa'
-        fc = FileCollection(SkittykatExtractor, self.url, self.id, title, self.author)
+        fc = info.FileCollection(SkittykatExtractor, self.url, self.id, title, self.author)
 
 
         # NOTE: strategy for now is:
@@ -148,7 +149,7 @@ class SkittykatExtractor(BaseExtractor):
             # use it to check if the file has been downloaded before and this would
             # give wrong results, since here multiple files can be on the same page
             fi_page_url = audio_url if len(audio_embed_containers) > 1 else self.url
-            fi = FileInfo(self.__class__, is_audio=True, ext=ext, page_url=fi_page_url,
+            fi = info.FileInfo(self.__class__, is_audio=True, ext=ext, page_url=fi_page_url,
                           direct_url=escaped_audio_url, title=audio_title, _id = None,
                           descr=descr_text, author=self.author, parent=fc)
             fi_report = ExtractorReport(audio_url, ExtractorErrorCode.NO_ERRORS)

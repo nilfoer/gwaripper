@@ -14,7 +14,9 @@ from ..exceptions import (
         NoAuthenticationError, AuthenticationFailed
         )
 from .. import config
-from ..info import FileInfo, FileCollection
+# import whole module instead of individual symbols (import FileCollection,..)
+# to avoid circular import problems
+from gwaripper import info
 from ..download import DownloadErrorCode, download_text
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,27 @@ class ExtractorErrorCode(Enum):
     # used when an extractor that returns a FileCollection encounters an url
     # that itself would result in a FileCollection with more FileCollections etc.
     STOP_RECURSION = auto()
+
+    @classmethod
+    def is_error(cls, x: 'ExtractorErrorCode') -> bool:
+        if not ExtractorErrorCode.is_warning(x) and not ExtractorErrorCode.is_ok(x):
+            return True
+        else:
+            return False
+
+    @classmethod
+    def is_warning(cls, x: 'ExtractorErrorCode') -> bool:
+        if x in (cls.BANNED_TAG, cls.EMPTY_COLLECTION, cls.STOP_RECURSION):
+            return True
+        else:
+            return False
+
+    @classmethod
+    def is_ok(cls, x: 'ExtractorErrorCode') -> bool:
+        if x is cls.NO_ERRORS:
+            return True
+        else:
+            return False
 
 
 # TODO @CleanUp make this more general since it's not just extractor specific anymore
@@ -157,21 +180,21 @@ class BaseExtractor(Generic[T]):
     # returned string list are messages that go into the parsing report
     # since it's otherwise too easy to miss skipped urls, unsupported links,
     # in the logs etc.; strings should be formatted with html
-    def _extract(self) -> Tuple[Optional[Union[FileInfo, FileCollection]],
+    def _extract(self) -> Tuple[Optional[Union['info.FileInfo', 'info.FileCollection']],
                                 ExtractorReport]:
         raise NotImplementedError
 
     # should not raise but rather logs unexpected and expected errors
     # and returns the appropriate error code
     @classmethod
-    def extract(cls, url: str, parent: Optional[FileCollection] = None,
+    def extract(cls, url: str, parent: Optional['info.FileCollection'] = None,
                 parent_report: Optional[ExtractorReport] = None,
                 init_from: Optional[T] = None) -> Tuple[
-            Optional[Union[FileInfo, FileCollection]], ExtractorReport]:
+            Optional[Union['info.FileInfo', 'info.FileCollection']], ExtractorReport]:
 
         # all reports here have code BROKEN_EXTRACTOR
         report = ExtractorReport(url, ExtractorErrorCode.BROKEN_EXTRACTOR)
-        result: Optional[Union[FileInfo, FileCollection]] = None
+        result: Optional[Union['info.FileInfo', 'info.FileCollection']] = None
 
         if cls.is_broken:
             logger.warning("Skipping URL '%s' due to broken extractor: %s",
@@ -208,7 +231,7 @@ class BaseExtractor(Generic[T]):
 
         if result is not None:
             if parent is not None:
-                if isinstance(result, FileCollection):
+                if isinstance(result, info.FileCollection):
                     parent.add_collection(result)
                 else:
                     parent.add_file(result)

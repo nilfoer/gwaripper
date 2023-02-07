@@ -11,13 +11,11 @@ import sqlite3
 
 import praw
 
-from typing import List, Union, Optional, cast, Dict, ClassVar, Tuple, Any
+from typing import List, Union, Optional, cast, Dict, ClassVar, Tuple, Any, Set, Final, Type
 
 from . import utils
 from . import config
-from .extractors import find_extractor
-from .extractors.base import ExtractorErrorCode, ExtractorReport
-from .extractors.reddit import RedditExtractor
+from gwaripper import extractors as extr
 from .info import (
         FileInfo, FileCollection, RedditInfo, children_iter_dfs,
         UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER, DownloadType
@@ -78,6 +76,9 @@ report_preamble = r"""
     .error {
         background-color: #d70000;
     }
+    .warning {
+        background-color: #e6b700;
+    }
     .collection > span {
         font-size: 1.5rem;
         font-weight: bold;
@@ -107,21 +108,32 @@ class GWARipper:
         'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
         }
 
+    download_duplicates: Final[bool]
+    skip_non_audio: Final[bool]
+    only_one_mirror: Final[bool]
+    host_priority: Final[List['extr.AudioHost']]
+
     # we can only omit -> None if at least one arg is typed otherwise it is
     # considered an untyped method
     def __init__(self,
                  download_duplicates: bool = False,
                  skip_non_audio: bool = False,
-                 dont_write_selftext: bool = False) -> None:
+                 dont_write_selftext: bool = False,
+                 only_one_mirror: bool = False,
+                 host_priority: Optional[List['extr.AudioHost']] = None) -> None:
+        # TODO @CleanUp remove all dependencies on config, the class should be passed all the relevant
+        # setting through init -> easiert to test, more robust etc.
         self.db_con, _ = load_or_create_sql_db(
                 os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.urls: List[str] = []
         self.nr_urls: int = 0
-        self.extractor_reports: List[ExtractorReport] = []
+        self.extractor_reports: List[extr.base.ExtractorReport] = []
         self.download_duplicates = download_duplicates
         self.skip_non_audio = skip_non_audio
         # TODO no tests available
         self.dont_write_selftext = dont_write_selftext
+        self.only_one_mirror = only_one_mirror
+        self.host_priority = host_priority if host_priority is not None else []
 
     # return type needed otherwise we don't get type checking if used in with..as
     def __enter__(self) -> 'GWARipper':
@@ -155,10 +167,10 @@ class GWARipper:
         self.nr_urls = len(self.urls)
 
     def extract_and_download(self, url: str) -> None:
-        extractor = find_extractor(url)
+        extractor = extr.find_extractor(url)
         if extractor is None:
             self.extractor_reports.append(
-                    ExtractorReport(url, ExtractorErrorCode.NO_EXTRACTOR))
+                    extr.base.ExtractorReport(url, extr.base.ExtractorErrorCode.NO_EXTRACTOR))
             logger.warning("Found no extractor for URL: %s", url)
             return None
 
@@ -175,12 +187,12 @@ class GWARipper:
         url = f"{reddit_url}{sub.permalink}"
         # init_from not type-checked for Submission since praw doesn't have
         # type hints
-        info, extr_report = RedditExtractor.extract(url, init_from=sub)
+        info, extr_report = extr.reddit.RedditExtractor.extract(url, init_from=sub)
         if info is not None:
             self.download(info)
         self.extractor_reports.append(extr_report)
 
-    def write_report(self, reports: List[ExtractorReport]):
+    def write_report(self, reports: List[extr.base.ExtractorReport]):
         # parsing report!
         # since information is easy to miss when looking at just the log output
         #
@@ -188,8 +200,8 @@ class GWARipper:
         contents = [report_preamble]
 
         # dfs to traverse reports
-        stack: List[Tuple[int, List[ExtractorReport]]] = []
-        cur_list: List[ExtractorReport] = reports
+        stack: List[Tuple[int, List[extr.base.ExtractorReport]]] = []
+        cur_list: List[extr.base.ExtractorReport] = reports
         idx = 0
         level = 0
         while True:
@@ -206,7 +218,7 @@ class GWARipper:
 
             report = cur_list[idx]
             is_collection = bool(report.children)
-            success = True if report.err_code == ExtractorErrorCode.NO_ERRORS else False
+            success = True if report.err_code == extr.base.ExtractorErrorCode.NO_ERRORS else False
             dl_success = True if report.download_error_code in (
                     dl.DownloadErrorCode.DOWNLOADED,
                     dl.DownloadErrorCode.SKIPPED_DUPLICATE,
@@ -406,6 +418,11 @@ class GWARipper:
         # priority is 1. reddit 2. file collection author 3. file author 4. fallbacks
         author_name = top_collection.get_preferred_author_name()
 
+        # TODO should ideally happen before extracting, but that would require changing the
+        # architecture, so do it here for now..
+        if self.only_one_mirror:
+            info.choose_mirrors(self.host_priority)
+
         # NOTE: this function needs to be recursive, since otherwise collections
         # that had no (successful) audio downloads will still be added to the DB
 
@@ -414,6 +431,11 @@ class GWARipper:
         with_file_idx = info.nr_files > 1
         rel_idx = 1
         for fi_or_fc in info.children:
+            if fi_or_fc.downloaded is dl.DownloadErrorCode.CHOSE_OTHER_HOST:
+                logger.info("Skipped URL %s in favor of a prioritized host!",
+                            fi_or_fc.url if isinstance(fi_or_fc, FileCollection) else fi_or_fc.page_url)
+                continue
+
             # add FileCollections to DB here
             if isinstance(fi_or_fc, FileCollection):
                 # recursive call
@@ -708,3 +730,4 @@ class GWARipper:
             if not self.dont_write_selftext:
                 info.reddit_info.write_selftext_file(
                         config.get_root(), file_path, force_path=True)
+

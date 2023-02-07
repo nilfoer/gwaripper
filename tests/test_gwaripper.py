@@ -905,7 +905,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
                               file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
-    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi.downloaded is DownloadErrorCode.HTTP_ERROR_OTHER
 
     assert called_with == exc_tests_called_with
 
@@ -925,7 +925,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
                               file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
-    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi.downloaded is DownloadErrorCode.HTTP_ERROR_OTHER
 
     assert called_with == exc_tests_called_with
 
@@ -946,7 +946,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
                               file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
-    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi.downloaded is DownloadErrorCode.HTTP_ERROR_OTHER
 
     assert called_with == exc_tests_called_with
 
@@ -967,7 +967,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
                               file_index=2, dl_idx=7, dl_max=120) is None
     assert fi.id_in_db is None
-    assert fi.downloaded is DownloadErrorCode.NOT_DOWNLOADED
+    assert fi.downloaded is DownloadErrorCode.HTTP_ERROR_OTHER
 
     assert called_with == exc_tests_called_with
 
