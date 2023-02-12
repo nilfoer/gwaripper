@@ -12,6 +12,7 @@ import sqlite3
 import praw
 
 from typing import List, Union, Optional, cast, Dict, ClassVar, Tuple, Any, Set, Final, Type
+from enum import Enum, unique, auto
 
 from . import utils
 from . import config
@@ -66,7 +67,7 @@ report_preamble = r"""
         padding: 2px;
         margin-right: 5px;
     }
-    .success, .error {
+    .success, .error, .warning {
         color: #fff;
         font-weight: bold;
     }
@@ -96,6 +97,13 @@ class DownloadCollectionResult:
     any_audio_downloads: bool
     dl_idx: int
     error_code: dl.DownloadErrorCode
+
+
+@unique
+class Status(Enum):
+    SUCCESS = 0
+    WARNING = auto()
+    ERROR = auto()
 
 
 class GWARipper:
@@ -204,6 +212,9 @@ class GWARipper:
         cur_list: List[extr.base.ExtractorReport] = reports
         idx = 0
         level = 0
+        # Status.SUCCESS, Status.WARNING, Status.ERROR
+        status = [0, 0, 0]
+        dl_status = [0, 0, 0]
         while True:
             if idx >= len(cur_list):
                 try:
@@ -218,11 +229,23 @@ class GWARipper:
 
             report = cur_list[idx]
             is_collection = bool(report.children)
-            success = True if report.err_code == extr.base.ExtractorErrorCode.NO_ERRORS else False
-            dl_success = True if report.download_error_code in (
-                    dl.DownloadErrorCode.DOWNLOADED,
-                    dl.DownloadErrorCode.SKIPPED_DUPLICATE,
-                    dl.DownloadErrorCode.NO_ERRORS) else False
+            if extr.base.ExtractorErrorCode.is_ok(report.err_code):
+                success = Status.SUCCESS
+            elif extr.base.ExtractorErrorCode.is_warning(report.err_code):
+                success = Status.WARNING
+            else:
+                success = Status.ERROR
+
+            if dl.DownloadErrorCode.is_ok(report.download_error_code):
+                dl_success = Status.SUCCESS
+            elif dl.DownloadErrorCode.is_warning(report.download_error_code):
+                dl_success = Status.WARNING
+            else:
+                dl_success = Status.ERROR
+
+            if not is_collection:
+                status[success.value] += 1
+                dl_status[dl_success.value] += 1
 
             contents.append(
                 f"<div class=\"{'collection ' if is_collection else 'block '}"
@@ -232,11 +255,11 @@ class GWARipper:
                 f"{report.url}\">{report.url}</a>")
             contents.append(
                 f"<div class='info'>EXTRACT: <span class='"
-                f"{'success ' if success else 'error '}'>{report.err_code.name}"
+                f"{success.name.lower()}'>{report.err_code.name}"
                 f"</span></div>")
             contents.append(
                 f"<div class='info'>DOWNLOAD: <span class='"
-                f"{'success ' if dl_success else 'error '}'>"
+                f"{dl_success.name.lower()}'>"
                 f"{report.download_error_code.name}</span></div>")
             if not is_collection:
                 contents.append('</div>')
@@ -251,6 +274,19 @@ class GWARipper:
         root_dir = config.get_root()
         dirname = os.path.join(root_dir, "_reports")
         fn = os.path.join(dirname, f"report_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html")
+        contents.insert(1,
+          ("<p>EXTRACTOR STATUS:"
+           "<ul>"
+           f"<li><span class=\"success\">SUCCESS: {status[Status.SUCCESS.value]}</span></li>"
+           f"<li><span class=\"warning\">WARNING: {status[Status.WARNING.value]}</span></li>"
+           f"<li><span class=\"error\">ERROR: {status[Status.ERROR.value]}</span></li>"
+           "</ul>DOWNLOADS:<ul>"
+           f"<li><span class=\"success\">SUCCESS: {dl_status[Status.SUCCESS.value]}</span></li>"
+           f"<li><span class=\"warning\">WARNING: {dl_status[Status.WARNING.value]}</span></li>"
+           f"<li><span class=\"error\">ERROR: {dl_status[Status.ERROR.value]}</span></li>"
+           "</ul></p>")
+        )
+
         while True:
             try:
                 with open(fn, 'w', encoding="UTF-8") as w:

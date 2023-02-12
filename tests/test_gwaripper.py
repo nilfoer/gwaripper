@@ -9,7 +9,7 @@ import urllib.error
 
 import gwaripper.config as cfg
 
-from gwaripper.gwaripper import GWARipper, report_preamble
+from gwaripper.gwaripper import GWARipper, report_preamble, Status
 from gwaripper.db import load_or_create_sql_db
 from gwaripper import exceptions
 from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER, UNKNOWN_USR_FOLDER
@@ -1556,74 +1556,84 @@ def test_write_report(setup_tmpdir):
 
     expected = [
             report_preamble,
+            ("<p>EXTRACTOR STATUS:"
+             "<ul>"
+             "<li><span class=\"success\">SUCCESS: 5</span></li>"
+             "<li><span class=\"warning\">WARNING: 2</span></li>"
+             "<li><span class=\"error\">ERROR: 3</span></li>"
+             "</ul>DOWNLOADS:<ul>"
+             "<li><span class=\"success\">SUCCESS: 4</span></li>"
+             "<li><span class=\"warning\">WARNING: 5</span></li>"
+             "<li><span class=\"error\">ERROR: 1</span></li>"
+             "</ul></p>"),
             "<div class=\"block \">",
             "<a href=\"url1\">url1</a>",
-            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='success '>DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='success'>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success'>DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url2col\">url2col</a>",
-            "<div class='info'>EXTRACT: <span class='error '>ERROR_IN_CHILDREN</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>EXTRACT: <span class='error'>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error'>ERROR_IN_CHILDREN</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl1\">url2colurl1</a>",
-            "<div class='info'>EXTRACT: <span class='error '>NO_RESPONSE</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error'>NO_RESPONSE</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='warning'>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl2\">url2colurl2</a>",
-            "<div class='info'>EXTRACT: <span class='error '>NO_EXTRACTOR</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error'>NO_EXTRACTOR</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='warning'>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection indent \">",
             "<span>Collection: </span><a href=\"url2colurl3col\">url2colurl3col</a>",
-            "<div class='info'>EXTRACT: <span class='error '>ERROR_IN_CHILDREN</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>EXTRACT: <span class='error'>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error'>ERROR_IN_CHILDREN</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl1\">url2colurl3colurl1</a>",
-            "<div class='info'>EXTRACT: <span class='error '>NO_AUTHENTICATION</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='error'>NO_AUTHENTICATION</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='warning'>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url2colurl3colurl2\">url2colurl3colurl2</a>",
-            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>HTTP_ERR_NOT_FOUND</span></div>",
+            "<div class='info'>EXTRACT: <span class='success'>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error'>HTTP_ERR_NOT_FOUND</span></div>",
             "</div>",
             "</div>",  # urlcol2url3col
             "</div>",  # url2col
             "<div class=\"block \">",
             "<a href=\"url3\">url3</a>",
-            "<div class='info'>EXTRACT: <span class='error '>BANNED_TAG</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='warning'>BANNED_TAG</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='warning'>NOT_DOWNLOADED</span></div>",
             "</div>",
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url4col\">url4col</a>",
-            "<div class='info'>EXTRACT: <span class='error '>NO_SUPPORTED_AUDIO_LINK</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>ERROR_IN_CHILDREN</span></div>",
+            "<div class='info'>EXTRACT: <span class='error'>NO_SUPPORTED_AUDIO_LINK</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='error'>ERROR_IN_CHILDREN</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url4colurl1\">url4colurl1</a>",
-            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='success '>SKIPPED_DUPLICATE</span></div>",
+            "<div class='info'>EXTRACT: <span class='success'>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success'>SKIPPED_DUPLICATE</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url4colurl2\">url4colurl2</a>",
-            "<div class='info'>EXTRACT: <span class='error '>BANNED_TAG</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='error '>NOT_DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='warning'>BANNED_TAG</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='warning'>NOT_DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # url4col
             "<div class=\"collection \">",
             "<span>Collection: </span><a href=\"url5col\">url5col</a>",
-            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='success '>NO_ERRORS</span></div>",
+            "<div class='info'>EXTRACT: <span class='success'>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success'>NO_ERRORS</span></div>",
             "<div class=\"block indent \">",
             "<a href=\"url5colurl1\">url5colurl1</a>",
-            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='success '>SKIPPED_DUPLICATE</span></div>",
+            "<div class='info'>EXTRACT: <span class='success'>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success'>SKIPPED_DUPLICATE</span></div>",
             "</div>",
             "<div class=\"block indent \">",
             "<a href=\"url5colurl2\">url5colurl2</a>",
-            "<div class='info'>EXTRACT: <span class='success '>NO_ERRORS</span></div>",
-            "<div class='info'>DOWNLOAD: <span class='success '>DOWNLOADED</span></div>",
+            "<div class='info'>EXTRACT: <span class='success'>NO_ERRORS</span></div>",
+            "<div class='info'>DOWNLOAD: <span class='success'>DOWNLOADED</span></div>",
             "</div>",
             "</div>",  # url5col
     ]
