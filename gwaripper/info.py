@@ -10,7 +10,7 @@ from typing import (
         )
 from typing_extensions import Literal
 
-from collections import deque
+from collections import deque, defaultdict
 
 from .download import DownloadErrorCode
 from gwaripper import extractors as extr
@@ -543,7 +543,11 @@ class FileCollection:
                 if i.extractor in extr.EXTRACTOR_TO_HOST}
         if len(available_hosts) > 1:
             direct_audio_children = [i for i in self.children if i.extractor in extr.EXTRACTOR_TO_HOST]
-            if len(direct_audio_children) % len(available_hosts) == 0:
+            # NOTE: !IMPORANT! need to check that all audio hosts have equal nr of items
+            # otherwise: 2 audio hosts 1 on whyp 3 on sgasm -> would be mod 2 == 0,
+            # but not equal nr of items
+            if (len(direct_audio_children) % len(available_hosts) == 0
+                    and hosts_have_same_item_count(direct_audio_children)):
                 # divides evenly -> just mirrors
                 only_host = pick_host_based_on_priority_list(available_hosts, host_priority)
                 # mark other mirrors so that they will be skipped
@@ -641,3 +645,24 @@ def pick_host_based_on_priority_list(
             return e
     # use first as default
     return next(iter(available_hosts))
+
+
+def hosts_have_same_item_count(audio_files: List[Union[FileInfo, FileCollection]]) -> bool:
+    counts: Dict[int, int] = defaultdict(int)
+    for f in audio_files:
+        try:
+            host = extr.EXTRACTOR_TO_HOST[f.extractor]
+        except KeyError:
+            continue
+        counts[host.value] += 1
+
+    result = True
+    count = next(iter(counts.values()))
+    for c in counts.values():
+        if c != count:
+            result = False
+            break
+
+    return result
+
+
