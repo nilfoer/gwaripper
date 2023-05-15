@@ -8,9 +8,11 @@ block_cipher = None
 # Scripts\pyinstaller.exe
 a = Analysis(['gwaripper-runner.py'],
              # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see
-             # https://pyinstaller.readthedocs.io/en/v3.3.1/usage.html#windows   
+             # https://pyinstaller.org/en/stable/usage.html#windows
+             # UniversalCRTDLLs symlinked to UCRT path in WindowsKit:
+             # C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\10.0.19041.0\\ucrt\\DLLs
              pathex=['gwaripper', 'gwaripper_webGUI',
-                     '..\\UniversalCRTDLLs\\x86', '..\\UniversalCRTDLLs\\x64'],
+                     'UniversalCRTDLLs\\x86', 'UniversalCRTDLLs\\x64'],
              binaries=[],
              # praw needs praw.ini (which it looks for in 3 places appdata etc. including cwd)
              # -> pyinstaller automatically changes __file__ refs to be relative to the bundle
