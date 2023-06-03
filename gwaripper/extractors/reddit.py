@@ -29,10 +29,12 @@ class RedditExtractor(BaseExtractor[Submission]):
     EXTRACTOR_ID: ClassVar[int] = 1
     BASE_URL: ClassVar[str] = "reddit.com"
 
-    # grp1: subreddit, grp2: reddit id, grp3: title
+    # grp1: r|user, grp2: subreddit/username, grp3: reddit id, grp4: title
+    # user subreddit link: /user/fooname/comments/...
+    # -> same as /r/u_fooname/comments/...
     VALID_REDDIT_URL_RE: ClassVar[Pattern] = re.compile(
-            r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/r/(\w+)/comments/"
-            r"([A-Za-z0-9]+)/(\w+)?/?", re.IGNORECASE)
+        r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/(r|user)/(\w+)/comments/"
+        r"([A-Za-z0-9]+)/(\w+)?/?", re.IGNORECASE)
 
     REDDIT_DOMAIN_RE: ClassVar[Pattern] = re.compile(
             r"^(?:https?://)?(?:www\.|old\.)?reddit\.com/(\w+)", re.IGNORECASE)
