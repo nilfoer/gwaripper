@@ -1,0 +1,113 @@
+{% extends "layout.html" %}
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='selectize.bootstrap3.css') }}" />
+<script type="text/javascript" src="{{ url_for('static', filename='selectize.min.js') }}"></script>
+{% endblock %}
+{% block body %}
+<div class="container">
+<div class="row">
+<div class="col-xl-10 col-md-11" style="margin: 0 auto;">
+<div class="row edit-audio-line">
+    <div class="col">
+        <h1>{{ collection.title if collection else file_info.title }}</h1>
+    </div>
+</div>
+{# TODO use xhr and add a progress bar #}
+<form id=add-audio action="{{ url_for('main.add_audio') }}" method=post enctype=multipart/form-data>
+{{ csrf_token_field() }}
+<div class="row edit-audio-line">
+    <div class="col-md-2 col-xs-12">
+        File to import:
+    </div>
+    <div class="col-md-10 col-xs-12">
+        {# <input id="audio-file" class="file-input" type="file" name="file" required> #}
+        <div class="input-group">
+        <label class="input-group-btn" for="audio-file" style="margin-bottom: 0;">
+            <span class="btn btn-primary" style="border-radius: .25rem 0 0 .25rem;">
+                Choose File <input type="file" id="audio-file" name="file" style="display: none;">
+            </span>
+        </label>
+        <input type="text" class="form-control" id="audio-name" placeholder="Select the audio file" readonly>
+        </div>
+    </div>
+</div>
+<div class="row edit-audio-line">
+    <div class="col-md-2 col-xs-12">
+        Title:
+    </div>
+    <div class="col-md-10 col-xs-12">
+        <input type="text" name="title" class="form-control" style="width: 100%;" required
+         placeholder="The title will be used for the filename..."/>
+    </div>
+</div>
+<div class="row edit-audio-line">
+    <div class="col-md-2 col-xs-12">
+        URL:
+    </div>
+    <div class="col-md-10 col-xs-12">
+        <input type="text" name="page_url" class="form-control" style="width: 100%;" required
+         placeholder="URL to the src page: e.g. https://www.patreon.com/posts/wake-up-quietly-72251064/">
+    </div>
+</div>
+<div class="row edit-audio-line">
+    <div class="col-md-2 col-xs-12">
+        ID:
+    </div>
+    <div class="col-md-10 col-xs-12">
+        <input type="text" name="id" class="form-control" style="width: 100%;"
+         placeholder="ID on the website, like /r/subbreddit/comments/{id}/... on reddit"/>
+    </div>
+</div>
+<div class="row edit-audio-line">
+    <div class="col-md-2 col-xs-12">
+        Artist:
+    </div>
+    <div class="col-md-10 col-xs-12">
+        <select required name="artist" class="selectized select-single-create"
+            placeholder="Artist name (will be used for the subdirectory name)">
+            <option value="">Select Artist...</option>
+            {% for name in artists %}
+            <option value="{{ name }}">{{ name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+<div class="row edit-audio-line" style="align-items: start;">
+    {# need to have >12 cols to wrap on -> do that for small screens #}
+    <div class="col-md-2 col-xs-12">
+        Description:
+    </div>
+    <div class="col-md-10 col-xs-12">
+        <textarea name="description" class="form-control" style="width: 100%;" rows="7"
+            placeholder="Audio description..."></textarea>
+    </div>
+</div>
+<div class="row edit-audio-line">
+    <div class="col-md-2 col-xs-12">
+        <button type="submit" class="btn btn-primary">Import</button>
+    </div>
+</div>
+</form>
+</div>
+</div>
+</div>
+<script>
+$('.select-single-create').selectize({
+	create: true,
+	sortField: {
+		field: 'text',
+		direction: 'asc'
+	},
+	dropdownParent: 'body'
+});
+$(function() {
+  $('input[type=file]').change(function(){
+    var t = $(this).val();
+    // remove C:\fakepath\
+    var labelText = t.substr(12, t.length);
+    $(this).parents('.input-group').children('input[type=text]').val(labelText);
+  })
+});
+</script>
+{% endblock %}

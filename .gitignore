@@ -47,6 +47,7 @@ secrets/
 dist/
 build/
 !gwaripper_webGUI/static/webfonts/*
+!gwaripper_webGUI/templates/**
 gwaripper_test.ipynb
 gwaripper/gwaripper_config*.ini
 *.egg-info/
