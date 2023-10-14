@@ -146,8 +146,8 @@ hr {
     align-self: center; /* vert */
     font-size: 14px;
 }
-.entry-container .odd {
-    background-color: #3c3c3c;
+.entry-container.odd {
+    background-color: #2d2d2d;
 }
 .entry-expand {
     border-top: 1px solid #fff;

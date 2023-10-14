@@ -10,18 +10,18 @@ import datetime
 from typing import Optional, List, Tuple, Dict, Any, NamedTuple
 
 from flask import (
-        current_app, request, redirect, url_for, Blueprint,
-        render_template, flash, send_from_directory,
-        jsonify, send_file, session, g, Response, abort
+    current_app, request, redirect, url_for, Blueprint,
+    render_template, flash, send_from_directory,
+    jsonify, send_file, session, g, Response, abort
 )
 from werkzeug.utils import secure_filename
 
 from gwaripper.gwaripper import GWARipper
 from gwaripper import config
 from gwaripper.db import (
-        get_x_entries, validate_order_by_str, search,
-        remove_entry as gwa_remove_entry, set_favorite_entry,
-        set_rating, RowData
+    get_x_entries, validate_order_by_str, search,
+    remove_entry as gwa_remove_entry, set_favorite_entry,
+    set_rating, RowData
 )
 from gwaripper.info import sanitize_filename, FileInfo, FileCollection
 from gwaripper.extractors.base import BaseExtractor
@@ -121,15 +121,18 @@ def artist_file(filename):
         # or on 416 (Range Not Satisfiable): unsatisfied-range = "*/" complete-length
 
         # starts with "bytes " or "bytes=" even though rfc7233 only specifies SP (space)
-        start_first_byte = next(i for i, c in enumerate(range_header) if c.isdigit())
-        first_byte_str, last_byte_str = range_header[start_first_byte:].split('-')
+        start_first_byte = next(
+            i for i, c in enumerate(range_header) if c.isdigit())
+        first_byte_str, last_byte_str = range_header[start_first_byte:].split(
+            '-')
         first_byte = int(first_byte_str)
         if last_byte_str:
             last_byte = int(last_byte)
 
     full_path = os.path.join(current_app.instance_path, subpath, filename)
     try:
-        chunk, start, chunk_size, file_size = get_chunk(full_path, first_byte, last_byte)
+        chunk, start, chunk_size, file_size = get_chunk(
+            full_path, first_byte, last_byte)
     except FileNotFoundError:
         abort(404)
 
@@ -137,10 +140,43 @@ def artist_file(filename):
     resp = Response(chunk, 206, mimetype='audio',
                     content_type='audio', direct_passthrough=True)
     # byte-pos is 0-based
-    resp.headers.add('Content-Range', f"bytes {start}-{start + chunk_size - 1}/{file_size}")
+    resp.headers.add(
+        'Content-Range', f"bytes {start}-{start + chunk_size - 1}/{file_size}")
 
     # TODO send 416 with unsatisfied-range if we can't provide the range that was requested
     return resp
+
+
+@main_bp.route('/embed/audio/<path:filename>')
+def embed_audio(filename: str):
+    subpath = request.args.get('subpath', '')
+
+    full_path = os.path.join(current_app.instance_path, subpath, filename)
+    if not os.path.exists(full_path):
+        return (
+            "Local file couldn't be found, use the link to "
+            "the source page (world icon) instead!")
+    return "".join(["<audio controls src='",
+                   url_for('main.artist_file',
+                           subpath=subpath, filename=filename),
+                   "'></audio>"])
+
+
+@main_bp.route('/embed/selftext/<path:filename>')
+def embed_selftext(filename: str):
+    subpath = request.args.get('subpath', '')
+
+    if not filename:
+        return "No selftext file has been saved!"
+
+    full_path = os.path.join(current_app.instance_path, subpath, filename)
+    if not os.path.exists(full_path):
+        return (
+            "<br/>Error: Local selftext file couldn&#39;t be found!<br/>")
+    with open(full_path, 'r') as f:
+        lines = f.readlines()
+    return "".join(['<h2>Selftext:</h2>',
+                    "<br/>".join(lines)])
 
 
 # py3.6: new way to define named tuples with types using class syntax
@@ -158,7 +194,8 @@ def get_entries(query: Optional[str] = None) -> Tuple[
     # validate our sorting col otherwise were vulnerable to sql injection
     if not validate_order_by_str(order_by_col):
         order_by_col = "id"
-    asc_desc = "ASC" if request.args.get('order', "DESC", type=str) == "ASC" else "DESC"
+    asc_desc = "ASC" if request.args.get(
+        'order', "DESC", type=str) == "ASC" else "DESC"
     order_by = f"AudioFile.{order_by_col} {asc_desc}"
     # dont need to validate since we pass them in with SQL param substitution
     after = request.args.getlist("after", None)
@@ -210,8 +247,8 @@ def get_entries(query: Optional[str] = None) -> Tuple[
                     # fcol_alias_name etc. but just alias_name
                     # needs author_subdir to get correct length
                     selftext_filename = sanitize_filename(
-                            os.path.join(author_subdir, subpath),
-                            entry.fcol_title) + '.txt'
+                        os.path.join(author_subdir, subpath),
+                        entry.fcol_title) + '.txt'
                 else:
                     selftext_filename = f"{entry.filename}.txt"
 
@@ -240,7 +277,7 @@ def show_entries():
 
 def first_last_more(entries: List[RowData], order_by_col: str = "id",
                     after: Optional[int] = None, before: Optional[int] = None) -> Tuple[
-                            Optional[Any], Optional[Any], Optional[Dict[str, bool]]]:
+        Optional[Any], Optional[Any], Optional[Dict[str, bool]]]:
     if not entries:
         return None, None, None
 
@@ -296,7 +333,8 @@ def search_entries():
     if URL_RE.match(searchstr):
         return redirect(url_for("main.jump_to_book_by_url", ext_url=searchstr))
 
-    entries, audio_paths, order_by_col, asc_desc, first, last, more = get_entries(searchstr)
+    entries, audio_paths, order_by_col, asc_desc, first, last, more = get_entries(
+        searchstr)
 
     return render_template(
         'show_entries.html',
@@ -357,24 +395,33 @@ def set_favorite():
 def rate_entry():
     entry_id = request.form.get("entryId", None, type=int)
     rating = request.form.get("rating", None, type=float)
-    if entry_id is None or rating is None:
-        return jsonify({"error": "Missing entry id or rating from data!"})
-    set_rating(get_db(), entry_id, rating)
-    return jsonify({})
-
-
-@main_bp.route('/entry/remove', methods=("POST",))
-def remove_entry():
-    entry_id = request.form.get("entryId", None, type=int)
     if entry_id is None:
-        return jsonify({"error": "Missing entry id from data!"})
+        return render_template(
+            'components/entry_rate.html',
+            rate_error='Error: Failed to update rating! Missing entry id!')
+    if rating is None:
+        return render_template(
+            'components/entry_rate.html',
+            rate_error='Error: Failed to update rating! Missing rating!')
+
+    set_rating(get_db(), entry_id, rating)
+    return render_template(
+        'components/entry_rate.html',
+        entry={'id': entry_id, 'rating': rating})
+
+
+@main_bp.route('/entry/<int:entry_id>', methods=("DELETE",))
+def remove_entry(entry_id: int):
     gwa_remove_entry(get_db(), entry_id, current_app.instance_path)
-    return jsonify({"removed": True})
+    return (
+        '<div class="red-fcolor">Entry was successfully removed from the DB! '
+        'You have to delete the files manually!</div>')
 
 
 @main_bp.route("/entry/add")
 def show_add_audio():
-    new_info = FileInfo(BaseExtractor, True, "", "", "", None, "New Audio", None, None)
+    new_info = FileInfo(BaseExtractor, True, "", "", "",
+                        None, "New Audio", None, None)
     db = get_db()
     c = db.execute("SELECT name FROM Artist")
     artists = [r['name'] for r in c.fetchall()]
@@ -433,6 +480,7 @@ def add_audio():
         # since manually added files currently don't have a FileCollection
         # we need to add the associated artist manually
         GWARipper.add_artist(db, new_info.author)
-        GWARipper.add_to_db(db, new_info, None, filename, file_author_is_artist=True)
+        GWARipper.add_to_db(db, new_info, None, filename,
+                            file_author_is_artist=True)
 
     return redirect(url_for('main.show_entries'))

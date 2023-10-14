@@ -4,14 +4,13 @@
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='fontawesome-all.min.css') }}">
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='bootstrap.min.css') }}">
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
+<script type="text/javascript" src="{{ url_for('static', filename='htmx.min.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='jquery-3.3.1.min.js') }}"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='bootstrap.bundle.min.js') }}"></script>
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script type="text/javascript">
-    // configure jquery ajax requests to send csrf_token as X-CSRF-Token header on POST request
-    // taken from flask-wtf
-
+    const rootUrl = {{ request.script_root|tojson }};
     // The settings specified here will affect all calls to $.ajax or Ajax-based derivatives
     // such as $.get(). This can cause undesirable behavior since other callers (for example,
     // plugins) may be expecting the normal default settings. For that reason we strongly
@@ -123,4 +122,11 @@
 		{% endif %}
 	{% endwith %}
 {% block body %}{% endblock %}
+<script type="text/javascript">
+    // can't be in head, otherwise loaded too early
+    // configure htmx ajax requests to send csrf_token as X-CSRF-Token header on POST request
+    document.body.addEventListener('htmx:configRequest', (event) => {
+        event.detail.headers['X-CSRFToken'] = document.querySelector('meta[name="csrf-token"]').content;
+    });
+</script>
 </div>
