@@ -27,6 +27,8 @@
 !*.py
 !*.bat
 !*.spec
+!*.js
+!*.css
 
 .*/
 
@@ -44,10 +46,8 @@ test_files_bu*
 secrets/
 dist/
 build/
+!gwaripper_webGUI/static/webfonts/*
 gwaripper_test.ipynb
-webGUI/static/webfonts
-webGUI/static/*
-!webGUI/static/style.css
 gwaripper/gwaripper_config*.ini
 *.egg-info/
 *.swp
