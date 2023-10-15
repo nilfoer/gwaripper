@@ -146,6 +146,12 @@ hr {
     align-self: center; /* vert */
     font-size: 14px;
 }
+
+.entry-container-popout {
+    margin: .5em;
+    align-self: center;
+}
+
 .entry-container.odd {
     background-color: #2d2d2d;
 }
@@ -477,6 +483,15 @@ input[type=submit] {
     /* 1rem == 16px */
     font-size: .9rem;
     background-color: #2d2d2d;
+}
+/* for removing borders from a bootstrap table */
+.table-borderless > tbody > tr > td,
+.table-borderless > tbody > tr > th,
+.table-borderless > tfoot > tr > td,
+.table-borderless > tfoot > tr > th,
+.table-borderless > thead > tr > td,
+.table-borderless > thead > tr > th {
+    border: none;
 }
 .entries img    { width: 100% }
 .entries li h2  { margin-left: -1em; }

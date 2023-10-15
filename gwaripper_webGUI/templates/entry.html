@@ -1,0 +1,118 @@
+{% extends "layout.html" %}
+{% block head %}
+    {{ super() }}
+    <script type="text/javascript" src="{{ url_for('static', filename='gwaripper.js') }}"></script>
+    <title>{{ entry.title }} - GWARipper</title>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+<div class="row">
+<div class="col-md-10" style="margin:auto;">
+    <div class="row">
+        <div class="col">
+            <h1 style="border-bottom: 2px solid #eee; margin: 0 0 .25em 0">
+                {{ entry.title }}
+            </h1>
+        </div>
+    </div>
+    <div class="row" style="margin: 0 0 .25em .5em;">
+        <div class="col">
+            {% include 'components/entry_rate.html' %}
+        </div>
+    </div>
+    {% if entry.fcol_title %}
+    <div class="row" style="margin: 0 0 1em .5em;">
+        <div class="col">
+            <h2><strong>Collection:</strong> {{ entry.fcol_title }}</h2>
+        </div>
+    </div>
+    {% endif %}
+    <div class="row ml-1">
+        <table class="table-sm table-borderless table-responsive">
+        <tbody>
+            <tr>
+                <th scope="row"><strong>Date:</strong></th>
+                <td>{{ entry.date }}</td>
+            </tr>
+            <tr>
+                <th scope="row"><strong>Artist:</strong></th>
+                <td>
+                <div class="entry-container-artist" style="display: inline; margin: 0">
+                    <a href="{{ url_for('main.search_entries', q='artist:"' + (entry.artist_name if entry.artist_name else entry.alias_name) + '"') }}" title={{ entry.artist_name or entry.alias_name }}>{{ entry.artist_name or entry.alias_name }}</a>
+                </div>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row"><strong>Favorite:</strong></th>
+                <td style="font-size: 1.25em;">
+                    <i class="fa{{ 's' if entry.favorite else 'r' }} fa-heart pink-fcolor align-middle"></i>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row"><strong>Local filename:</strong></th>
+                <td>{{ (audio_path.subpath + '/' + entry.filename) if entry.filename else 'Missing!' }}</td>
+            </tr>
+            <tr>
+                <th scope="row"><strong>Description:</strong></th>
+                <td>
+                {% if entry.description %}
+                    {% for ln in entry.description.splitlines() %}
+                        {{ ln }}<br/>
+                    {% endfor %}
+                {% else %}
+                    Missing!<br/>
+                {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle"><strong>Source:</strong></th>
+                <td class="entry-expand-icons">
+                    {% if entry.fcol_url %}
+                    <a href={{ entry.fcol_url }} title="Visit reddit thread!"><i class="fab fa-reddit-square"></i></a>
+                    {% endif %}
+                    <a href={{ entry.url if entry.url else '#' }} title="Visit audio source page!"><i class="fas fa-globe-americas"></i></a>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle"><strong>Embed:</strong></th>
+                <td class="entry-expand-icons">
+                    <a href="#" class="load-audio-embed" title="Embed audio file!"
+                        hx-get="{{ url_for('main.embed_audio', subpath=audio_path.subpath, filename=entry.filename) if entry.filename else '' }}"
+                        hx-target="next .audio-embed" >
+                        <i class="fas fa-file-audio"></i></a>
+                    <a href="#" class="load-selftxt-embed" title="Embed local selftext file!"
+                        hx-get="{{ url_for('main.embed_selftext', subpath=audio_path.subpath, filename=audio_path.selftext_filename) if audio_path.selftext_filename else '' }}"
+                        hx-target="next .selftxt-embed">
+
+                        <i class="fas fa-file-alt"></i>
+                    </a>
+                </td>
+            </tr>
+            <tr>
+                <th scope="row" class="align-middle"><strong>Actions:</strong></th>
+                <td class="entry-expand-icons">
+                    {# set favIntbool to opposite of what it is 0 or 1 with 1-val #}
+                    {# need to account  for entry.favorite being None #}
+                    <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - entry.favorite if entry.favorite is not none else 1 }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
+                    <a href="#" class="remove-entry-btn"
+                        title="Remove audio!"
+                        hx-delete="{{ url_for('main.remove_entry', entry_id=entry.id) }}"
+                        hx-target="previous .entry-container-title"
+                        hx-swap="beforeend"
+                        hx-confirm="Are you sure you want to delete this entry from the DB?">
+                        <i class="fas fa-trash-alt red-fcolor"></i></a>
+                </td>
+            </tr>
+        </tbody>
+        </table>
+    </div>
+    <div class="row ml-2">
+        <div class="audio-embed">
+        </div>
+        <div class="selftxt-embed">
+        </div>
+    </div>
+</div>
+</div>
+</div>
+{% endblock %}

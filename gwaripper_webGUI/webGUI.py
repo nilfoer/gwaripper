@@ -187,6 +187,38 @@ class AudioPathHelper(NamedTuple):
     selftext_filename: Optional[str]
 
 
+def create_audiopath_helper(entry: RowData) -> AudioPathHelper:
+    selftext_filename: Optional[str] = None
+
+    if entry.collection_id is not None:
+        author_subdir = entry.fcol_alias_name
+        subpath = entry.fcol_subpath
+    else:
+        author_subdir = entry.alias_name
+        subpath = ""
+
+    # we write a selftext in set_missing_reddit even though we don't have a filename
+    # but ignore that here @Incomplete
+    if entry.filename and entry.fcol_id_on_page is not None:
+        date: datetime.date = entry.date
+        # date v0.3 started
+        if date > datetime.date(year=2020, month=10, day=10):
+            # @CleanUp basically repeating code from info.py here
+
+            # selftext might have been added later which means it won't use
+            # fcol_alias_name etc. but just alias_name
+            # needs author_subdir to get correct length
+            selftext_filename = sanitize_filename(
+                os.path.join(author_subdir, subpath),
+                entry.fcol_title) + '.txt'
+        else:
+            selftext_filename = f"{entry.filename}.txt"
+
+    return AudioPathHelper(
+        os.path.join(author_subdir, subpath).replace('\\', '/'),
+        selftext_filename)
+
+
 def get_entries(query: Optional[str] = None) -> Tuple[
         List[RowData], List[AudioPathHelper], str, str, Optional[Any], Optional[Any],
         Optional[Dict[str, bool]]]:
@@ -226,35 +258,8 @@ def get_entries(query: Optional[str] = None) -> Tuple[
         # <0.3 audio file name + '.txt'
         # ==0.3: subpath + sanitized reddit title + '.txt'
         for entry in entries:
-            selftext_filename: Optional[str] = None
-
-            if entry.collection_id is not None:
-                author_subdir = entry.fcol_alias_name
-                subpath = entry.fcol_subpath
-            else:
-                author_subdir = entry.alias_name
-                subpath = ""
-
-            # we write a selftext in set_missing_reddit even though we don't have a filename
-            # but ignore that here @Incomplete
-            if entry.filename and entry.fcol_id_on_page is not None:
-                date: datetime.date = entry.date
-                # date v0.3 started
-                if date > datetime.date(year=2020, month=10, day=10):
-                    # @CleanUp basically repeating code from info.py here
-
-                    # selftext might have been added later which means it won't use
-                    # fcol_alias_name etc. but just alias_name
-                    # needs author_subdir to get correct length
-                    selftext_filename = sanitize_filename(
-                        os.path.join(author_subdir, subpath),
-                        entry.fcol_title) + '.txt'
-                else:
-                    selftext_filename = f"{entry.filename}.txt"
-
-            audio_paths.append(AudioPathHelper(
-                os.path.join(author_subdir, subpath).replace('\\', '/'),
-                selftext_filename))
+            helper = create_audiopath_helper(entry)
+            audio_paths.append(helper)
 
     return entries, audio_paths, order_by_col, asc_desc, first, last, more
 
@@ -347,6 +352,28 @@ def search_entries():
         search_field=searchstr,
         order_col=order_by_col,
         asc_desc=asc_desc)
+
+
+@main_bp.route('/entry/<int:entry_id>')
+def entry(entry_id: int):
+    db = get_db()
+
+    query = """
+        SELECT * FROM v_audio_and_collection_combined AudioFile
+        WHERE id = ?
+    """
+    c = db.execute(query, (entry_id,))
+    row = c.fetchone()
+
+    if not row:
+        return render_template('entry.html',
+                               error=f'Could not find entry with id {entry_id}!')
+    entry = RowData(row)
+    helper = create_audiopath_helper(entry)
+    return render_template(
+        'entry.html',
+        audio_path=helper,
+        entry=entry)
 
 
 # function that accepts ajax request so we can add lists on show_info
