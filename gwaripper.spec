@@ -20,7 +20,7 @@ a = Analysis(['gwaripper-runner.py'],
              # was
              datas=[
                 ("venv/Lib/site-packages/praw/praw.ini", "praw/"),
-                 # also enclude webgui fils
+                 # also include webgui files
                 ("gwaripper_webGUI/static", "static"),
                 ("gwaripper_webGUI/templates", "templates"),
                 ("gwaripper/migrations/*.py", "gwaripper/migrations"),

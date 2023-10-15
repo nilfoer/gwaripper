@@ -19,7 +19,7 @@ for dirpath, dirnames, filenames in os.walk(os.path.abspath('gwaripper_webGUI'))
 
 setuptools.setup(
     name="GWARipper",
-    version="0.6.8",
+    version="0.7.0",
     description="A script that downloads audio files from the gonewildaudio subreddit.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -30,8 +30,9 @@ setuptools.setup(
     keywords="script reddit gonewildaudio download scraping",
     packages=setuptools.find_packages(exclude=['tests*']),
     python_requires='>=3.6',
-    install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw>=7.5",
+    install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw>=7.5,<8",
                       "beautifulsoup4>=4.5.3,<=4.6.3",
+                      "flask>=3,<4",
                       # 3.7.2 would be enough but mypy 0.782 uses >=3.7.4
                       "typing-extensions>=3.7.4"],
 
@@ -43,7 +44,7 @@ setuptools.setup(
     package_data={
         'gwaripper_webGUI': webgui_data,
         'gwaripper': 'migrations/*.py',
-        },
+    },
     entry_points={
         'console_scripts': [
             # linking the executable gwaripper here to running the python
