@@ -19,7 +19,7 @@ from werkzeug.utils import secure_filename
 from gwaripper.gwaripper import GWARipper
 from gwaripper import config
 from gwaripper.db import (
-    get_x_entries, validate_order_by_str, search,
+    get_x_entries, get_x_listen_later_entries, validate_order_by_str, search,
     remove_entry as gwa_remove_entry, set_favorite_entry,
     set_rating, RowData
 )
@@ -344,12 +344,65 @@ def search_entries():
     return render_template(
         'show_entries.html',
         display_search_err_msg=True if entries is None else False,
+        listen_later_only=False,
         entries=entries,
         audio_paths=audio_paths,
         more=more,
         first=first,
         last=last,
         search_field=searchstr,
+        order_col=order_by_col,
+        asc_desc=asc_desc)
+
+
+@main_bp.route('/listen-later')
+def show_listen_later() -> Tuple[
+        List[RowData], List[AudioPathHelper], str, str, Optional[Any], Optional[Any],
+        Optional[Dict[str, bool]]]:
+    order_by_col = request.args.get('sort_col', "id", type=str)
+    # validate our sorting col otherwise were vulnerable to sql injection
+    if not validate_order_by_str(order_by_col):
+        order_by_col = "id"
+    asc_desc = "ASC" if request.args.get(
+        'order', "DESC", type=str) == "ASC" else "DESC"
+    order_by = f"AudioFile.{order_by_col} {asc_desc}"
+    # dont need to validate since we pass them in with SQL param substitution
+    after = request.args.getlist("after", None)
+    after = after if after else None
+    before = request.args.getlist("before", None)
+    before = before if before else None
+
+    # branch on condition if we have a NULL for the primary sorting col
+    # order_by_col isnt id but we only got one value from after/before
+    if after is not None and len(after) == 1 and order_by_col != "id":
+        after = (None, after[0])
+    elif before is not None and len(before) == 1 and order_by_col != "id":
+        before = (None, before[0])
+
+    entries: List[RowData] = get_x_listen_later_entries(
+        get_db(), ENTRIES_PER_PAGE+1, after=after, before=before,
+        order_by=order_by)
+    first, last, more = first_last_more(entries, order_by_col, after, before)
+
+    audio_paths: List[AudioPathHelper] = []
+    if entries:
+        # account for older selftext filenames
+        # <0.3 audio file name + '.txt'
+        # ==0.3: subpath + sanitized reddit title + '.txt'
+        for entry in entries:
+            helper = create_audiopath_helper(entry)
+            audio_paths.append(helper)
+
+    return render_template(
+        'show_entries.html',
+        display_search_err_msg=True if entries is None else False,
+        listen_later_only=True,
+        entries=entries,
+        audio_paths=audio_paths,
+        more=more,
+        first=first,
+        last=last,
+        search_field='',
         order_col=order_by_col,
         asc_desc=asc_desc)
 
@@ -416,6 +469,27 @@ def set_favorite():
         return jsonify({"error": "Missing entry id or fav value from data!"})
     set_favorite_entry(get_db(), entry_id, fav_intbool)
     return jsonify({})
+
+
+@main_bp.route("/entry/listen-later", methods=("POST",))
+def listen_later():
+    entry_id = request.form.get("entryId", None, type=int)
+    if entry_id is None:
+        return '<span style="color: red;">Error: Missing entryId!</span>'
+    db = get_db()
+    c = db.execute('SELECT * FROM ListenLater WHERE audio_id = ?', (entry_id,))
+    row = c.fetchone()
+    if not row:
+        # add it
+        with db:
+            c.execute(
+                'INSERT INTO ListenLater (audio_id) VALUES (?)', (entry_id,))
+        return '<i class="fas fa-clock"></i>'
+    else:
+        # remove it
+        with db:
+            c.execute('DELETE FROM ListenLater WHERE audio_id = ?', (entry_id,))
+        return '<i class="far fa-clock"></i>'
 
 
 @main_bp.route("/entry/rate", methods=("POST",))

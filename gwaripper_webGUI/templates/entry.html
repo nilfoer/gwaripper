@@ -94,6 +94,12 @@
                     {# set favIntbool to opposite of what it is 0 or 1 with 1-val #}
                     {# need to account  for entry.favorite being None #}
                     <a href="#" class="set-fav-btn" data-fav-intbool={{ 1 - entry.favorite if entry.favorite is not none else 1 }} data-entry-id={{ entry.id }} title="{{ 'Un-f' if entry.favorite else 'F' }}avorite audio!"><i class="fa{{ 'r' if entry.favorite else 's' }} fa-heart pink-fcolor"></i></a>
+                    <a class="entry-container-popout"
+                       hx-post={{ url_for('main.listen_later', entry_id=entry.id) }}
+                       hx-vals='{"entryId": {{ entry.id }} }'
+                       hx-target='this'>
+                        <i class="fa{{ 's' if entry.listen_later else 'r' }} fa-clock"></i>
+                    </a>
                     <a href="#" class="remove-entry-btn"
                         title="Remove audio!"
                         hx-delete="{{ url_for('main.remove_entry', entry_id=entry.id) }}"

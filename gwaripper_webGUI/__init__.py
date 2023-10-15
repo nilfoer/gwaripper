@@ -50,7 +50,8 @@ def create_app(test_config=None, **kwargs):
         SECRET_KEY='gwaripper dev',
         DATABASE_PATH=os.path.join(app.instance_path, 'gwarip_db.sqlite'),
         # limit upload size to 500MiB
-        MAX_CONTENT_LENGTH=500 * 1024 * 1024
+        MAX_CONTENT_LENGTH=500 * 1024 * 1024,
+        SESSION_COOKIE_NAME='gwarsession'
     )
 
     if test_config is None:

@@ -53,6 +53,13 @@
     <a href="{{ url_for('main.search_entries', before=first, q=search_field,
 	sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-prev">‹</div></a>
 	{% endif %}
+{% elif listen_later_only %}
+	{% if more.next %}
+    <a href="{{ url_for('main.show_listen_later', after=last, sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-next">›</div></a>
+	{% endif %}
+	{% if more.prev %}
+    <a href="{{ url_for('main.show_listen_later', before=first, sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-prev">‹</div></a>
+	{% endif %}
 {% else %}
 	{% if more.next %}
     <a href="{{ url_for('main.show_entries', after=last, sort_col=order_col, order=asc_desc) }}"><div class="page-nav" id="page-next">›</div></a>

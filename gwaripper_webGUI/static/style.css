@@ -21,6 +21,7 @@ a               { text-decoration: none; }
 a:hover, a:visited, a:focus {
     text-decoration: none;
     color: #fff;
+    cursor:pointer;
 }
 h1, h2          { font-family: 'Open Sans',sans-serif; margin: 0; }
 h1              { border-bottom: 2px solid #eee; margin-bottom: 1em;}

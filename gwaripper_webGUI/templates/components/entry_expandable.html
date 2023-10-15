@@ -17,9 +17,17 @@
                 {# TODO change this to search for both collection and audio alias? #}
                 <a href="{{ url_for('main.search_entries', q='artist:"' + (entry.artist_name if entry.artist_name else entry.alias_name) + '"') }}" title={{ entry.artist_name or entry.alias_name }}>{{ entry.artist_name or entry.alias_name }}</a>
             </div>
-            <a class="entry-container-popout" href={{ url_for('main.entry', entry_id=entry.id) }}>
-                <i class="fas fa-external-link-alt"></i>
-            </a>
+            <div class="col mdb-nav-right">
+                <a class="entry-container-popout"
+                   hx-post={{ url_for('main.listen_later', entry_id=entry.id) }}
+                   hx-vals='{"entryId": {{ entry.id }} }'
+                   hx-target='this'>
+                    <i class="fa{{ 's' if entry.listen_later else 'r' }} fa-clock"></i>
+                </a>
+                <a class="entry-container-popout" href={{ url_for('main.entry', entry_id=entry.id) }}>
+                    <i class="fas fa-external-link-alt"></i>
+                </a>
+            </div>
         </div>
     </div>
     <div class="entry-expand" style="display:none;">

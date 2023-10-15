@@ -27,7 +27,7 @@
 <nav class="navbar navbar-expand mdb-nav dark-color">
     <a class="mdb-navbar-brand" href="/">GWARipper</a>
 
-    <form id="searchForm" action="{{ url_for('main.search_entries') }}" method=get class="search-form">
+    <form id="searchForm" action="{{ url_for('main.search_entries') if not listen_later_only else url_for('main.show_listen_later') }}" method=get class="search-form">
         <i class="fa fa-search" id="search-icon"></i>
         <input type="text" id="searchBar" class="searchbar" name ="q" placeholder="Search" value="{{ search_field }}"/>
         <input type="hidden" value="{{ order_col if order_col else 'id' }}" name="sort_col" />
@@ -50,6 +50,9 @@
       </li>
     </ul>
     <div class="mdb-nav-right">
+        <a href="{{ url_for('main.show_listen_later') }}" style="margin-right: .75em;">
+            <i class="fas fa-user-clock"></i>
+        </a>
         <a href="{{ url_for('main.show_add_audio') }}" style="margin-right: .75em;">
             <i class="fas fa-plus"></i>
         </a>

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # so we don't have to read all migration scripts every time
-LATEST_VERSION = 2
+LATEST_VERSION = 3
 VERSION_TABLE = 'GWAR_Version'
 MIGRATIONS_DIRNAME = 'migrations'
 # migrations dir has to be a sub-folder of the MODULE_DIR
@@ -133,7 +133,7 @@ class Database:
             return -1, False
 
         version_id, dirty = self.db_con.execute(
-                f"SELECT version_id, dirty FROM {VERSION_TABLE}").fetchone()
+            f"SELECT version_id, dirty FROM {VERSION_TABLE}").fetchone()
         dirty = bool(dirty)
         return version_id, dirty
 
@@ -146,7 +146,8 @@ class Database:
         try:
             migration = self.migrations[version]
         except KeyError:
-            raise MigrationMissing(f"No such version '{version}' available as migration!")
+            raise MigrationMissing(
+                f"No such version '{version}' available as migration!")
         else:
             migration.load_module()
 
@@ -204,7 +205,7 @@ class Database:
         migrations = gather_migrations(self.version)
         if not migrations:
             raise MigrationMissing(
-                    f"No migrations available to upgrade to latest version {LATEST_VERSION}!")
+                f"No migrations available to upgrade to latest version {LATEST_VERSION}!")
         self.migrations = migrations
 
         if self.version != LATEST_VERSION:
@@ -248,7 +249,8 @@ class Migration:
                 self.module = importlib.import_module(module_name,
                                                       package=__package__)
             except ModuleNotFoundError:
-                raise MigrationMissing(f"Migration {module_name} could not be imported!")
+                raise MigrationMissing(
+                    f"Migration {module_name} could not be imported!")
 
             self.loaded = True
             self.date = self.module.date

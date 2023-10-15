@@ -118,6 +118,13 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                     -- selftext TEXT
                 );
 
+                CREATE TABLE ListenLater (
+                  id INTEGER PRIMARY KEY ASC,
+                  audio_id INTEGER,
+                  FOREIGN KEY (audio_id) REFERENCES AudioFile(id)
+                    ON DELETE CASCADE
+                );
+
                 CREATE VIEW v_audio_and_collection_combined
                 AS
                 SELECT
@@ -147,7 +154,8 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                     (SELECT
                             Alias.name
                      FROM Alias WHERE Alias.id = FileCollection.alias_id) as fcol_alias_name,
-                    RedditInfo.created_utc as reddit_created_utc
+                    RedditInfo.created_utc as reddit_created_utc,
+                    EXISTS (SELECT 1 FROM ListenLater WHERE audio_id = AudioFile.id) as listen_later
                 FROM AudioFile
                 LEFT JOIN FileCollection ON AudioFile.collection_id = FileCollection.id
                 LEFT JOIN RedditInfo ON FileCollection.reddit_info_id = RedditInfo.id
@@ -320,7 +328,7 @@ def export_to_sql(filename, db_con):
     db_con.row_factory = sqlite3.Row
 
     c = db_con.execute(
-            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name")
+        "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name")
     sql_master = c.fetchall()
 
     # store all full text search names here so we can later filter out
@@ -391,7 +399,7 @@ def db_to_sql_insert_only(db_con: sqlite3.Connection) -> str:
     db_con.row_factory = sqlite3.Row
 
     c = db_con.execute(
-            "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE type = 'table' ORDER BY name")
     sql_master = c.fetchall()
 
     fts_tables = [r['name'] for r in sql_master
@@ -447,8 +455,10 @@ def backup_db(db_path: str, bu_dir: str,
     # time.time() get utc number
     now = time.time()
     # freq in days convert to secs since utc time is in secs since epoch
-    freq_secs: float = config.getfloat("Settings", "db_bu_freq", fallback=5.0) * 24 * 60 * 60
-    elapsed_time: float = now - config.getfloat("Time", "last_db_bu", fallback=0.0)
+    freq_secs: float = config.getfloat(
+        "Settings", "db_bu_freq", fallback=5.0) * 24 * 60 * 60
+    elapsed_time: float = now - \
+        config.getfloat("Time", "last_db_bu", fallback=0.0)
 
     # if time since last db bu is greater than frequency in settings or we want to force a bu
     # time.time() is in gmt/utc whereas time.strftime() uses localtime
@@ -468,13 +478,15 @@ def backup_db(db_path: str, bu_dir: str,
         # for sorting (doesnt change but we can assume oldest bu also has oldest
         # mtime) whereas ctime could be the same for all) or use shutil.copy ->
         # only copies permission not m,ctime etc
-        shutil.copy(db_path, os.path.join(bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
+        shutil.copy(db_path, os.path.join(
+            bu_dir, "{}_gwarip_db.sqlite".format(time_str)))
         # Unlock database
         con.rollback()
         con.close()
 
         if csv_path:
-            shutil.copy(csv_path, os.path.join(bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
+            shutil.copy(csv_path, os.path.join(
+                bu_dir, "{}_gwarip_db_exp.csv".format(time_str)))
 
         # update last db bu time
         if config.has_section("Time"):
@@ -494,7 +506,8 @@ def backup_db(db_path: str, bu_dir: str,
             bu_dir_list = sorted(bu_dir_list, key=os.path.getctime)
 
             oldest = os.path.basename(bu_dir_list[0])
-            logger.info("Too many backups, deleting oldest one: {}".format(oldest))
+            logger.info(
+                "Too many backups, deleting oldest one: {}".format(oldest))
 
             os.remove(bu_dir_list[0])
             # try to delete csv of same day, since bu of csv is optional
@@ -503,28 +516,33 @@ def backup_db(db_path: str, bu_dir: str,
             except FileNotFoundError:
                 logger.debug("No csv file backup of that day")
             else:
-                logger.info("Also deleted csv backup, that was created on the same day!")
+                logger.info(
+                    "Also deleted csv backup, that was created on the same day!")
     else:
         # time in sec that is needed to reach next backup
         next_bu = freq_secs - elapsed_time
         logger.info("The last backup date is not yet {} days old! "
                     "The next backup will be in {: .2f} days!".format(
-                        config.getfloat("Settings", "db_bu_freq", fallback=5.0),
+                        config.getfloat(
+                            "Settings", "db_bu_freq", fallback=5.0),
                         next_bu / 24 / 60 / 60))
 
 
 def set_favorite_entry(db_con: sqlite3.Connection, _id: int, fav_intbool: int) -> None:
     with db_con:
-        db_con.execute("UPDATE AudioFile SET favorite = ? WHERE id = ?", (fav_intbool, _id))
+        db_con.execute(
+            "UPDATE AudioFile SET favorite = ? WHERE id = ?", (fav_intbool, _id))
 
 
 def set_rating(db_con: sqlite3.Connection, _id: int, rating: float):
     with db_con:
-        db_con.execute("UPDATE AudioFile SET rating = ? WHERE id = ?", (rating, _id))
+        db_con.execute(
+            "UPDATE AudioFile SET rating = ? WHERE id = ?", (rating, _id))
 
 
 def remove_entry(db_con: sqlite3.Connection, _id: int, root_dir: str):
-    c = db_con.execute("SELECT collection_id FROM AudioFile WHERE id = ?", (_id,))
+    c = db_con.execute(
+        "SELECT collection_id FROM AudioFile WHERE id = ?", (_id,))
     collection_id_row = c.fetchone()
 
     with db_con:
@@ -537,7 +555,8 @@ def remove_entry(db_con: sqlite3.Connection, _id: int, root_dir: str):
         if collection_id_row is not None:
             collection_id = collection_id_row[0]
             try:
-                c.execute("DELETE FROM FileCollection WHERE id = ?", (collection_id,))
+                c.execute("DELETE FROM FileCollection WHERE id = ?",
+                          (collection_id,))
             except sqlite3.IntegrityError:
                 # raises IntegrityError when we try to delete a FileCollection
                 # that still has an AudioFile
@@ -564,8 +583,8 @@ def get_x_entries(con: sqlite3.Connection, x: int,
             ORDER BY {order_by}
             LIMIT ?"""
     query, vals_in_order = keyset_pagination_statment(
-            query, [], after=after, before=before,
-            order_by=order_by, first_cond=True)
+        query, [], after=after, before=before,
+        order_by=order_by, first_cond=True)
     c = con.execute(query, (*vals_in_order, x))
     rows = c.fetchall()
 
@@ -575,7 +594,32 @@ def get_x_entries(con: sqlite3.Connection, x: int,
         return None
 
 
-VALID_ORDER_BY = {"ASC", "DESC", "AudioFile.id", "AudioFile.rating", "id", "rating"}
+def get_x_listen_later_entries(con: sqlite3.Connection, x: int,
+                               after: Optional[int] = None, before: Optional[int] = None,
+                               order_by: str = "AudioFile.id DESC"):
+    # order by has to come b4 limit/offset
+    # alias the view v_.. as AudioFile so we can use regular order_by
+    # with the actual table name
+    query = f"""
+        SELECT AudioFile.* FROM ListenLater
+        LEFT JOIN v_audio_and_collection_combined AS AudioFile ON AudioFile.id = ListenLater.audio_id
+        ORDER BY {order_by}
+        LIMIT ?"""
+    query, vals_in_order = keyset_pagination_statment(
+        query, [], after=after, before=before,
+        order_by=order_by, first_cond=True)
+    print(query)
+    c = con.execute(query, (*vals_in_order, x))
+    rows = c.fetchall()
+
+    if rows:
+        return [RowData(row) for row in rows]
+    else:
+        return None
+
+
+VALID_ORDER_BY = {"ASC", "DESC", "AudioFile.id",
+                  "AudioFile.rating", "id", "rating"}
 
 
 def validate_order_by_str(order_by):
@@ -593,7 +637,7 @@ WORD_RE = re.compile(r'([^"^\s]+)\s*|"([^"]+)"\s*')
 
 
 VALID_SEARCH_COLS: Set[str] = {
-        "title", "rating", "favorite", "artist", "url", "reddit_id"
+    "title", "rating", "favorite", "artist", "url", "reddit_id"
 }
 
 
@@ -684,7 +728,8 @@ def search_sytnax_parser(search_str: str,
                 # -> search type is part of the word
                 search_col, part = single.split(":", 1)
                 if search_col not in VALID_SEARCH_COLS:
-                    logger.info("'%s' is not a supported search type!", search_col)
+                    logger.info(
+                        "'%s' is not a supported search type!", search_col)
                     # set to None so we skip adding search_options for next word (which
                     # still belongs to unsupported search_col)
                     search_col = None
@@ -716,9 +761,9 @@ def search_sytnax_parser(search_str: str,
             search_expressions.append(search_expr)
         else:
             search_expressions.append(
-                    # assume AND
-                    SearchExpression(ConditionalOp.AND, [
-                        SearchColumnExpression(ConditionalOp.NONE, search_col, part)])
+                # assume AND
+                SearchExpression(ConditionalOp.AND, [
+                    SearchColumnExpression(ConditionalOp.NONE, search_col, part)])
             )
 
     return search_expressions, " ".join(title_search)
@@ -730,12 +775,13 @@ def search(db_con, query, order_by="AudioFile.id DESC", **kwargs):
         logger.warning("Sorting %s is not supported", order_by)
         order_by = "AudioFile.id DESC"
 
-    search_expressions, title_search_str = search_sytnax_parser(query, **kwargs)
+    search_expressions, title_search_str = search_sytnax_parser(
+        query, **kwargs)
 
     if search_expressions or title_search_str:
         rows = search_normal_columns(
-                db_con, search_expressions, title_search_str,
-                order_by=order_by, **kwargs)
+            db_con, search_expressions, title_search_str,
+            order_by=order_by, **kwargs)
         if rows is None:
             return None
         else:
@@ -766,8 +812,8 @@ def search_normal_columns(
                                     for word in title_search_str.split(" "))
         # use full-text-search for titles
         cond_statements.append(
-                f"{'AND' if cond_statements else 'WHERE'} AudioFile.id IN "
-                 "(SELECT rowid FROM Titles_fts_idx WHERE Titles_fts_idx MATCH ?)")
+            f"{'AND' if cond_statements else 'WHERE'} AudioFile.id IN "
+            "(SELECT rowid FROM Titles_fts_idx WHERE Titles_fts_idx MATCH ?)")
         vals_in_order.append(title_search_str)
 
     for search_expr in search_expressions:
@@ -778,12 +824,14 @@ def search_normal_columns(
             # NOTE: enum members all evaluate to True
             cond_op = search_column_expr.conditional_op
             if cond_op != ConditionalOp.NONE:
-                sub_expression.append('AND' if cond_op == ConditionalOp.AND else 'OR')
-            sub_expression.append(f"AudioFile.{search_column_expr.column_name} = ?")
+                sub_expression.append('AND' if cond_op ==
+                                      ConditionalOp.AND else 'OR')
+            sub_expression.append(
+                f"AudioFile.{search_column_expr.column_name} = ?")
             vals_in_order.append(search_column_expr.search_value)
 
         cond_statements.append(
-                f"{'AND' if cond_statements else 'WHERE'} ({' '.join(sub_expression)})")
+            f"{'AND' if cond_statements else 'WHERE'} ({' '.join(sub_expression)})")
 
     cond_statements_str = "\n".join(cond_statements)
 
@@ -798,9 +846,9 @@ def search_normal_columns(
     # important to do this last and limit mustnt be in vals_in_order (since its after
     # keyset param in sql substitution)
     query, vals_in_order = keyset_pagination_statment(
-            query, vals_in_order, after=after, before=before,
-            order_by=order_by, first_cond=not bool(cond_statements)
-            )
+        query, vals_in_order, after=after, before=before,
+        order_by=order_by, first_cond=not bool(cond_statements)
+    )
     try:
         c = db_con.execute(query, (*vals_in_order, limit))
     except sqlite3.OperationalError as e:
@@ -831,7 +879,8 @@ def insert_order_by_id(query, order_by="AudioFile.id DESC"):
         query = query.splitlines()
         # if we have subqueries take last order by to insert; strip line of whitespace since
         # we might have indentation
-        order_by_i = [i for i, ln in enumerate(query) if ln.strip().startswith("ORDER BY")][-1]
+        order_by_i = [i for i, ln in enumerate(
+            query) if ln.strip().startswith("ORDER BY")][-1]
         inserted = f"ORDER BY {order_by}, {order_by.split('.')[0]}.id {order_by.split(' ')[1]}"
         query[order_by_i] = inserted
         query = "\n".join(query)
@@ -852,7 +901,8 @@ def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
     # CAREFUL order_by needs to be unique for keyset pagination, possible to add rnd cols
     # to make it unique
     if after is not None and before is not None:
-        raise ValueError("Either after or before can be supplied but not both!")
+        raise ValueError(
+            "Either after or before can be supplied but not both!")
     elif after is None and before is None:
         return insert_order_by_id(query, order_by), vals_in_order
 
@@ -940,7 +990,8 @@ def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
         # @Cleanup assuming upper case order statment
         # need to reverse order in query to not get results starting from first one possible
         # to before(id) but rather to get limit nr of results starting from before(id)
-        result = result.replace(f"{' ASC' if asc else ' DESC'}", f"{' DESC' if asc else ' ASC'}")
+        result = result.replace(
+            f"{' ASC' if asc else ' DESC'}", f"{' DESC' if asc else ' ASC'}")
         result = f"""
             SELECT *
             FROM (
@@ -949,6 +1000,7 @@ def keyset_pagination_statment(query, vals_in_order, after=None, before=None,
             ORDER BY {order_by.replace('AudioFile.', 't.')}"""
         if un_unique_sort_col:
             # since were using a subquery we need to modify our order by to use the AS tablename
-            result = insert_order_by_id(result, order_by.replace("AudioFile.", "t."))
+            result = insert_order_by_id(
+                result, order_by.replace("AudioFile.", "t."))
 
     return result, vals_in_order
