@@ -8,6 +8,7 @@ import urllib.request
 import urllib.error
 import dataclasses
 import sqlite3
+import music_tag
 
 import praw
 
@@ -386,6 +387,10 @@ class GWARipper:
                     # executes the SQL query but leaves commiting it to context manager
                     file_info_id_in_db = self._add_to_db(info, None, filename)
                     dl_function(info, mypath, filename)
+                    f = music_tag.load_file(mypath + filename)
+                    title_item = f['artist']
+                    f['artist'] = author_name
+                    f.save()
             else:
                 # don't add to db if it's a redownload or non-audio
                 # NOTE: we already skip duplicate audios up top if download_duplicates isn't set
