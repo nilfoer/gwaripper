@@ -608,7 +608,6 @@ def get_x_listen_later_entries(con: sqlite3.Connection, x: int,
     query, vals_in_order = keyset_pagination_statment(
         query, [], after=after, before=before,
         order_by=order_by, first_cond=True)
-    print(query)
     c = con.execute(query, (*vals_in_order, x))
     rows = c.fetchall()
 

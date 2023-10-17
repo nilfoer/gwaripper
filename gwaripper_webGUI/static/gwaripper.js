@@ -10,6 +10,9 @@ $(document).ready(function() {
         let fav_icon = fav_btn.find(".fa-heart");
         let entry_id = $(event.currentTarget).data("entryId");
         let fav_intbool = $(event.currentTarget).data("favIntbool");
+        // showing the actual state instead of what action (currently fav
+        // shows heart while action shows empty heart to unfav)
+        let other_fav_icon = $('#fav-display i');
         if(fav_intbool == 1) {
             ribbon.removeClass("gwa-hidden");
             ribbon.addClass("gwa-visible");
@@ -18,6 +21,10 @@ $(document).ready(function() {
             fav_icon.addClass("far");
             fav_btn.data("favIntbool", 0);
             fav_btn.title = "Un-favorite audio!";
+            if (other_fav_icon) {
+                other_fav_icon.removeClass("far");
+                other_fav_icon.addClass("fas");
+            }
         } else {
             ribbon.removeClass("gwa-visible");
             ribbon.addClass("gwa-hidden");
@@ -26,6 +33,10 @@ $(document).ready(function() {
             fav_icon.addClass("fas");
             fav_btn.data("favIntbool", 1);
             fav_btn.title = "Favorite audio!";
+            if (other_fav_icon) {
+                other_fav_icon.removeClass("fas");
+                other_fav_icon.addClass("far");
+            }
         }
         event.preventDefault();
 
