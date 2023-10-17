@@ -5,9 +5,9 @@ import re
 from enum import Enum, auto, unique
 
 from typing import (
-        Optional, Union, List, Type, Tuple, Iterator, Sequence,
-        Deque, TYPE_CHECKING, cast, overload, Dict, Set
-        )
+    Optional, Union, List, Type, Tuple, Iterator, Sequence,
+    Deque, TYPE_CHECKING, cast, overload, Dict, Set
+)
 from typing_extensions import Literal
 
 from collections import deque, defaultdict
@@ -91,14 +91,14 @@ def sanitize_filename(subpath: str, filename: str):
 def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: Literal[False],
                       relative_enum: bool = False) -> Iterator[
-                              Tuple[int, Union['FileInfo', 'FileCollection']]]: ...
+    Tuple[int, Union['FileInfo', 'FileCollection']]]: ...
 
 
 @overload
 def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: Literal[True],
                       relative_enum: bool = False) -> Iterator[
-                              Tuple[int, 'FileInfo']]: ...
+    Tuple[int, 'FileInfo']]: ...
 
 
 # only allow literals for file_info_only otherwise we'd do one more overload
@@ -106,7 +106,7 @@ def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
 def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: bool,  # can't be a default arg
                       relative_enum: bool = False) -> Iterator[
-                              Tuple[int, Union['FileInfo', 'FileCollection']]]:
+        Tuple[int, Union['FileInfo', 'FileCollection']]]:
     """
     Iterator over a list containing FileInfo or FileCollection objects and their
     childrne using DFS
@@ -157,20 +157,20 @@ def children_iter_dfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
 def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: Literal[False],
                       relative_enum: bool = False) -> Iterator[
-                              Tuple[int, Union['FileInfo', 'FileCollection']]]: ...
+    Tuple[int, Union['FileInfo', 'FileCollection']]]: ...
 
 
 @overload
 def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: Literal[True],
                       relative_enum: bool = False) -> Iterator[
-                              Tuple[int, 'FileInfo']]: ...
+    Tuple[int, 'FileInfo']]: ...
 
 
 def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
                       file_info_only: bool,
                       relative_enum: bool = False) -> Iterator[
-                              Tuple[int, Union['FileInfo', 'FileCollection']]]:
+        Tuple[int, Union['FileInfo', 'FileCollection']]]:
     """
     Iterator over a list containing FileInfo or FileCollection objects and their
     childrne using DFS
@@ -233,7 +233,6 @@ def children_iter_bfs(start_list: Sequence[Union['FileInfo', 'FileCollection']],
             # not a FileCollection
             yield i if relative_enum else enumerator, cur
             enumerator += 1
-
 
 
 @unique
@@ -431,7 +430,7 @@ class FileCollection:
 
     def _update_subpath(self) -> str:
         subpath = sanitize_filename(
-                "", f"{self.title if self.title else self.id}")[:70].strip()
+            "", f"{self.title if self.title else self.id}")[:70].strip()
         self._subpath = subpath
         return subpath
 
@@ -449,6 +448,15 @@ class FileCollection:
         self._nr_files = value
         if self.parent:
             self.parent.nr_files += delta
+
+    def get_num_audio_files(self) -> int:
+        num_audios = 0
+        for _, child in children_iter_dfs(self._children, file_info_only=True):
+            cast(FileInfo, child)
+            if child.is_audio:
+                num_audios += 1
+
+        return num_audios
 
     def add_file(self, info: FileInfo) -> None:
         # if an audio file gets added, this FileCollection as well as all its
@@ -528,7 +536,8 @@ class FileCollection:
                 names.append(child.author)
 
         # @Hack
-        names.append(DELETED_USR_FOLDER if isinstance(self, RedditInfo) else None)
+        names.append(DELETED_USR_FOLDER if isinstance(
+            self, RedditInfo) else None)
         names.append(UNKNOWN_USR_FOLDER)
 
         # preferred_author_name determines subfolder that the file gets save in
@@ -539,17 +548,19 @@ class FileCollection:
 
     def choose_mirrors(self, host_priority: List['extr.AudioHost']):
         available_hosts = {
-                extr.EXTRACTOR_TO_HOST[i.extractor] for i in self.children
-                if i.extractor in extr.EXTRACTOR_TO_HOST}
+            extr.EXTRACTOR_TO_HOST[i.extractor] for i in self.children
+            if i.extractor in extr.EXTRACTOR_TO_HOST}
         if len(available_hosts) > 1:
-            direct_audio_children = [i for i in self.children if i.extractor in extr.EXTRACTOR_TO_HOST]
+            direct_audio_children = [
+                i for i in self.children if i.extractor in extr.EXTRACTOR_TO_HOST]
             # NOTE: !IMPORANT! need to check that all audio hosts have equal nr of items
             # otherwise: 2 audio hosts 1 on whyp 3 on sgasm -> would be mod 2 == 0,
             # but not equal nr of items
             if (len(direct_audio_children) % len(available_hosts) == 0
                     and hosts_have_same_item_count(direct_audio_children)):
                 # divides evenly -> just mirrors
-                only_host = pick_host_based_on_priority_list(available_hosts, host_priority)
+                only_host = pick_host_based_on_priority_list(
+                    available_hosts, host_priority)
                 # mark other mirrors so that they will be skipped
                 for i in direct_audio_children:
                     if extr.EXTRACTOR_TO_HOST[i.extractor] is not only_host:
@@ -597,7 +608,8 @@ class RedditInfo(FileCollection):
     # override base class implementation to disallow recursive RedditInfos
     def _set_parent(self, parent: 'FileCollection'):
         if isinstance(parent, RedditInfo):
-            raise Exception("RedditInfo is not allowed to contain other RedditInfos!")
+            raise Exception(
+                "RedditInfo is not allowed to contain other RedditInfos!")
         else:
             super()._set_parent(parent)
 
@@ -664,5 +676,3 @@ def hosts_have_same_item_count(audio_files: List[Union[FileInfo, FileCollection]
             break
 
     return result
-
-

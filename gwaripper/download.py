@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_HEADERS = {
     'User-Agent':
     'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
-    }
+}
 
 
 @unique
@@ -82,7 +82,6 @@ HTTP_ERR_TO_DL_ERR: Dict[int, DownloadErrorCode] = {
 }
 
 
-
 def download(url: str, dl_path: str):
     """
     Will download the file to dl_path, return True on success
@@ -98,7 +97,8 @@ def download(url: str, dl_path: str):
         os.makedirs(dirpath, exist_ok=True)
 
     try:
-        _, headers = urllib.request.urlretrieve(url, dl_path)  # reporthook=prog_bar_dl)
+        _, headers = urllib.request.urlretrieve(
+            url, dl_path)  # reporthook=prog_bar_dl)
     except urllib.error.HTTPError as err:
         # catch this more detailed first then broader one (HTTPError is subclass of URLError)
         logger.warning("HTTP Error %s: %s: \"%s\"", err.code, err.reason, url)
@@ -157,8 +157,8 @@ def download_in_chunks(url: str, filename: str,
     # raises the exception.
     if file_size_dl < reported_file_size:
         raise ContentTooShortError(
-                f"Downloaded file's size is samller than the reported size for \"{url}\"",
-                None)
+            f"Downloaded file's size is samller than the reported size for \"{url}\"",
+            None)
     else:
         return file_size_dl
 
@@ -230,7 +230,7 @@ def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
     num_parts = len(parts)
     # NOTE: default of 1 seems to work for erocast, which results in a default sleep time of 0.5s
     # in seconds
-    backoff_factor = 1 
+    backoff_factor = 1
     retries = 0
     # in seconds
     max_backoff = 64
@@ -255,7 +255,8 @@ def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
             retries += 1
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                logger.debug("Hit request limit while downloading... backing off...", )
+                logger.debug(
+                    "Hit request limit while downloading... backing off...", )
                 # too many requests -> sleep more and retry
                 retries += 1
             else:
@@ -308,8 +309,8 @@ def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
 
 
 def download_text(headers, url: str,
-             additional_headers: Optional[Dict[str, str]] = None) -> Tuple[
-                     Optional[str], Optional[int]]:
+                  additional_headers: Optional[Dict[str, str]] = None) -> Tuple[
+        Optional[str], Optional[int]]:
     res: Optional[str] = None
     http_code: Optional[int] = None
 

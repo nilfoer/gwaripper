@@ -18,13 +18,14 @@ from . import utils
 from . import config
 from gwaripper import extractors as extr
 from .info import (
-        FileInfo, FileCollection, RedditInfo, children_iter_dfs,
-        UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER, DownloadType
-        )
+    FileInfo, FileCollection, RedditInfo, children_iter_dfs,
+    UNKNOWN_USR_FOLDER, DELETED_USR_FOLDER, DownloadType
+)
 from . import download as dl
 from . import exceptions
 from .reddit import reddit_praw
 from .db import load_or_create_sql_db, export_table_to_csv, backup_db
+from .file_tags import update_meta_tags
 
 rqd = utils.RequestDelayer(0.25, 0.75)
 
@@ -114,7 +115,7 @@ class GWARipper:
     headers: ClassVar[Dict[str, str]] = {
         'User-Agent':
         'Mozilla/5.0 (Windows NT 6.1; WOW64; rv:12.0) Gecko/20100101 Firefox/12.0'
-        }
+    }
 
     download_duplicates: Final[bool]
     skip_non_audio: Final[bool]
@@ -132,7 +133,7 @@ class GWARipper:
         # TODO @CleanUp remove all dependencies on config, the class should be passed all the relevant
         # setting through init -> easiert to test, more robust etc.
         self.db_con, _ = load_or_create_sql_db(
-                os.path.join(config.get_root(), "gwarip_db.sqlite"))
+            os.path.join(config.get_root(), "gwarip_db.sqlite"))
         self.urls: List[str] = []
         self.nr_urls: int = 0
         self.extractor_reports: List[extr.base.ExtractorReport] = []
@@ -154,9 +155,9 @@ class GWARipper:
         # you don't want to suppress errors then you can return a value that
         # evaluates to False.
         export_table_to_csv(
-                self.db_con,
-                os.path.join(config.get_root(), "gwarip_db_exp.csv"),
-                "v_audio_and_collection_combined")
+            self.db_con,
+            os.path.join(config.get_root(), "gwarip_db_exp.csv"),
+            "v_audio_and_collection_combined")
         self.db_con.close()
 
         # so download report will always be written even on KeyboardInterrupt
@@ -178,7 +179,7 @@ class GWARipper:
         extractor = extr.find_extractor(url)
         if extractor is None:
             self.extractor_reports.append(
-                    extr.base.ExtractorReport(url, extr.base.ExtractorErrorCode.NO_EXTRACTOR))
+                extr.base.ExtractorReport(url, extr.base.ExtractorErrorCode.NO_EXTRACTOR))
             logger.warning("Found no extractor for URL: %s", url)
             return None
 
@@ -195,7 +196,8 @@ class GWARipper:
         url = f"{reddit_url}{sub.permalink}"
         # init_from not type-checked for Submission since praw doesn't have
         # type hints
-        info, extr_report = extr.reddit.RedditExtractor.extract(url, init_from=sub)
+        info, extr_report = extr.reddit.RedditExtractor.extract(
+            url, init_from=sub)
         if info is not None:
             self.download(info)
         self.extractor_reports.append(extr_report)
@@ -273,19 +275,20 @@ class GWARipper:
 
         root_dir = config.get_root()
         dirname = os.path.join(root_dir, "_reports")
-        fn = os.path.join(dirname, f"report_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html")
+        fn = os.path.join(
+            dirname, f"report_{time.strftime('%Y-%m-%dT%Hh%Mm')}.html")
         contents.insert(1,
-          ("<p>EXTRACTOR STATUS:"
-           "<ul>"
-           f"<li><span class=\"success\">SUCCESS: {status[Status.SUCCESS.value]}</span></li>"
-           f"<li><span class=\"warning\">WARNING: {status[Status.WARNING.value]}</span></li>"
-           f"<li><span class=\"error\">ERROR: {status[Status.ERROR.value]}</span></li>"
-           "</ul>DOWNLOADS:<ul>"
-           f"<li><span class=\"success\">SUCCESS: {dl_status[Status.SUCCESS.value]}</span></li>"
-           f"<li><span class=\"warning\">WARNING: {dl_status[Status.WARNING.value]}</span></li>"
-           f"<li><span class=\"error\">ERROR: {dl_status[Status.ERROR.value]}</span></li>"
-           "</ul></p>")
-        )
+                        ("<p>EXTRACTOR STATUS:"
+                         "<ul>"
+                         f"<li><span class=\"success\">SUCCESS: {status[Status.SUCCESS.value]}</span></li>"
+                         f"<li><span class=\"warning\">WARNING: {status[Status.WARNING.value]}</span></li>"
+                         f"<li><span class=\"error\">ERROR: {status[Status.ERROR.value]}</span></li>"
+                         "</ul>DOWNLOADS:<ul>"
+                         f"<li><span class=\"success\">SUCCESS: {dl_status[Status.SUCCESS.value]}</span></li>"
+                         f"<li><span class=\"warning\">WARNING: {dl_status[Status.WARNING.value]}</span></li>"
+                         f"<li><span class=\"error\">ERROR: {dl_status[Status.ERROR.value]}</span></li>"
+                         "</ul></p>")
+                        )
 
         while True:
             try:
@@ -303,13 +306,15 @@ class GWARipper:
 
         if sub_list is None:
             for idx, url in enumerate(self.urls):
-                logger.info("Processing URL %d of %d: %s", idx + 1, self.nr_urls, url)
+                logger.info("Processing URL %d of %d: %s",
+                            idx + 1, self.nr_urls, url)
                 self.extract_and_download(url)
         else:
             nr_subs = len(sub_list)
             idx = 1
             for sub in sub_list:
-                logger.info("Processing submission %d of %d: %s", idx, nr_subs, sub.permalink)
+                logger.info("Processing submission %d of %d: %s",
+                            idx, nr_subs, sub.permalink)
                 self.parse_and_download_submission(sub)
 
     def download(self, info: Union[FileInfo, FileCollection]):
@@ -353,7 +358,8 @@ class GWARipper:
         # TODO re-add request delay?
         already_downloaded = self.already_downloaded(info)
         if already_downloaded and not self.download_duplicates:
-            logger.info("File was already downloaded, skipped URL: %s", info.page_url)
+            logger.info(
+                "File was already downloaded, skipped URL: %s", info.page_url)
             return None
         elif not info.is_audio and self.skip_non_audio:
             logger.info("Non-audio file was skipped! URL: %s", info.page_url)
@@ -362,7 +368,8 @@ class GWARipper:
         if not author_name:
             author_name = UNKNOWN_USR_FOLDER
 
-        subpath, filename, ext = info.generate_filename(top_collection, file_index)
+        subpath, filename, ext = info.generate_filename(
+            top_collection, file_index)
 
         mypath = os.path.join(config.get_root(), author_name, subpath)
         os.makedirs(mypath, exist_ok=True)
@@ -391,7 +398,8 @@ class GWARipper:
                 # NOTE: we already skip duplicate audios up top if download_duplicates isn't set
                 dl_function(info, mypath, filename)
         except urllib.error.HTTPError as err:
-            logger.warning("HTTP Error %d: %s: \"%s\"", err.code, err.reason, info.direct_url)
+            logger.warning("HTTP Error %d: %s: \"%s\"",
+                           err.code, err.reason, info.direct_url)
 
             try:
                 info.downloaded = dl.HTTP_ERR_TO_DL_ERR[err.code]
@@ -407,9 +415,9 @@ class GWARipper:
 
             if info.parent:
                 logger.warning(
-                        "Containing root collection: %s",
-                        info.reddit_info.url if info.reddit_info is not None
-                        else info.parent.url)
+                    "Containing root collection: %s",
+                    info.reddit_info.url if info.reddit_info is not None
+                    else info.parent.url)
 
         except urllib.error.URLError as err:
             logger.error("URL Error for %s: %s\nExtractor %s is probably broken! "
@@ -422,8 +430,19 @@ class GWARipper:
         else:
             info.downloaded = dl.DownloadErrorCode.DOWNLOADED
             info.id_in_db = file_info_id_in_db
+
+            if info.is_audio:
+                try:
+                    update_meta_tags(os.path.join(
+                        mypath, filename), info, top_collection)
+                except Exception:
+                    # don't fail the download due to errors when updating the
+                    # file tags
+                    logger.warning("Failed to write file tags for file %s",
+                                   os.path.join(mypath, filename))
+
             return subpath
-        
+
         return None
 
     def _download_file_http(self, info: FileInfo, mypath: str, filename: str):
@@ -475,7 +494,8 @@ class GWARipper:
             # add FileCollections to DB here
             if isinstance(fi_or_fc, FileCollection):
                 # recursive call
-                dl_collection_result = self._download_collection(fi_or_fc, top_collection, dl_idx=dl_idx)
+                dl_collection_result = self._download_collection(
+                    fi_or_fc, top_collection, dl_idx=dl_idx)
                 dl_idx = dl_collection_result.dl_idx
                 any_audio_downloads = any_audio_downloads or dl_collection_result.any_audio_downloads
                 if dl_collection_result.error_code != dl.DownloadErrorCode.NO_ERRORS:
@@ -484,9 +504,9 @@ class GWARipper:
                 fi: FileInfo = fi_or_fc
                 # rel_idx is 0-based
                 self._download_file(
-                        fi, author_name, top_collection,
-                        rel_idx if with_file_idx else 0,
-                        dl_idx=dl_idx, dl_max=top_collection.nr_files)
+                    fi, author_name, top_collection,
+                    rel_idx if with_file_idx else 0,
+                    dl_idx=dl_idx, dl_max=top_collection.nr_files)
                 if fi.is_audio and fi.downloaded is dl.DownloadErrorCode.DOWNLOADED:
                     any_audio_downloads = True
                 rel_idx += 1
@@ -509,7 +529,7 @@ class GWARipper:
                 # :PassSubpathSelftext
                 if not self.dont_write_selftext:
                     cast(RedditInfo, info).write_selftext_file(
-                            config.get_root(), os.path.join(author_name, subpath))
+                        config.get_root(), os.path.join(author_name, subpath))
             else:
                 with self.db_con:
                     self._add_to_db_collection(info, author_name)
@@ -519,16 +539,16 @@ class GWARipper:
     @staticmethod
     def add_artist(db_con: sqlite3.Connection, artist: str):
         c = db_con.execute("INSERT OR IGNORE INTO Artist(name) VALUES (?)",
-                  (artist,))
+                           (artist,))
         c.execute("""
         INSERT OR IGNORE INTO Alias(name, artist_id) VALUES (
             ?,
             (SELECT id FROM Artist WHERE name = ?)
         )""", (artist, artist))
 
-
     # TODO: @CleanUp this RedditInfo stuff is clunky, generalize it to just be added metadata
     # like storing upvotes etc.
+
     def _add_to_db_collection(self, file_col: FileCollection, author: str) -> Tuple[str, bool]:
         """
         Add FileCollection to DB; will return a pre-existing FileCollection if
@@ -595,7 +615,6 @@ class GWARipper:
                               (file_col.id_in_db, fi.id_in_db))
 
         return author, False
-
 
     def _add_to_db_ri(self, r_info: RedditInfo) -> Tuple[int, str]:
         c = self.db_con.cursor()
@@ -709,10 +728,11 @@ class GWARipper:
         # otherwise we might set it on a file that was downloaded for the first time
         # we know there is a parent otherwise we wouldn't have reddit info
         # and that there are children
-        same_url_fi = [fi for fi in cast(List[Union[FileInfo, FileCollection]], 
+        same_url_fi = [fi for fi in cast(List[Union[FileInfo, FileCollection]],
                                          cast(FileCollection, info.parent).children)
                        if type(fi) is FileInfo and fi.page_url == info.page_url]
-        own_index = next(i for i in range(len(same_url_fi)) if same_url_fi[i] is info)
+        own_index = next(i for i in range(len(same_url_fi))
+                         if same_url_fi[i] is info)
         if own_index != 0:
             return
 
@@ -741,7 +761,7 @@ class GWARipper:
             # update artist_id of alias if it's NULL
             if af_row['artist_id'] is None:
                 artist_id_row = c.execute(
-                        "SELECT id FROM Artist WHERE name = ?", (reddit_author,)).fetchone()
+                    "SELECT id FROM Artist WHERE name = ?", (reddit_author,)).fetchone()
                 if artist_id_row:
                     artist_id = artist_id_row[0]
                     c.execute("UPDATE Alias SET artist_id = ? WHERE id = ?",
@@ -758,12 +778,11 @@ class GWARipper:
             # can write the selftext
             if not filename_local:  # prev NULL filename will now be ""
                 filename_local = re.sub(
-                        r"[^\w\-_.,\[\] ]", "_",
-                        af_row['title'][0:110]) + ".m4a"
+                    r"[^\w\-_.,\[\] ]", "_",
+                    af_row['title'][0:110]) + ".m4a"
             # intentionally don't write into subpath that might get used
             # by RedditInfo since this file was downloaded without it
             file_path = os.path.join(author_subdir, filename_local)
             if not self.dont_write_selftext:
                 info.reddit_info.write_selftext_file(
-                        config.get_root(), file_path, force_path=True)
-
+                    config.get_root(), file_path, force_path=True)
