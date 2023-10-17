@@ -360,6 +360,7 @@ def show_listen_later() -> Tuple[
         List[RowData], List[AudioPathHelper], str, str, Optional[Any], Optional[Any],
         Optional[Dict[str, bool]]]:
     order_by_col = request.args.get('sort_col', "id", type=str)
+    query = request.args.get('q', '', type=str)
     # validate our sorting col otherwise were vulnerable to sql injection
     if not validate_order_by_str(order_by_col):
         order_by_col = "id"
@@ -379,9 +380,18 @@ def show_listen_later() -> Tuple[
     elif before is not None and len(before) == 1 and order_by_col != "id":
         before = (None, before[0])
 
-    entries: List[RowData] = get_x_listen_later_entries(
-        get_db(), ENTRIES_PER_PAGE+1, after=after, before=before,
-        order_by=order_by)
+    if query:
+        # get 1 entry more than ENTRIES_PER_PAGE so we know if we need btn in that direction
+        entries = search(
+            get_db(), query, order_by=order_by,
+            limit=ENTRIES_PER_PAGE+1, after=after, before=before,
+            additional_conditions=('EXISTS (SELECT 1 '
+                                   'FROM ListenLater WHERE '
+                                   'ListenLater.audio_id = AudioFile.id)'))
+    else:
+        entries: List[RowData] = get_x_listen_later_entries(
+            get_db(), ENTRIES_PER_PAGE+1, after=after, before=before,
+            order_by=order_by)
     first, last, more = first_last_more(entries, order_by_col, after, before)
 
     audio_paths: List[AudioPathHelper] = []

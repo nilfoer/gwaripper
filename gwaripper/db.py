@@ -791,7 +791,7 @@ def search(db_con, query, order_by="AudioFile.id DESC", **kwargs):
 
 def search_normal_columns(
         db_con: sqlite3.Connection, search_expressions: List[SearchExpression],
-        title_search_str: str,
+        title_search_str: str, additional_conditions="",
         order_by="AudioFile.id DESC", limit=-1,  # no row limit when limit is neg. nr
         after=None, before=None):
     """Can search in normal columns as well as multiple associated columns
@@ -832,6 +832,9 @@ def search_normal_columns(
         cond_statements.append(
             f"{'AND' if cond_statements else 'WHERE'} ({' '.join(sub_expression)})")
 
+    if additional_conditions:
+        cond_statements.append(
+            f"{'AND' if cond_statements else 'WHERE'} ({additional_conditions})")
     cond_statements_str = "\n".join(cond_statements)
 
     # NOTE: alias view as AudioFile so we can keep other parts of this function
