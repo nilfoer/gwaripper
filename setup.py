@@ -33,7 +33,7 @@ setuptools.setup(
     install_requires=["pyperclip>=1.5.25,<=1.7.0", "praw>=7.5,<8",
                       "beautifulsoup4>=4.5.3,<=4.6.3",
                       "flask>=3,<4",
-                      "music-tag=>0.4,<0.5",
+                      "music-tag>=0.4,<0.5",
                       # 3.7.2 would be enough but mypy 0.782 uses >=3.7.4
                       "typing-extensions>=3.7.4"],
 
