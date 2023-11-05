@@ -28,9 +28,9 @@ def main(args: Optional[List[str]] = None):
 
     # use host='0.0.0.0' or ip to run on machine's ip address and be accessible over lan
     if 'open' in args:
-        app.run(threaded=False, host='0.0.0.0', port=port)
+        app.run(threaded=True, host='0.0.0.0', port=port)
     else:
-        app.run(threaded=False, port=port)
+        app.run(threaded=True, port=port)
 
 
 if __name__ == "__main__":

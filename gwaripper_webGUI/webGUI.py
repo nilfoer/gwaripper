@@ -47,15 +47,6 @@ def init_app(app):
 
     return None
 
-
-# BUG: the server gets "stuck" while sending an audio file and won't repsond to any requests
-# need to have multiple files that are playing or started playing and were then paused
-# sometimes seeking to a different place in the audio file on the client fixes it
-# flask still responds to a new request since reloading the page or opening
-# a new one works but when opening a new one in the debugger it crashes inside
-# the jinja code? in show_entries.html on the entry title div
-
-# not the cause for this ^ bug or at least both 'solutions' don't fix
 # flask send_from_directory just sends the whole file to the client, which can cause
 # freezes esp. in single threaded mode
 # to solve this either use multi-threaded mode (not tested if this acutally solves it)

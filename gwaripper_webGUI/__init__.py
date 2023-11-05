@@ -8,6 +8,7 @@ from gwaripper.config import get_root
 from .webGUI import main_bp, init_app
 from .csrf import init_app as csrf_init_app
 from .auth import auth_bp, init_app as auth_init_app
+from .gwaripper_db import init_db
 
 
 def create_app(test_config=None, **kwargs):
@@ -77,6 +78,7 @@ def create_app(test_config=None, **kwargs):
 
     csrf_init_app(app)
     init_app(app)
+    init_db(app)
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp)
     auth_init_app(app)
