@@ -7,12 +7,7 @@ block_cipher = None
 # pyinstaller needs to be installed in the venv as well and then started (on Win) using
 # Scripts\pyinstaller.exe
 a = Analysis(['gwaripper-runner.py'],
-             # tell pyinstaller where Universal CRT dlls are (needed for >py3.5 on <win10 -> see
-             # https://pyinstaller.org/en/stable/usage.html#windows
-             # UniversalCRTDLLs symlinked to UCRT path in WindowsKit:
-             # C:\\Program Files (x86)\\Windows Kits\\10\\Redist\\10.0.19041.0\\ucrt\\DLLs
-             pathex=['gwaripper', 'gwaripper_webGUI',
-                     'UniversalCRTDLLs\\x86', 'UniversalCRTDLLs\\x64'],
+             pathex=['gwaripper', 'gwaripper_webGUI'],
              binaries=[],
              # praw needs praw.ini (which it looks for in 3 places appdata etc. including cwd)
              # -> pyinstaller automatically changes __file__ refs to be relative to the bundle
