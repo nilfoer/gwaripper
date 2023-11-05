@@ -1,0 +1,46 @@
+name: GWARipper release
+on:
+  push:
+    # pattern matched against refs/tags
+    tags:
+      - 'v*'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Package Source
+      run: |
+        mkdir dist/
+        python3 dev_tools/build_zip_dist.py . dist/GWARipper-${{github.ref_name}}.zip
+
+    # output will be in src/dist/windows
+    - name: Package Application on Windows
+      uses: JackMcKew/pyinstaller-action-windows@main
+      with:
+        path: .
+        spec: gwaripper.spec
+
+    - name: Rename output Windows
+      run: mv src/dist/windows src/dist/GWARipper-${{github.ref_name}}_single-folder_win-x64
+
+    # output will be in src/dist/linux
+    - name: Package Application on Linux
+      uses: JackMcKew/pyinstaller-action-linux@main
+      with:
+        path: .
+        spec: gwaripper.spec
+
+    - name: Rename output Linux
+      run: mv src/dist/linux src/dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        draft: true
+        generate_release_notes: true
+        files: |
+          dist/GWARipper-${{github.ref_name}}.zip
+          src/dist/GWARipper-${{github.ref_name}}_single-folder_win-x64
+          src/dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64

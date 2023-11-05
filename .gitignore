@@ -32,6 +32,9 @@
 
 .*/
 
+!.github/
+!.github/**
+
 # include everything in tests/ in git since these exact files are needed for the tests and since the code may change and the files could change with the code they need to be version controlled
 # dirs only when prefixed with test_
 !tests/**
