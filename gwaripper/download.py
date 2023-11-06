@@ -6,6 +6,7 @@ import logging
 import subprocess
 import re
 import time
+import shutil
 
 from typing import Optional, Dict, Tuple
 from enum import Enum, auto, unique
@@ -215,9 +216,29 @@ def prog_bar_dl(blocknum: int, blocksize: int, totalsize: int) -> None:
 
 
 PARTS_RE = re.compile(r"^(https?://.*\.ts$)", re.MULTILINE)
+BUNDLED_FFMPEG = None
+if getattr(sys, 'frozen', False):
+    ffmpeg_base = os.path.join(
+        os.path.abspath(sys._MEIPASS), 'ffmpeg')
+    BUNDLED_FFMPEG = shutil.which(ffmpeg_base)
+    # shutil.which does not seem to append PATHEXT extensions
+    # we know that the bundled one either has none (POSX) or
+    # .exe, so test the latter manually
+    if not BUNDLED_FFMPEG:
+        ffmpeg_exe = ffmpeg_base + ".exe"
+        BUNDLED_FFMPEG = shutil.which(ffmpeg_exe)
 
 
-def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
+def download_hls_ffmpeg(
+    m3u8_url, filename,
+    show_progress: bool = True,
+    # prefer the bundled ffmpeg by default
+    ffmpeg_executable: str = BUNDLED_FFMPEG or 'ffmpeg'
+) -> bool:
+    if shutil.which(ffmpeg_executable) is None:
+        logger.error("No ffmpeg executable found! Aborting download!")
+        return False
+
     # TODO: add max retries or timeout
     res, err_code = download_text(DEFAULT_HEADERS, m3u8_url)
     if not res:
@@ -285,11 +306,14 @@ def download_hls_ffmpeg(m3u8_url, filename, show_progress: bool = True) -> bool:
 
     # -vn: no vieo; -acodec copy: copy audio codec
     # NOTE: the path to the concat file apparently needs to use all / even on Windows
-    args = ['ffmpeg', '-hide_banner', '-f', 'concat', '-i', concat_list_fn.replace("\\", "/"),
-            '-vn', '-acodec', 'copy', filename]
+    args = [ffmpeg_executable, '-hide_banner', '-f', 'concat', '-i',
+            concat_list_fn.replace("\\", "/"), '-vn', '-acodec', 'copy',
+            filename]
     ffmpeg_success = False
     try:
-        proc = subprocess.run(args, capture_output=True, check=True)
+        subprocess.run(args, capture_output=True, check=True)
+    except FileNotFoundError:
+        logger.error("Missing ffmpeg executable! Aborting merge...")
     except subprocess.CalledProcessError as err:
         logger.error("FFmpeg concatentation error: %s", str(err))
         logger.debug("FFmpeg stdout: %s", err.stdout)
