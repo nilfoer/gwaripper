@@ -15,25 +15,56 @@ jobs:
         mkdir dist/
         python3 dev_tools/build_zip_dist.py . dist/GWARipper-${{github.ref_name}}.zip
 
-    # output will be in src/dist/windows
+    - name: Get date
+      run: echo "date_year=$(date +'%Y')" >> "$GITHUB_ENV"
+
+    - name: Cache binary deps
+      id: cache-binary-deps
+      uses: actions/cache@v3
+      with:
+        path: binary_deps/
+        key: ${{ runner.os }}-build-${{ env.date_year }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.date_year }}
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+
+    # only download deps if we don't have a cached version
+    - if: ${{ steps.cache-binary-deps.outputs.cache-hit != 'true' }}
+      name: Download binary deps Windows
+      run: |
+        mkdir binary_deps
+        wget -O ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+        unzip ffmpeg.zip -d binary_deps/
+        find binary_deps/ffmpeg*-essentials_build/ -name ffmpeg.exe -exec cp {} binary_deps/ \;
+        rm -rf binary_deps/ffmpeg*-essentials_build/
+        rm ffmpeg.zip
+
+    # output (dir named 'gwaripper') will be in dist/windows
     - name: Package Application on Windows
       uses: JackMcKew/pyinstaller-action-windows@main
       with:
         path: .
         spec: gwaripper.spec
 
-    - name: Rename output Windows
-      run: mv src/dist/windows src/dist/GWARipper-${{github.ref_name}}_single-folder_win-x64
+    - name: Bundle Windows
+      run: |
+        pushd dist/windows/gwaripper
+        zip -r ../../GWARipper-${{github.ref_name}}_single-folder_win-x64.zip .
+        popd
 
-    # output will be in src/dist/linux
+    # output (dir named 'gwaripper') will be in dist/linux
     - name: Package Application on Linux
       uses: JackMcKew/pyinstaller-action-linux@main
       with:
         path: .
         spec: gwaripper.spec
 
-    - name: Rename output Linux
-      run: mv src/dist/linux src/dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64
+    - name: Bundle Linux
+      run: |
+        pushd dist/linux/gwaripper
+        zip -r ../../GWARipper-${{github.ref_name}}_single-folder_lin-x64.zip .
+        popd
 
     - name: Release
       uses: softprops/action-gh-release@v1
@@ -42,5 +73,5 @@ jobs:
         generate_release_notes: true
         files: |
           dist/GWARipper-${{github.ref_name}}.zip
-          src/dist/GWARipper-${{github.ref_name}}_single-folder_win-x64
-          src/dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64
+          dist/GWARipper-${{github.ref_name}}_single-folder_win-x64.zip
+          dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64.zip
