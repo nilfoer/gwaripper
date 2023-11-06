@@ -5,15 +5,10 @@ on:
     tags:
       - 'v*'
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  build_win:
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
-
-    - name: Package Source
-      run: |
-        mkdir dist/
-        python3 dev_tools/build_zip_dist.py . dist/GWARipper-${{github.ref_name}}.zip
 
     - name: Get date
       run: echo "date_year=$(date +'%Y')" >> "$GITHUB_ENV"
@@ -31,40 +26,101 @@ jobs:
 
     # only download deps if we don't have a cached version
     - if: ${{ steps.cache-binary-deps.outputs.cache-hit != 'true' }}
-      name: Download binary deps Windows
+      name: Download binary deps
       run: |
         mkdir binary_deps
-        wget -O ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
-        unzip ffmpeg.zip -d binary_deps/
-        find binary_deps/ffmpeg*-essentials_build/ -name ffmpeg.exe -exec cp {} binary_deps/ \;
-        rm -rf binary_deps/ffmpeg*-essentials_build/
-        rm ffmpeg.zip
+        Invoke-WebRequest https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip -OutFile ffmpeg.zip
+        Expand-Archive -Path ffmpeg.zip -DestinationPath .\binary_deps
+        Get-ChildItem -r -Filter ffmpeg.exe ./binary_deps/ | % { Copy-Item -Path $_.FullName -Destination ./binary_deps/ }
+        Remove-Item -Recurse -Force binary_deps/ffmpeg*-essentials_build/
+        Remove-Item ffmpeg.zip
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.10' 
 
     # output (dir named 'gwaripper') will be in dist/windows
-    - name: Package Application on Windows
-      uses: JackMcKew/pyinstaller-action-windows@main
-      with:
-        path: .
-        spec: gwaripper.spec
-
-    - name: Bundle Windows
+    - name: Build PyInstaller single folder dist
       run: |
-        pushd dist/windows/gwaripper
-        zip -r ../../GWARipper-${{github.ref_name}}_single-folder_win-x64.zip .
-        popd
+        python -m pip install -r requirements.txt
+        python -m pip install --upgrade pip pyinstaller
+        pyinstaller --clean -y --dist ./dist/windows/ --workpath /tmp gwaripper.spec
 
-    # output (dir named 'gwaripper') will be in dist/linux
-    - name: Package Application on Linux
-      uses: JackMcKew/pyinstaller-action-linux@main
+    - name: Bundle folder dist
+      run: |
+        Push-Location dist/windows/gwaripper
+        Compress-Archive -Path * -DestinationPath ../../GWARipper-${{github.ref_name}}_single-folder_win-x64.zip
+        Pop-Location
+
+    - name: Updload windows build
+      uses: actions/upload-artifact@v3
       with:
-        path: .
-        spec: gwaripper.spec
+        name: gwaripper-bundle-windows
+        path: dist/GWARipper-${{github.ref_name}}_single-folder_win-x64.zip
 
-    - name: Bundle Linux
+  build_lin:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    # # only download deps if we don't have a cached version
+    # - if: ${{ steps.cache-binary-deps.outputs.cache-hit != 'true' }}
+    #   name: Download binary deps Windows
+    #   run: |
+    #     mkdir binary_deps
+    #     wget -O ffmpeg.zip https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+    #     unzip ffmpeg.zip -d binary_deps/
+    #     find binary_deps/ffmpeg*-essentials_build/ -name ffmpeg.exe -exec cp {} binary_deps/ \;
+    #     rm -rf binary_deps/ffmpeg*-essentials_build/
+    #     rm ffmpeg.zip
+
+    - uses: actions/setup-python@v4
+      with:
+        python-version: '3.10' 
+
+    # output (dir named 'gwaripper') will be in dist/windows
+    - name: Build PyInstaller single folder dist
+      run: |
+        python -m pip install --upgrade pip pyinstaller
+        python -m pip install -r requirements.txt
+        pyinstaller --clean -y --dist ./dist/linux/ --workpath /tmp gwaripper.spec
+
+    - name: Bundle folder dist
       run: |
         pushd dist/linux/gwaripper
         zip -r ../../GWARipper-${{github.ref_name}}_single-folder_lin-x64.zip .
         popd
+
+    - name: Upload linux build
+      uses: actions/upload-artifact@v3
+      with:
+        name: gwaripper-bundle-linux
+        path: dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64.zip
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build_win, build_lin]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Package Source
+      run: |
+        mkdir dist/
+        python3 dev_tools/build_zip_dist.py . dist/GWARipper-${{github.ref_name}}.zip
+
+
+    # NOTE: downloads all artifacts in a workflow if with:name omitted
+    #       then all artifact contents will be saved under a folder with their name
+    #       so here:
+    #       ./dist
+    #         ./gwaripper-bundle-linux
+    #           ./GWARipper-..._lin-x64.zip
+    #         ./gwaripper-bundle-windows
+    #           ./GWARipper-..._win-x64.zip
+    - name: Download builds
+      uses: actions/download-artifact@v3
+      with:
+        path: dist/
 
     - name: Release
       uses: softprops/action-gh-release@v1
@@ -73,5 +129,5 @@ jobs:
         generate_release_notes: true
         files: |
           dist/GWARipper-${{github.ref_name}}.zip
-          dist/GWARipper-${{github.ref_name}}_single-folder_win-x64.zip
-          dist/GWARipper-${{github.ref_name}}_single-folder_lin-x64.zip
+          dist/gwaripper-bundle-windows/GWARipper-${{github.ref_name}}_single-folder_win-x64.zip
+          dist/gwaripper-bundle-linux/GWARipper-${{github.ref_name}}_single-folder_lin-x64.zip
