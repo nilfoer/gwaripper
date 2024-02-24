@@ -4,3 +4,4 @@ praw>=7.5,<8
 flask>=2.2.5,<4
 music-tag>=0.4,<0.5
 typing-extensions>=3.7.4
+certifi

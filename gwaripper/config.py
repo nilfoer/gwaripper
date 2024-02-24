@@ -74,6 +74,7 @@ if not config.sections():
             "set_missing_reddit": "True",
             "only_one_mirror": "False",
             "host_priority": "0,5,4",
+            "set_ssl_cert_file": "True",
         },
         "Time": {
             "last_db_bu": str(time.time()),

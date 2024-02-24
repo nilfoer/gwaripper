@@ -6,6 +6,7 @@ import time
 import logging
 
 import praw
+import certifi
 
 from typing import List, Optional
 
@@ -274,6 +275,7 @@ def main():
         args = parser.parse_args()
 
     if root_dir:
+        setup_cacerts()
 
         # set selected ignore-banned option in config
         if args.ignore_banned:
@@ -292,6 +294,21 @@ def main():
     else:
         print("root_path not set in gwaripper_config.ini, use command config -p "
               "\"C:\\absolute\\path\" to specify where the files will be downloaded to")
+
+
+def setup_cacerts() -> None:
+    # depending on the packaged libcrypto on Unix systems the cacerts default
+    # paths might differ
+    # (see: https://github.com/pyinstaller/pyinstaller/issues/7229)
+    # to get an actually portable solution we use certifi's bundled cacerts
+    # (CAs approved by Mozilla)
+    # since that is not what users may want and the bundled cacerts might
+    # be outdated we added a config option for this, so a user can
+    # set the environment variable `SSL_CERT_FILE` themselve
+    import config
+    if config.config["Settings"].getboolean("set_ssl_cert_file", True):
+        cacerts_path = certifi.where()
+        os.environ["SSL_CERT_FILE"] = cacerts_path
 
 
 def download_all_links(urls: List[str], args: argparse.Namespace) -> None:
