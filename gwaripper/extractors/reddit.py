@@ -96,7 +96,14 @@ class RedditExtractor(BaseExtractor[Submission]):
                 submission = redirect_xpost(submission)
             except prawcore.exceptions.ResponseException as err:
                 return self._handle_praw_exc(err)
-            sub_url: str = submission.url
+
+            try:
+                sub_url: str = submission.url
+            except prawcore.exceptions.Forbidden as err:
+                # NOTE: Don't use _handle_praw_exc, since we might also get a
+                #       forbidden response if the target submission group
+                #       was banned
+                return None, ExtractorReport(self.url, ExtractorErrorCode.NO_AUTHENTICATION)
 
             # rebuild subs url to account for redirection
             redirected_url: str = f"{self.praw.config.reddit_url}{submission.permalink}"

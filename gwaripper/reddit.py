@@ -91,7 +91,10 @@ def redirect_xpost(sub: praw.models.Submission) -> praw.models.Submission:
         parent = sub.crosspost_parent
         logger.info("Reddit submission with id %s is a crosspost, using the redirected "
                     "submission with id %s instead!", sub.id, parent)
-        assert len(sub.crosspost_parent_list) == 1
+        if not sub.crosspost_parent_list:
+            logger.warning("Empty parent list, crosspost has most likely been deleted!")
+        elif len(sub.crosspost_parent_list) > 1:
+            logger.info("Submission has more than one crosspost parent!")
         # crosspost_parent has the full name of the submission -> u get id by splitting at '_'
         # e.g. id 'j6y1n9' has a crosspost_parent of 't3_boo4rq'
         # The fullname of an object is the object’s type followed by an

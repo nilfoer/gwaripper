@@ -305,7 +305,7 @@ def setup_cacerts() -> None:
     # since that is not what users may want and the bundled cacerts might
     # be outdated we added a config option for this, so a user can
     # set the environment variable `SSL_CERT_FILE` themselve
-    import config
+    from gwaripper import config
     if config.config["Settings"].getboolean("set_ssl_cert_file", True):
         cacerts_path = certifi.where()
         os.environ["SSL_CERT_FILE"] = cacerts_path
