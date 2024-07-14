@@ -103,12 +103,23 @@ def _setup_db_2col_5audio(tmpdir, with_reddit=True):
             TESTS_DIR, "all_test_files",
             f"db_2col_5audio{'_without_reddit' if not with_reddit else ''}.sql")
     test_db_fn = os.path.join(tmpdir, "gwarip_db.sqlite")
+    assert not os.path.exists(test_db_fn)
     db_con, _ = load_or_create_sql_db(test_db_fn)
 
     with open(sql_fn, "r", encoding="UTF-8") as f:
         sql = f.read()
 
     db_con.executescript(sql)
+
+    c = db_con.execute("PRAGMA integrity_check")
+    row = c.fetchone()
+    print("INTEG", [x for x in row])
+    c = db_con.execute("PRAGMA foreign_key_check")
+    row = c.fetchone()
+    print("FK CHK", row)
+    c = db_con.execute("PRAGMA foreign_keys")
+    row = c.fetchone()
+    print("FK", [x for x in row])
 
     db_con.close()
 
@@ -152,7 +163,9 @@ def test_set_missing_reddit(setup_db_2col_5audio_without_reddit) -> None:
     ri = RedditInfo(object, "reddit_url",
                     #                                              v use this as artist
                     "inserted_reddit_id", "isnerted_reddit_title", "sassmastah77",
-                    "inserted/subreddit", 'inserted_rddt_url', 1254323.0, children=[fi])
+                    "inserted/subreddit", 'inserted_rddt_url', 1254323.0,
+                    None, None,
+                    children=[fi])
     ri.nr_files = 4
     ri.selftext = "selftext not written to subpath even though ri has subpath"
     ri.r_post_url = "url-to-self-or-outgoing"
@@ -243,7 +256,9 @@ def test_set_missing_reddit_no_filenme(
     ri = RedditInfo(object, "reddit_url",
                     #                                              v use this as artist
                     "inserted_reddit_id", "isnerted_reddit_title", "sassmastah77",
-                    "inserted/subreddit", 'inserted_rddt_url', 1254323.0, children=[fi])
+                    "inserted/subreddit", 'inserted_rddt_url', 1254323.0,
+                    None, None,
+                    children=[fi])
     ri.nr_files = 4
     ri.selftext = "selftext written to re-computed filename"
     ri.r_post_url = "url-to-self-or-outgoing"
@@ -297,7 +312,7 @@ def test_add_to_db(setup_db_2col_5audio):
     ri = RedditInfo(object, "add/set_missing:should-use-r_post_url",
                     "26iw32o", "Best title on reddit [SFW]", "skitty-gwa",
                     "pillowtalkaudio", "/r/pillowtalkaudio/comments/26iw32o/foo-bar-baz",
-                    1602557093.0, [fi])
+                    1602557093.0, "flair", 1530, [fi])
     fi.parent = ri
 
     # _add_to_db should NOT commit
@@ -407,6 +422,9 @@ def test_add_to_db_ri(setup_db_2col_5audio):
     SELECT
         fc.*,
         RedditInfo.created_utc,
+        RedditInfo.flair_id,
+        RedditInfo.upvotes,
+        RedditInfo.selftext,
         Alias.name as alias_name,
         Alias.artist_id as alias_artist_id,
         Artist.id as artist_id,
@@ -421,7 +439,7 @@ def test_add_to_db_ri(setup_db_2col_5audio):
     ri = RedditInfo(object, "add/set_missing:should-use-permalink",
                     "r3dd1t1d", "Best title on reddit [SFW]", "inserted-as-alias-and-artist",
                     "subr", "/r/subr/comments/r3dd1t1d/foo-bar-baz",
-                    1602557093.0)
+                    1602557093.0, "flair", 1337, "This is a selftext")
 
     #
     # _add_to_db_ri should not commit
@@ -440,7 +458,9 @@ def test_add_to_db_ri(setup_db_2col_5audio):
     expected = [
             [3, "https://www.reddit.com/r/subr/comments/r3dd1t1d/foo-bar-baz",
              #                            v-ri_id  v-alias_id
-             ri.id, ri.title, ri.subpath, 3, None, 6, ri.created_utc, ri.author, 3, 3, ri.author]
+             ri.id, ri.title, ri.subpath, 3, None, 6, ri.created_utc,
+             1, 1337, ri.selftext,
+             ri.author, 3, 3, ri.author]
     ]
     # artist inserted
     # alias inserted
@@ -477,7 +497,9 @@ def test_add_to_db_ri(setup_db_2col_5audio):
     expected.append(
         [4, 'https://www.reddit.com' + ri.permalink,
          #                subpath
-         ri.id, ri.title, ri.title[:70], 4, None, 5, ri.created_utc, ri.author, 2, 2, ri.author]
+         ri.id, ri.title, ri.title[:70], 4, None, 5, ri.created_utc,
+         1, 1337, ri.selftext,
+         ri.author, 2, 2, ri.author]
     )
     with GWARipper() as gwa:
         assert gwa._add_to_db_ri(ri) == (4, ri.author)
@@ -500,6 +522,7 @@ def test_add_to_db_ri(setup_db_2col_5audio):
     expected.append(
         [5, 'https://www.reddit.com' + ri.permalink,
          ri.id, ri.title, "", 5, None, 1, ri.created_utc,
+         1, 1337, ri.selftext,
          DELETED_USR_FOLDER, None, None, None]
     )
     with GWARipper() as gwa:
@@ -574,6 +597,17 @@ def test_already_downloaded(monkeypatch, setup_db_2col_5audio):
     cfg.config["Settings"]["set_missing_reddit"] = "False"
 
     db_con = sqlite3.connect(test_db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
+    db_con.execute("PRAGMA foreign_keys=on")
+
+    c = db_con.execute("PRAGMA integrity_check")
+    row = c.fetchone()
+    print("INTEG", [x for x in row])
+    c = db_con.execute("PRAGMA foreign_key_check")
+    row = c.fetchone()
+    print("FK CHK", row)
+    c = db_con.execute("PRAGMA foreign_keys")
+    row = c.fetchone()
+    print("FK", [x for x in row])
 
     fi1 = FileInfo(object, True, "m4a",
                    "https://soundgasm.net/u/skitty/Motherly-Moth-Girl-Keeps-You-Warm-F4M",
@@ -620,7 +654,7 @@ def test_already_downloaded(monkeypatch, setup_db_2col_5audio):
     #
     # check if set_missing_reddit is called correctly
     #
-    ri = RedditInfo(*([None] * 8))
+    ri = RedditInfo(*([None] * 10))
     fi1.parent = ri
 
     called_with_audio_id = None
@@ -940,7 +974,7 @@ def test_download_file(monkeypatch, caplog, setup_db_2col_5audio):
     #
     # ContentTooShortError WITH ri parent
     #
-    ri = RedditInfo(None, "fc_url", *([None] * 6))
+    ri = RedditInfo(None, "fc_url", *([None] * 8))
     fi.parent = ri
     download_sould_raise = urllib.error.ContentTooShortError("Content too short!", None)
     assert gwa._download_file(fi, author_name='author_name', top_collection=None,
@@ -1107,7 +1141,7 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     #
     fi1 = FileInfo(None, False, *([None] * 7))
     fi2 = FileInfo(None, True, *([None] * 7))
-    ri = RedditInfo(None, 'reddit_url', *([None] * 6))
+    ri = RedditInfo(None, 'reddit_url', *([None] * 8))
     ri.add_file(fi1)
     ri.add_file(fi2)
 
@@ -1142,7 +1176,7 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     #
     fi1 = FileInfo(None, False, *([None] * 7))
     fi2 = FileInfo(None, True, *([None] * 7))
-    ri = RedditInfo(None, 'reddit_url', *([None] * 6))
+    ri = RedditInfo(None, 'reddit_url', *([None] * 8))
     ri.add_file(fi1)
     ri.add_file(fi2)
 
@@ -1183,7 +1217,7 @@ def test_download_collection(monkeypatch, caplog, setup_db_2col_5audio):
     fi3 = FileInfo(None, False, *([None] * 7))
     fi4 = FileInfo(None, True, *([None] * 7))
     fc1 = FileCollection(None, 'fcol_url', *([None] * 3))
-    ri = RedditInfo(None, 'reddit_url', None, "subpath_test", *([None] * 5))
+    ri = RedditInfo(None, 'reddit_url', None, "subpath_test", *([None] * 7))
     ri.add_file(fi1)
     ri.add_file(fi2)
     fc1.add_file(fi3)
@@ -1275,6 +1309,7 @@ def test_extract_and_download(setup_tmpdir, monkeypatch, caplog):
 
     redditinfo = RedditInfo(RedditExtractor, "url", "id", "title",
                             'author', 'subreddit', 'permalink', 12345.0,
+                            'flair', 1337,
                             [soundgasmfi, imguralbumfc])
     redditinforep = ExtractorReport(redditinfo.url, ExtractorErrorCode.NO_ERRORS)
     monkeypatch.setattr('gwaripper.extractors.reddit.RedditExtractor._extract',
@@ -1450,7 +1485,8 @@ def test_parse_and_download_submission(setup_tmpdir, monkeypatch):
     monkeypatch.setattr('gwaripper.gwaripper.GWARipper.download', patched_dl)
 
     redditinfo = RedditInfo(RedditExtractor, "url", "id", "title",
-                            'author', 'subreddit', 'permalink', 12345.0)
+                            'author', 'subreddit', 'permalink',
+                            'flair', 1337, 12345.0)
     redditinfo_permalink = redditinfo.permalink
     redditinforep = ExtractorReport(redditinfo.url, ExtractorErrorCode.NO_ERRORS)
     redditinfo.report = redditinforep  # so downloaded gets propagted to report

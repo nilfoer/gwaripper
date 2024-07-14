@@ -90,118 +90,118 @@ class RedditExtractor(BaseExtractor[Submission]):
         except prawcore.exceptions.ResponseException as err:
             return self._handle_praw_exc(err)
 
-        if not title_has_banned_tag(sub_title):
-            # NOTE: IMPORTANT make sure to only use redirected submission from here on!
-            try:
-                submission = redirect_xpost(submission)
-            except prawcore.exceptions.ResponseException as err:
-                return self._handle_praw_exc(err)
+        if title_has_banned_tag(sub_title):
+            report.err_code = ExtractorErrorCode.BANNED_TAG
+            return ri, report
 
-            try:
-                sub_url: str = submission.url
-            except prawcore.exceptions.Forbidden as err:
-                # NOTE: Don't use _handle_praw_exc, since we might also get a
-                #       forbidden response if the target submission group
-                #       was banned
-                return None, ExtractorReport(self.url, ExtractorErrorCode.NO_AUTHENTICATION)
+        # NOTE: IMPORTANT make sure to only use redirected submission from here on!
+        try:
+            submission = redirect_xpost(submission)
+        except prawcore.exceptions.ResponseException as err:
+            return self._handle_praw_exc(err)
 
-            # rebuild subs url to account for redirection
-            redirected_url: str = f"{self.praw.config.reddit_url}{submission.permalink}"
-            ri = info.RedditInfo(self.__class__, redirected_url, submission.id, submission.title,
-                            None, submission.subreddit.display_name, str(submission.permalink),
-                            submission.created_utc)
-            ri.r_post_url = sub_url
-            try:
-                ri.author = submission.author.name
-            except AttributeError:
-                logger.warning("Author of submission id %s has been deleted! "
-                               "Using None as r_user.", submission.id)
-                ri.author = None
+        try:
+            sub_url: str = submission.url
+        except prawcore.exceptions.Forbidden as err:
+            # NOTE: Don't use _handle_praw_exc, since we might also get a
+            #       forbidden response if the target submission group
+            #       was banned
+            return None, ExtractorReport(self.url, ExtractorErrorCode.NO_AUTHENTICATION)
 
-            # sub url not pointing to itself
-            if not submission.is_self:
-                # TODO @Refactor change this so that the base class takes care of finding extractors
-                # mb this would only return a list of found links?
-                extractor: Optional[Type[BaseExtractor]] = find_extractor(sub_url)
+        # rebuild subs url to account for redirection
+        redirected_url: str = f"{self.praw.config.reddit_url}{submission.permalink}"
+        ri = info.RedditInfo(self.__class__, redirected_url, submission.id, submission.title,
+                        None, submission.subreddit.display_name, str(submission.permalink),
+                        submission.created_utc, submission.link_flair_text, submission.score)
+        ri.r_post_url = sub_url
+        try:
+            ri.author = submission.author.name
+        except AttributeError:
+            logger.warning("Author of submission id %s has been deleted! "
+                           "Using None as r_user.", submission.id)
+            ri.author = None
 
-                if extractor is not None:
-                    logger.info("%s link found in URL of: %s", extractor.EXTRACTOR_NAME,
-                                submission.permalink)
-                    fi, child_report = extractor.extract(sub_url, parent=ri,
-                                                         parent_report=report)
-                    if fi is None:
-                        logger.error("Could not extract from URL that the submission "
-                                     "points to: %s", sub_url)
-                        return None, report
-                else:
-                    ri = None
-                    logger.warning("Outgoing submission URL is not supported: %s", sub_url)
-                    report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
+        # sub url not pointing to itself
+        if not submission.is_self:
+            # TODO @Refactor change this so that the base class takes care of finding extractors
+            # mb this would only return a list of found links?
+            extractor: Optional[Type[BaseExtractor]] = find_extractor(sub_url)
+
+            if extractor is not None:
+                logger.info("%s link found in URL of: %s", extractor.EXTRACTOR_NAME,
+                            submission.permalink)
+                fi, child_report = extractor.extract(sub_url, parent=ri,
+                                                     parent_report=report)
+                if fi is None:
+                    logger.error("Could not extract from URL that the submission "
+                                 "points to: %s", sub_url)
+                    return None, report
+            else:
+                ri = None
+                logger.warning("Outgoing submission URL is not supported: %s", sub_url)
+                report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
+                report.children.append(
+                        ExtractorReport(sub_url, ExtractorErrorCode.NO_EXTRACTOR))
+
+        # elif is fine since posts with outgoing urls can't have a selftext
+        elif submission.selftext_html is not None:
+            ri.selftext = submission.selftext
+
+            soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
+            # selftext_html is not like the normal html it starts with <div class="md"..
+            # so i can just go through all a
+            # css selector -> tag a with set href attribute
+            links = soup.select('a[href]')
+
+            # TODO i.redd.it is always a direct link append FileInfo for it here
+            # without extractor?
+            for link in links:
+                href = link["href"]
+                extractor = find_extractor(href)
+                # TODO skipping "recursive" FileCollections should be handled in gwaripper.py
+                # NOTE: @Hack checking extractor types directly
+                if extractor is type(self) or extractor is SoundgasmUserExtractor:
+                    # disallow following refs into other reddit submissions
+                    logger.warning("Skipped supported %s url(%s) at %s, since it might lead to"
+                                   " downloading a lot of unwanted audios!",
+                                   cast(BaseExtractor, extractor).EXTRACTOR_NAME,
+                                   href, submission.shortlink)
+                    # NOTE: we don't change the error code of the parent here, this it not
+                    # technically regarded as an error
                     report.children.append(
-                            ExtractorReport(sub_url, ExtractorErrorCode.NO_EXTRACTOR))
-
-            # elif is fine since posts with outgoing urls can't have a selftext
-            elif submission.selftext_html is not None:
-                ri.selftext = submission.selftext
-
-                soup = bs4.BeautifulSoup(submission.selftext_html, "html.parser")
-                # selftext_html is not like the normal html it starts with <div class="md"..
-                # so i can just go through all a
-                # css selector -> tag a with set href attribute
-                links = soup.select('a[href]')
-
-                # TODO i.redd.it is always a direct link append FileInfo for it here
-                # without extractor?
-                for link in links:
-                    href = link["href"]
-                    extractor = find_extractor(href)
-                    # TODO skipping "recursive" FileCollections should be handled in gwaripper.py
-                    # NOTE: @Hack checking extractor types directly
-                    if extractor is type(self) or extractor is SoundgasmUserExtractor:
-                        # disallow following refs into other reddit submissions
-                        logger.warning("Skipped supported %s url(%s) at %s, since it might lead to"
-                                       " downloading a lot of unwanted audios!",
-                                       cast(BaseExtractor, extractor).EXTRACTOR_NAME,
-                                       href, submission.shortlink)
-                        # NOTE: we don't change the error code of the parent here, this it not
-                        # technically regarded as an error
-                        report.children.append(
-                                ExtractorReport(href, ExtractorErrorCode.STOP_RECURSION))
-                        continue
-                    if extractor is not None:
-                        logger.info("%s link found in selftext of: %s",
-                                    extractor.EXTRACTOR_NAME, submission.permalink)
-                        if title_has_banned_tag(link.text):
-                            report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
-                            report.children.append(
-                                    ExtractorReport(href, ExtractorErrorCode.BANNED_TAG))
-                            continue
-
-                        fi, extr_msgs = extractor.extract(href, parent=ri,
-                                                          parent_report=report)
-                    elif RedditExtractor.is_unsupported_audio_url(href):
-                        logger.warning("Found unsupported audio link '%s' in "
-                                       "submission at '%s'", href, submission.shortlink)
+                            ExtractorReport(href, ExtractorErrorCode.STOP_RECURSION))
+                    continue
+                if extractor is not None:
+                    logger.info("%s link found in selftext of: %s",
+                                extractor.EXTRACTOR_NAME, submission.permalink)
+                    if title_has_banned_tag(link.text):
                         report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
                         report.children.append(
-                                ExtractorReport(href, ExtractorErrorCode.NO_EXTRACTOR))
+                                ExtractorReport(href, ExtractorErrorCode.BANNED_TAG))
+                        continue
 
-            if ri:
-                if not (any(c.is_audio for _, c in info.children_iter_dfs(
-                               ri.children, file_info_only=True))):
-                    if config.config.getboolean('Settings', 'skip_reddit_without_audio',
-                                                fallback=False):
-                        # no audio file to download -> don't download anything
-                        ri = None
-                        # NOTE: only use this code if there are no children
-                        report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
-                    logger.warning("No supported audio link in \"%s\"", submission.shortlink)
+                    fi, extr_msgs = extractor.extract(href, parent=ri,
+                                                      parent_report=report)
+                elif RedditExtractor.is_unsupported_audio_url(href):
+                    logger.warning("Found unsupported audio link '%s' in "
+                                   "submission at '%s'", href, submission.shortlink)
+                    report.err_code = ExtractorErrorCode.ERROR_IN_CHILDREN
+                    report.children.append(
+                            ExtractorReport(href, ExtractorErrorCode.NO_EXTRACTOR))
 
-                if not cast(info.RedditInfo, ri).children:
+        if ri:
+            if not (any(c.is_audio for _, c in info.children_iter_dfs(
+                           ri.children, file_info_only=True))):
+                if config.config.getboolean('Settings', 'skip_reddit_without_audio',
+                                            fallback=False):
+                    # no audio file to download -> don't download anything
+                    ri = None
+                    # NOTE: only use this code if there are no children
                     report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
+                logger.warning("No supported audio link in \"%s\"", submission.shortlink)
 
-        else:
-            report.err_code = ExtractorErrorCode.BANNED_TAG
+            if not cast(info.RedditInfo, ri).children:
+                report.err_code = ExtractorErrorCode.NO_SUPPORTED_AUDIO_LINK
 
         return ri, report
 

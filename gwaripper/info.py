@@ -592,13 +592,15 @@ class RedditInfo(FileCollection):
     # author might have been deleted
     def __init__(self, extractor: Type['BaseExtractor'], url: str, _id: str,
                  title: str, author: Optional[str], subreddit: str, permalink: str,
-                 created_utc: float,
+                 created_utc: float, flair: Optional[str], upvotes: Optional[int],
                  children: Optional[List[Union[FileInfo, 'FileCollection']]] = None):
         super().__init__(extractor, url, _id, title, author, children)
 
         self.permalink = permalink
         self.created_utc = created_utc
         self.subreddit: str = subreddit
+        self.flair: Optional[str] = flair
+        self.upvotes = upvotes
         self.selftext: Optional[str] = None
         self.r_post_url: Optional[str] = None
 

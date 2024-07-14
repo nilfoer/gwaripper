@@ -103,7 +103,8 @@ def generate_redditinfo_tree(add_collections=True):
                     "For You [Extremely Long Title] ⛸📱🤳🤵 This Title Is Supposed To Be "
                     "Ridiculously Long [With] [So Many More Tags] [Max Path Is Crying Right Now] "
                     "🤢✔😎🙌 [#EmojisMakeEverythingBetter]", "xhabbaa", "pillowtalkaudio",
-                    "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0)
+                    "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0,
+                    "flair", 1337)
 
     # only set parent on fileinfos since we might test parent propagation
     fc1.add_file(fi3)
@@ -199,7 +200,8 @@ def test_fcol_subpath():
 
     # subpath gets generated in __init__ so we have to gen a new one
     ri = RedditInfo(base.BaseExtractor, "url", "6ghk3", None, "xhabbaa",
-                    "pillowtalkaudio", "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0)
+                    "pillowtalkaudio", "/r/pillowtalkaudio/comments/6ghk3/f4a_", 12345.0,
+                    "flair", 1337)
     ri.nr_files = 4
     assert ri.subpath == ri.id
 

@@ -47,9 +47,9 @@ for fn in [f for patt in ['tests/all_test_files/*.sql'] for f in glob.glob(patt)
     print('Migrating test sql file:', fn)
 
     temp_db_file = fn + "_tmp.sqlite"
+    if os.path.exists(temp_db_file):
+        os.remove(temp_db_file)
     db_con, _ = load_or_create_sql_db(temp_db_file)
-    # remove version so correct one gets inserted
-    db_con.execute(f"DELETE FROM {migrate.VERSION_TABLE}")
 
     with open(fn, "r", encoding="UTF-8") as f:
         sql = f.read()

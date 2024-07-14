@@ -39,8 +39,8 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
         # context mangaer auto-commits changes or does rollback on exception
         with conn:
             conn.executescript(f"""
-                BEGIN IMMEDIATE TRANSACTION;
                 PRAGMA foreign_keys=off;
+                BEGIN IMMEDIATE TRANSACTION;
 
                 CREATE TABLE AudioFile(
                     id INTEGER PRIMARY KEY ASC,
@@ -109,13 +109,19 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                       ON DELETE RESTRICT
                 );
 
-                -- we only need created_utc here (if at all) but put the structure in place anyway
-                -- since we might expand it later
                 CREATE TABLE RedditInfo(
                     id INTEGER PRIMARY KEY ASC,
-                    created_utc REAL
-                    -- should we safe the selftext in the db?
-                    -- selftext TEXT
+                    created_utc REAL,
+                    upvotes INTEGER,
+                    flair_id INTEGER,
+                    selftext TEXT,
+                    FOREIGN KEY (flair_id) REFERENCES Flair(id)
+                      ON DELETE RESTRICT
+                );
+
+                CREATE TABLE Flair(
+                    id INTEGER PRIMARY KEY ASC,
+                    name TEXT UNIQUE NOT NULL
                 );
 
                 CREATE TABLE ListenLater (
@@ -155,10 +161,12 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                             Alias.name
                      FROM Alias WHERE Alias.id = FileCollection.alias_id) as fcol_alias_name,
                     RedditInfo.created_utc as reddit_created_utc,
+                    Flair.name as reddit_flair,
                     EXISTS (SELECT 1 FROM ListenLater WHERE audio_id = AudioFile.id) as listen_later
                 FROM AudioFile
                 LEFT JOIN FileCollection ON AudioFile.collection_id = FileCollection.id
                 LEFT JOIN RedditInfo ON FileCollection.reddit_info_id = RedditInfo.id
+                LEFT JOIN Flair ON RedditInfo.flair_id = Flair.id
                 JOIN Alias ON Alias.id = AudioFile.alias_id
                 LEFT JOIN Artist ON Artist.id = Alias.artist_id;
 
@@ -247,8 +255,8 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 );
                 INSERT INTO {migrate.VERSION_TABLE} VALUES ({migrate.LATEST_VERSION}, 0);
 
-                PRAGMA foreign_keys=on;
                 COMMIT;
+                PRAGMA foreign_keys=on;
             """)
     else:
         # NOTE: migrate DB; context manager automatically closes connection

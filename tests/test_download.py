@@ -15,6 +15,10 @@ class ArgsDummy:
         assert(type(links) is list)
         self.links = links
         self.download_duplicates = True
+        self.skip_non_audio = False
+        self.dont_write_selftext = False
+        self.only_one_mirror = True
+        self.host_priority = "0,5,4"
         self.__dict__.update(kwargs)
 
 @pytest.mark.dltest

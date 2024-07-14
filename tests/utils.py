@@ -27,10 +27,16 @@ def setup_tmpdir():
     # have the possiblity to check the content of tmpdir manually
     # -> but then we also have to except FileNotFoundError since tmpdir
     # might not exist yet
-    try:
-        shutil.rmtree(tmpdir)
-    except FileNotFoundError:
-        pass
+    perm = 0
+    for f in os.listdir(TESTS_DIR):
+        full = os.path.join(TESTS_DIR, f)
+        if f.startswith("tmp") and os.path.isdir(full):
+            try:
+                shutil.rmtree(full)
+            except PermissionError:
+                perm += 1
+    while os.path.exists(tmpdir):
+        tmpdir += str(perm)
     os.makedirs(tmpdir)
 
     config.set_root(tmpdir)

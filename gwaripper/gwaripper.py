@@ -615,10 +615,24 @@ class GWARipper:
                               (file_col.id_in_db, fi.id_in_db))
 
         return author, False
+    
+    def _get_flair_id(self, name: Optional[str]) -> Optional[int]:
+        c = self.db_con.cursor()
+        flair_id: Optional[int] = None
+        if name:
+            c.execute("SELECT id FROM Flair WHERE name = ?",
+                      (name,))
+            row = c.fetchone()
+            if row is None:
+                c.execute("INSERT INTO Flair(name) VALUES (?)",
+                          (name,))
+                flair_id = c.lastrowid
+            else:
+                flair_id = row['id']
+
+        return flair_id
 
     def _add_to_db_ri(self, r_info: RedditInfo) -> Tuple[int, str]:
-        c = self.db_con.cursor()
-
         # for cases where the post is still available (as well as the linked
         # audio files) but the reddit user has been deleted
         reddit_author = r_info.author if r_info.author else DELETED_USR_FOLDER
@@ -626,10 +640,15 @@ class GWARipper:
         # TODO: check if this will use the correct author
         author, was_in_db = self._add_to_db_collection(r_info, reddit_author)
 
-        # TODO get rid of RedditInfo entirely and add the columns (there's only one) to FileCollection
         if not was_in_db:
-            c.execute("INSERT INTO RedditInfo(created_utc) VALUES (?)",
-                      (r_info.created_utc,))
+            flair_id = self._get_flair_id(r_info.flair)
+
+            c = self.db_con.cursor()
+            c.execute("""
+                INSERT INTO
+                RedditInfo(created_utc, upvotes, flair_id, selftext)
+                VALUES (?, ?, ?, ?)""",
+                (r_info.created_utc, r_info.upvotes, flair_id, r_info.selftext))
             r_info_id = c.lastrowid
             # assign reddit info to collection
             c.execute("UPDATE FileCollection SET reddit_info_id = ? WHERE id = ?",

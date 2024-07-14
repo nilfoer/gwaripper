@@ -18,9 +18,9 @@ INSERT INTO "FileCollection" VALUES
 (1,'https://www.reddit.com/r/gonewildaudio/comments/ix81f7/f4m_f4f_f4tf_motherly_moth_girl_keeps_you_warm/','ix81f7','[F4M] / [F4F] / [F4TF] Motherly Moth Girl Keeps You Warm [Gentle Fdom] [Size difference] [Thicc] [Monster Mommy] [Breastplay] [Outercourse] [Handjob/fingering] [Cozy blanket] [Kissing] [Thighjob] [Pinning you down] [Grinding] [Wrapped in wings] [Aftercare] [ASMR] [25min+] [Script: BowTieGuy_GWA]','[F4M] _ [F4F] _ [F4TF] Motherly Moth Girl Keeps You Warm [Gentle Fdom]',1,NULL,3),
 (2,'https://www.reddit.com/r/gonewildaudio/comments/6dvum7/f4m_my_daughter_is_an_idiot_for_breaking_up_with/','6dvum7','[F4M] My Daughter is an Idiot for Breaking Up With You... Let Me Help You Feel Better [milf] [sex with your ex''s sweet + sexy mom] [realistic slow build] [kissing] [sloppy wet handjob + deep-throating blowjob] [dirty talk] [sucking my big tits] [riding you on the couch] [creampie] [improv]','',2,NULL,5);
 UPDATE "GWAR_Version" SET
-version_id = 2, dirty = 0;
+version_id = 4, dirty = 0;
 INSERT INTO "RedditInfo" VALUES
-(1,1600718407.0),
-(2,1496001999.0);
+(1,1600718407.0,NULL,NULL,NULL),
+(2,1496001999.0,NULL,NULL,NULL);
 COMMIT;
 PRAGMA foreign_keys=on;

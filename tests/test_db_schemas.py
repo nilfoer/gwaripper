@@ -446,7 +446,18 @@ def clean_sql(sql: Optional[str]) -> Optional[List[str]]:
         return None
     sql_comment = re.compile(r'--.*')
     sql = re.sub(sql_comment, "", sql)
-    return sql.split()
+    words = sql.split()
+    cleaned = []
+    # remove quoted table names
+    for word in words:
+        print(word)
+        match = re.match(r'"(\w+)"(\(.*)', word)
+        if match:
+            print(match)
+            cleaned.append(f"{match.group(1)}{match.group(2)}")
+        else:
+            cleaned.append(word)
+    return cleaned
 
 
 def test_db_migration_to_latest_same_as_create(setup_tmpdir):
