@@ -10,7 +10,7 @@ import urllib.error
 import gwaripper.config as cfg
 
 from gwaripper.gwaripper import GWARipper, report_preamble, Status
-from gwaripper.db import load_or_create_sql_db
+from gwaripper.db import load_or_create_sql_db, export_to_sql, db_to_sql_insert_only
 from gwaripper import exceptions
 from gwaripper.info import FileInfo, RedditInfo, FileCollection, DELETED_USR_FOLDER, UNKNOWN_USR_FOLDER
 from gwaripper.download import DownloadErrorCode
@@ -104,22 +104,12 @@ def _setup_db_2col_5audio(tmpdir, with_reddit=True):
             f"db_2col_5audio{'_without_reddit' if not with_reddit else ''}.sql")
     test_db_fn = os.path.join(tmpdir, "gwarip_db.sqlite")
     assert not os.path.exists(test_db_fn)
-    db_con, _ = load_or_create_sql_db(test_db_fn)
+    db_con = sqlite3.connect(test_db_fn, detect_types=sqlite3.PARSE_DECLTYPES)
 
     with open(sql_fn, "r", encoding="UTF-8") as f:
         sql = f.read()
 
     db_con.executescript(sql)
-
-    c = db_con.execute("PRAGMA integrity_check")
-    row = c.fetchone()
-    print("INTEG", [x for x in row])
-    c = db_con.execute("PRAGMA foreign_key_check")
-    row = c.fetchone()
-    print("FK CHK", row)
-    c = db_con.execute("PRAGMA foreign_keys")
-    row = c.fetchone()
-    print("FK", [x for x in row])
 
     db_con.close()
 

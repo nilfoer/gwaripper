@@ -2,6 +2,7 @@ import sys
 import os
 import shutil
 import glob
+import sqlite3
 
 MODULE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -10,7 +11,7 @@ sys.path.insert(0, os.path.realpath(os.path.join(MODULE_DIR, '..', 'tests')))
 
 import gwaripper.migrate as migrate
 
-from gwaripper.db import db_to_sql_insert_only, load_or_create_sql_db
+from gwaripper.db import export_to_sql, load_or_create_sql_db
 from utils import load_db_from_sql_file, setup_tmpdir
 
 
@@ -49,6 +50,7 @@ for fn in [f for patt in ['tests/all_test_files/*.sql'] for f in glob.glob(patt)
     temp_db_file = fn + "_tmp.sqlite"
     if os.path.exists(temp_db_file):
         os.remove(temp_db_file)
+    # db_con = sqlite3.connect(temp_db_file, detect_types=sqlite3.PARSE_DECLTYPES)
     db_con, _ = load_or_create_sql_db(temp_db_file)
 
     with open(fn, "r", encoding="UTF-8") as f:
@@ -62,26 +64,8 @@ for fn in [f for patt in ['tests/all_test_files/*.sql'] for f in glob.glob(patt)
     assert migrate_db.upgrade_to_latest()
     os.rename(fn, f"{fn[:-4]}.old.sql")
     # @Hack using migrate_db's db_con
-    res = db_to_sql_insert_only(migrate_db.db_con).splitlines()
+    export_to_sql(fn, migrate_db.db_con)
     migrate_db._close()
-
-    # @Hack removing first two Alias rows, since they get inserted by load_or_create_sql_db
-    for i in range(len(res)):
-        line = res[i].strip()
-        if line.startswith("INSERT INTO \"Alias"):
-            del res[i+1]
-            del res[i+1]
-            break
-
-    # @Hack change version to use update instead of insert
-    version_idx = next(i for i in range(len(res))
-                       if res[i].startswith(f'INSERT INTO "{migrate.VERSION_TABLE}'))
-    version = res[version_idx + 1][1:].split(',')[0]
-    res[version_idx] = f'UPDATE "{migrate.VERSION_TABLE}" SET'
-    res[version_idx + 1] = f'version_id = {version}, dirty = 0;'
-
-    with open(fn, 'w', encoding='UTF-8') as f:
-        f.write("\n".join(res))
 
     os.remove(temp_db_file)
     try:

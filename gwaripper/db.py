@@ -184,7 +184,7 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 -- -> external content table (here using a view)
                 -- but then we have to keep the content table and the idx up-to-date ourselves
                 CREATE VIRTUAL TABLE IF NOT EXISTS Titles_fts_idx USING fts5(
-                  title, collection_title,
+                  audio_title, collection_title,
                   content='v_audio_and_collection_titles',
                   content_rowid='audio_id');
 
@@ -196,7 +196,7 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 -- use WHEN new.collection_id IS NULL instead
                 CREATE TRIGGER AudioFile_ai AFTER INSERT ON AudioFile
                 BEGIN
-                    INSERT INTO Titles_fts_idx(rowid, title, collection_title)
+                    INSERT INTO Titles_fts_idx(rowid, audio_title, collection_title)
                     VALUES (
                         new.id,
                         new.title,
@@ -211,7 +211,7 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 -- currently stored in the table otherwise the results may be unpredictable
                 CREATE TRIGGER AudioFile_ad AFTER DELETE ON AudioFile
                 BEGIN
-                    INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, title, collection_title)
+                    INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, audio_title, collection_title)
                     VALUES(
                         'delete',
                         old.id,
@@ -226,7 +226,7 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                 CREATE TRIGGER AudioFile_au AFTER UPDATE ON AudioFile
                 BEGIN
                     -- delete old entry
-                    INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, title, collection_title)
+                    INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, audio_title, collection_title)
                     VALUES(
                         'delete',
                         old.id,
@@ -237,7 +237,7 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                          END)
                     );
                     -- insert new one
-                    INSERT INTO Titles_fts_idx(rowid, title, collection_title)
+                    INSERT INTO Titles_fts_idx(rowid, audio_title, collection_title)
                     VALUES (
                         new.id,
                         new.title,
@@ -380,8 +380,10 @@ def export_to_sql(filename, db_con):
 
     # insert all the values
     for tbl_name in table_names:
-        result.append(f"INSERT INTO \"{tbl_name}\" VALUES")
         table_rows = c.execute(f"SELECT * FROM {tbl_name}").fetchall()
+        if not table_rows:
+            continue
+        result.append(f"INSERT INTO \"{tbl_name}\" VALUES")
         for i, tr in enumerate(table_rows):
             result.append(f"({','.join(convert_or_escape_to_str(c) for c in tr)})"
                           f"{';' if i == len(table_rows)-1 else ','}")
@@ -403,6 +405,8 @@ def export_to_sql(filename, db_con):
 
 def db_to_sql_insert_only(db_con: sqlite3.Connection) -> str:
     # NOTE: will not collect insert statements from external content FTS tables
+    # WARNING: will not respect foreign key order so inserts might need to
+    #          reordered manually
     row_fac_bu = db_con.row_factory
     db_con.row_factory = sqlite3.Row
 

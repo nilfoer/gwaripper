@@ -39,8 +39,13 @@ def upgrade(db_con):
     c.execute("DROP TABLE ri_temp")
 
     c.execute("DROP VIEW v_audio_and_collection_combined")
+
     c.execute("ALTER TABLE RedditInfo RENAME TO ri_temp")
     c.execute("ALTER TABLE ri_temp RENAME TO RedditInfo")
+    c.execute("DROP TRIGGER AudioFile_ai")
+    c.execute("DROP TRIGGER AudioFile_au")
+    c.execute("DROP TRIGGER AudioFile_ad")
+    c.execute("DROP TABLE Titles_fts_idx")
 
     c.execute("""
         CREATE VIEW v_audio_and_collection_combined
@@ -81,4 +86,68 @@ def upgrade(db_con):
         LEFT JOIN Flair ON RedditInfo.flair_id = Flair.id
         JOIN Alias ON Alias.id = AudioFile.alias_id
         LEFT JOIN Artist ON Artist.id = Alias.artist_id;
+    """)
+
+    c.execute("""
+        CREATE VIRTUAL TABLE Titles_fts_idx USING fts5(
+          audio_title, collection_title,
+          content='v_audio_and_collection_titles',
+          content_rowid='audio_id');
+    """)
+
+    c.execute("""
+        CREATE TRIGGER AudioFile_ai AFTER INSERT ON AudioFile
+        BEGIN
+            INSERT INTO Titles_fts_idx(rowid, audio_title, collection_title)
+            VALUES (
+                new.id,
+                new.title,
+                (CASE
+                 WHEN new.collection_id IS NULL THEN NULL
+                 ELSE (SELECT title FROM FileCollection WHERE id = new.collection_id)
+                 END)
+            );
+        END
+    """)
+    c.execute("""
+        CREATE TRIGGER AudioFile_ad AFTER DELETE ON AudioFile
+        BEGIN
+            INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, audio_title, collection_title)
+            VALUES(
+                'delete',
+                old.id,
+                old.title,
+                (CASE
+                 WHEN old.collection_id IS NULL THEN NULL
+                 ELSE (SELECT title FROM FileCollection WHERE id = old.collection_id)
+                 END)
+            );
+        END
+
+    """)
+    c.execute("""
+        CREATE TRIGGER AudioFile_au AFTER UPDATE ON AudioFile
+        BEGIN
+            -- delete old entry
+            INSERT INTO Titles_fts_idx(Titles_fts_idx, rowid, audio_title, collection_title)
+            VALUES(
+                'delete',
+                old.id,
+                old.title,
+                (CASE
+                 WHEN old.collection_id IS NULL THEN NULL
+                 ELSE (SELECT title FROM FileCollection WHERE id = old.collection_id)
+                 END)
+            );
+            -- insert new one
+            INSERT INTO Titles_fts_idx(rowid, audio_title, collection_title)
+            VALUES (
+                new.id,
+                new.title,
+                (CASE
+                 WHEN new.collection_id IS NULL THEN NULL
+                 ELSE (SELECT title FROM FileCollection WHERE id = new.collection_id)
+                 END)
+            );
+        END
     """)
