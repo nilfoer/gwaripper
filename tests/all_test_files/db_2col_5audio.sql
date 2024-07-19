@@ -102,6 +102,8 @@ CREATE VIEW v_audio_and_collection_combined
                     Alias.name
              FROM Alias WHERE Alias.id = FileCollection.alias_id) as fcol_alias_name,
             RedditInfo.created_utc as reddit_created_utc,
+            RedditInfo.upvotes as reddit_upvotes,
+            RedditInfo.selftext as reddit_selftext,
             Flair.name as reddit_flair,
             EXISTS (SELECT 1 FROM ListenLater WHERE audio_id = AudioFile.id) as listen_later
         FROM AudioFile

@@ -32,10 +32,11 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
     create_new = not os.path.isfile(filename)
     if create_new:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-    conn: sqlite3.Connection = sqlite3.connect(filename,
-                                               detect_types=sqlite3.PARSE_DECLTYPES)
 
+    conn: sqlite3.Connection
     if create_new:
+        conn = sqlite3.connect(
+            filename, detect_types=sqlite3.PARSE_DECLTYPES)
         # context mangaer auto-commits changes or does rollback on exception
         with conn:
             conn.executescript(f"""
@@ -161,6 +162,8 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
                             Alias.name
                      FROM Alias WHERE Alias.id = FileCollection.alias_id) as fcol_alias_name,
                     RedditInfo.created_utc as reddit_created_utc,
+                    RedditInfo.upvotes as reddit_upvotes,
+                    RedditInfo.selftext as reddit_selftext,
                     Flair.name as reddit_flair,
                     EXISTS (SELECT 1 FROM ListenLater WHERE audio_id = AudioFile.id) as listen_later
                 FROM AudioFile
@@ -263,9 +266,11 @@ def load_or_create_sql_db(filename: str) -> Tuple[sqlite3.Connection, sqlite3.Cu
         with migrate.Database(filename) as migration:
             migration_success = migration.upgrade_to_latest()
         if not migration_success:
-            conn.close()
             raise GWARipperError("Could not migrate DB! Open an issue at "
                                  "github.com/nilfoer/gwaripper")
+
+        conn = sqlite3.connect(
+            filename, detect_types=sqlite3.PARSE_DECLTYPES)
 
     # Row provides both index-based and case-insensitive name-based access
     # to columns with almost no memory overhead
