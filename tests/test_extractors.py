@@ -1345,24 +1345,33 @@ def test_extractor_skittykat_unicode_url(monkeypatch):
 
 
 erocast_expected = {
-    "id":392, "mp3":0, "waveform":0, "preview":0, "wav":0, "flac":0, "hd":0, "hls":1,
-    "title":"A Teacher's Voice - A Naughty Boy",
-    "description":"Our teacher comes up with a way to get back at the coach for his disobedience..\n\nScript u/StoryWeaver83",
-    "duration":645, "released_at":"11/22/2021",
-    "permalink_url":"https://erocast.me/track/392/a-teachers-voice-a-naughty-boy",
+    "id": 2927, "mp3": 0, "waveform": 0, "preview": 0, "wav": 0, "flac": 0, "hd": 0, "hls": 1,
+    "file_url": "https:\/\/erocast.s3.us-east-2.wasabisys.com\/554728\/track.m3u8",
+    "explicit": 0,
+    "selling": 1,
+    "title": "Girl Order Box (G.O.B.)",
+    "description": "[F4M] [Monster Girl][Goblin Girl][Enthusiastic] although [Prostitution][Direct][Honest][Experienced][Size difference][Shortstack][Smaller female][Blowjob][Face-off position][Humour][Look what came in the mail!][SFX][The Blend] by Acrobatic_Ticket_659",
+    "duration": 1250,
+    "created_at": "2022-05-29T06:58:47.000000Z",
+    "updated_at": "2024-07-19T21:02:49.000000Z",
+    "permalink_url": "https:\/\/erocast.me\/track\/2927\/girl-order-box-gob",
     "streamable": True,
-    "user":{"id":83, "name":"Wkdfaerie", "username":"wkdfaerie", "artist_id":0}
+    "user":  {
+        "id": 4128,
+        "name": "LurkyDip",
+        "artist_id": 0
+    },
 }
 
 def test_extractor_erocast():
-    extr = ErocastExtractor("https://erocast.me/track/392/a-teachers-voice-a-naughty-boy")
+    extr = ErocastExtractor("https://erocast.me/track/2927/girl-order-box-gob")
     assert extr.id == str(erocast_expected['id'])
 
     fi, report = extr._extract()
 
     assert fi.title == erocast_expected['title']
     assert fi.descr == erocast_expected['description']
-    assert re.match(r"https://erocast\..*/555083/track.m3u8", fi.direct_url)
+    assert re.match(r"https://erocast\..*/554728/track.m3u8", fi.direct_url)
     user = erocast_expected['user']
     assert fi.author == user['name']
     assert fi.download_type == DownloadType.HLS
@@ -1419,24 +1428,40 @@ def test_extractor_whyp_private():
         assert getattr(fi, k) == whyp_private_expected[k]
 
 whyp_public_expected = {
-        "id":38357,
-        "title":"Your Big Sister's Hot Roommate Seduces You And Takes Your Virginity",
-        "descr": json.loads(r'["Original Script by u/ScriptsFromaSub\n\nBecome a Patron to access my full library of original, high quality audios: patreon.com/SooJeong\n\n\u1d1b\u029c\u026a\ua731 \u1d00\u1d1c\u1d05\u026a\u1d0f \u1d0d\u1d00\u028f \u1d04\u1d0f\u0274\u1d1b\u1d00\u026a\u0274 \u1d04\u1d0f\u1d18\u028f\u0280\u026a\u0262\u029c\u1d1b \u1d0d\u1d1c\ua731\u026a\u1d04 \u1d00\u0274\u1d05 \ua731\ua730x \u1d21\u029c\u026a\u1d04\u029c \u026a, \u1d1b\u029c\u1d07 \u1d18\u1d07\u0280\ua730\u1d0f\u0280\u1d0d\u1d07\u0280 (\ua731\u1d0f\u1d0f\u1d0a\u1d07\u1d0f\u0274\u0262), \u1d00\u1d0d \u029f\u1d07\u0262\u1d00\u029f\u029f\u028f \u1d00\u1d1c\u1d1b\u029c\u1d0f\u0280\u026a\u1d22\u1d07\u1d05 \u1d1b\u1d0f \u1d1c\ua731\u1d07. \u1d05\u1d0f \u0274\u1d0f\u1d1b \u1d04\u1d0f\u1d18\u028f, \u1d07\u1d05\u026a\u1d1b, \u1d0f\u0280 \u0280\u1d07\u1d1c\u1d18\u029f\u1d0f\u1d00\u1d05 \u1d0d\u028f \u1d04\u1d0f\u0274\u1d1b\u1d07\u0274\u1d1b \u1d21\u026a\u1d1b\u029c\u1d0f\u1d1c\u1d1b \u1d07x\u1d18\u029f\u026a\u1d04\u026a\u1d1b \u1d04\u1d0f\u0274\ua731\u1d07\u0274\u1d1b."]')[0],
-        "duration":1619.98,
-        "direct_url":"https://cdn.whyp.it/e2c8515a-bc1e-4613-886a-6b2d89f4c56f.mp3",
-        "artwork_url":"https://cdn.whyp.it/cd530d16-d734-4222-b0f9-86164bfa55a3.jpg",
-        "created_at":"2022-08-25T21:04:02+00:00",
-        "user_id":4497,
-        "tags":[],
-        "token":"I3Eo3",
-        "public":True,
-        "author":"SooJeong",
-        "avatar":"https://cdn.whyp.it/4b1a5fe6-834f-4bf9-9a91-9a7b338733c3.jpg",
-        "cover":"https://cdn.whyp.it/177b90b0-56a9-4d7b-9cd8-f8fd5770bbc5.jpg"
+    "id": 143212,
+    "title": "[FF4M] French Documentarian Spies on Mommy & her Good Boy",
+    "slug": "ff4m-french-documentarian-spies-on-mommy-her-good-boy",
+    "descr": "🎧 Mommy-Only Audio Track without Giselle [F4M]: https://www.patreon.com/posts/94571074\nJoin Patreon to listen to this audio, participate in our Discord server, and more!\n\n[FF4M] French Documentarian Spies on Mommy & her Good Boy [Gentle Fdom] [Mdlb] [Voyeurism / Exhibitionist] [Humor] [Skitty peeks through window] [She’s recording us!] [Blowjob] [Riled up] [He’s MINE!] [Breast Suckling] [Eye Contact] [PIV] [Countdown] [Creampie] [Kisses]\n\nScript by u/livejoker\nThumbnail art by TingleRotunda\n\nhttps://www.patreon.com/skittykat\nhttps://www.youtube.com/c/skittykat\nhttps://twitter.com/SkittyKatVA\nhttps://www.skittykat.cc\n\n🗳️ Submit a script for me? https://forms.gle/Qu9uVbXZMprby15Z7\n😊 Anonymous Feedback? https://forms.gle/q9z3RrFPfiTRnw5R7",
+    "duration": 887.95,
+    "audio_url": "https://cdn.whyp.it/44b2faee-2dd7-46b7-b667-91c9ccdf3eb6.mp3",
+    "direct_url": "https://cdn.whyp.it/44b2faee-2dd7-46b7-b667-91c9ccdf3eb6.mp3",
+    "artwork_url": "https://cdn.whyp.it/fc8c4267-c40b-45e4-ba86-bbc89f41a57c.png",
+    "artwork_url_fallback": "https://cdn.whyp.it/f713e761-d9f4-4e2b-bf43-8eafc6713b7b.png",
+    "created_at": "2023-12-13T01:45:52+00:00",
+    "user_id": 4384,
+    "comments_count": 2,
+    "token": "j9UcX",
+    "public": True,
+    "allow_downloads": False,
+    "settings_comments": "users",
+    "nsfw": True,
+    "author": "skittykat",
+    "user": {
+        "id": 4384,
+        "slug": "skittykat",
+        "username": "skittykat",
+        "avatar": "https://cdn.whyp.it/f713e761-d9f4-4e2b-bf43-8eafc6713b7b.png",
+        "status": None,
+        "tracks_count": 8
+    },
+    "tags": [
+        "nsfw",
+        "mommy"
+    ]
 }
 
 def test_extractor_whyp_public():
-    url = "https://whyp.it/tracks/38357/your-big-sisters-hot-roommate-seduces-you-and-takes-your-virginity"
+    url = "https://whyp.it/tracks/143212/ff4m-french-documentarian-spies-on-mommy-her-good-boy"
     extr = WhypExtractor(url)
     assert extr.id == str(whyp_public_expected['id'])
     assert extr.token is None

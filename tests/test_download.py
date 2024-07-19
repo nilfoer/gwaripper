@@ -24,7 +24,9 @@ class ArgsDummy:
 @pytest.mark.dltest
 def test_download_hls(setup_tmpdir_param):
     # NOTE: not deterministic?
-    expected_md5 = ("c5d91cb3d0fd7340479f22232115111f", "cf2fe1a305f6128ae0c9893b91178212")
+    expected_md5 = ("ebc7b24e0aa57c8bf890ce43f54f3b2a",
+                    "c5d91cb3d0fd7340479f22232115111f",
+                    "cf2fe1a305f6128ae0c9893b91178212")
 
     testpath = setup_tmpdir_param
     cfg.set_root(testpath)
