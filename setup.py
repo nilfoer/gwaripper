@@ -19,7 +19,7 @@ for dirpath, dirnames, filenames in os.walk(os.path.abspath('gwaripper_webGUI'))
 
 setuptools.setup(
     name="GWARipper",
-    version="0.8.0",
+    version="0.9.0",
     description="A script that downloads audio files from the gonewildaudio subreddit.",
     long_description=long_description,
     long_description_content_type="text/markdown",
