@@ -81,6 +81,9 @@ def upgrade(db_con):
 
     c.execute("DROP TABLE af_temp")
 
+    c.execute("CREATE INDEX audio_file_collection_id_idx ON AudioFile(collection_id)")
+    c.execute("CREATE INDEX audio_file_alias_id_idx ON AudioFile(alias_id)")
+
     # to update FK references in other tables
     c.execute("ALTER TABLE AudioFile RENAME TO af_temp")
     c.execute("ALTER TABLE af_temp RENAME TO AudioFile")
