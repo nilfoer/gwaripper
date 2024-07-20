@@ -8,15 +8,17 @@
         </div>
         {% if entry.reddit_created_utc is not none %}
             <div class="row no-margin">
-                {% if entry.reddit_flair %}
-                <div class="flair" style="margin-left: 1em;">{{ entry.reddit_flair or "N/A" }}</div>
-                {% endif %}
-                {% if entry.reddit_upvotes %}
-                <div style="margin: .25em .3em;">
-                    <i style="color: #6ec0ff;" class="fas fa-thumbs-up"></i>
-                    <span style="vertical-align: middle;">{{ entry.reddit_upvotes or "N/A" }}</span>
+                <div class="extended-reddit-line">
+                    {% if entry.reddit_flair %}
+                    <div class="flair">{{ entry.reddit_flair or "N/A" }}</div>
+                    {% endif %}
+                    {% if entry.reddit_upvotes %}
+                    <div class="upvotes">
+                        <i class="fas fa-thumbs-up upvote-icon"></i>
+                        <span style="vertical-align: middle;">{{ entry.reddit_upvotes or "N/A" }}</span>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
         {% endif %}
         <div class="row no-margin">
@@ -50,13 +52,23 @@
                 <strong>Local filename:</strong> 
                 {{ (audio_path.subpath + '/' + entry.filename) if entry.filename else 'Missing!' }}
                 <br/><br/>
+                <h2><b>Selftext:</b></h2>
+                {% if entry.reddit_selftext %}
+                    {% for ln in entry.reddit_selftext.strip().splitlines() %}
+                        {{ ln }}<br/>
+                    {% endfor %}
+                {% else %}
+                    <span title="Press the text icon on the right to try to embed it from disk!">
+                        Missing or not in DB!</span><br/>
+                {% endif %}
+                <br/><br/>
+                <h2><b>Description:</b></h2>
                 {% if entry.description %}
-                    <h2>Description:</h2>
                     {% for ln in entry.description.splitlines() %}
                         {{ ln }}<br/>
                     {% endfor %}
                 {% else %}
-                    Description: Missing!<br/>
+                    Missing!<br/>
                 {% endif %}
             </div>
             <div class="entry-expand-actions-wrap">
@@ -106,8 +118,6 @@
             <br/>
         </div> {# entry-expand-inner #}
         <div class="embeds-container row no-margin">
-            {# TODO too much code inside template #}
-            {# we don't have a filename for older entries, so check for it's presence #}
             <div class="audio-embed">
             </div>
             <div class="selftxt-embed">

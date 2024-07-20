@@ -488,6 +488,16 @@ select:-webkit-autofill:focus {
     margin: .25em .1em;
     font-size: .85em;
 }
+.extended-reddit-line {
+    margin-left: 1em;
+    display: inline-flex;
+}
+.upvotes {
+    margin: .25em .3em;
+}
+.upvote-icon {
+    color: #e8e8e8;
+}
 input[type=submit] {
     border: none;
     color: #fff;
