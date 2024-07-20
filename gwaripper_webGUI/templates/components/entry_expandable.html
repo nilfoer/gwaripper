@@ -54,9 +54,12 @@
                 <br/><br/>
                 <h2><b>Selftext:</b></h2>
                 {% if entry.reddit_selftext %}
-                    {% for ln in entry.reddit_selftext.strip().splitlines() %}
-                        {{ ln }}<br/>
-                    {% endfor %}
+                    <a class="text-toggle">Click to toggle...</a>
+                    <div class="toggle-text-container">
+                        {% for ln in entry.reddit_selftext.strip().splitlines() %}
+                            {{ ln }}<br/>
+                        {% endfor %}
+                    </div>
                 {% else %}
                     <span title="Press the text icon on the right to try to embed it from disk!">
                         Missing or not in DB!</span><br/>
@@ -64,9 +67,12 @@
                 <br/><br/>
                 <h2><b>Description:</b></h2>
                 {% if entry.description %}
-                    {% for ln in entry.description.splitlines() %}
-                        {{ ln }}<br/>
-                    {% endfor %}
+                    <a class="text-toggle">Click to toggle...</a>
+                    <div class="toggle-text-container">
+                        {% for ln in entry.description.splitlines() %}
+                            {{ ln }}<br/>
+                        {% endfor %}
+                    </div>
                 {% else %}
                     Missing!<br/>
                 {% endif %}

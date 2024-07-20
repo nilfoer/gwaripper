@@ -498,6 +498,12 @@ select:-webkit-autofill:focus {
 .upvote-icon {
     color: #e8e8e8;
 }
+.text-toggle {
+    display: none;
+}
+.toggle-text-container {
+    display: block;
+}
 input[type=submit] {
     border: none;
     color: #fff;

@@ -59,4 +59,20 @@ $(document).ready(function() {
             }
         });
     });
+    $('.text-toggle').click(function(event) {
+        let self = $(event.currentTarget)
+        let text_container = self.next();
+        self.hide();
+        text_container.show();
+    });
+    $('.toggle-text-container').click(function(event) {
+        let self = $(event.currentTarget)
+        let toggle_text = self.prev();
+        let selection = window.getSelection();
+        if(selection.toString().length === 0) {
+            // only when not selecting text
+            self.hide();
+            toggle_text.show();
+        }
+    });
 });
