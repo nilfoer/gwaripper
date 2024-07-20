@@ -46,18 +46,28 @@ for row in rows:
     if entry.reddit_info_id is None:
         continue
 
-    sub = praw.models.Submission(reddit, id=row['id_on_page'])
-    with g.db_con:
-        flair_id = None
-        if sub.link_flair_text:
-            flair_id = g._get_flair_id(sub.link_flair_text)
+    c.execute("SELECT * FROM RedditInfo WHERE id = ?", (entry.reddit_info_id,))
+    ri_row = c.fetchone()
+    if ri_row['upvotes'] is not None:
+        print(f"Skipping Sub<{row['id_on_page']}> that already has upvotes/..")
+        continue
 
-        print(f"Upd Sub<{row['id_on_page']}> flair: {sub.link_flair_text} upvotes: {sub.score} self: {bool(sub.selftext)}")
+    try:
+        sub = praw.models.Submission(reddit, id=row['id_on_page'])
+        with g.db_con:
+            flair_id = None
+            if sub.link_flair_text:
+                flair_id = g._get_flair_id(sub.link_flair_text)
 
-        c.execute("""
-            UPDATE RedditInfo SET
-                upvotes = ?,
-                flair_id = ?,
-                selftext = ?
-            WHERE id = ?
-        """, (sub.score, flair_id, sub.selftext or None, entry.reddit_info_id))
+            print(f"Upd Sub<{row['id_on_page']}> flair: {sub.link_flair_text} upvotes: {sub.score} self: {bool(sub.selftext)}")
+
+            c.execute("""
+                UPDATE RedditInfo SET
+                    upvotes = ?,
+                    flair_id = ?,
+                    selftext = ?
+                WHERE id = ?
+            """, (sub.score, flair_id, sub.selftext or None, entry.reddit_info_id))
+    except Exception as e:
+        print(f"Skipped Sub<{row['id_on_page']}>: {str(e)}")
+
