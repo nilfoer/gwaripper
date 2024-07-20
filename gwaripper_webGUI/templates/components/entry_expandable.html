@@ -6,6 +6,19 @@
                 {{ entry.fcol_title or entry.title }}
             </div>
         </div>
+        {% if entry.reddit_created_utc is not none %}
+            <div class="row no-margin">
+                {% if entry.reddit_flair %}
+                <div class="flair" style="margin-left: 1em;">{{ entry.reddit_flair or "N/A" }}</div>
+                {% endif %}
+                {% if entry.reddit_upvotes %}
+                <div style="margin: .25em .3em;">
+                    <i style="color: #6ec0ff;" class="fas fa-thumbs-up"></i>
+                    <span style="vertical-align: middle;">{{ entry.reddit_upvotes or "N/A" }}</span>
+                </div>
+                {% endif %}
+            </div>
+        {% endif %}
         <div class="row no-margin">
             <div class="entry-container-rating">
                 {% include 'components/entry_rate.html' %}

@@ -48,12 +48,43 @@
                     <i class="fa{{ 's' if entry.favorite else 'r' }} fa-heart pink-fcolor align-middle"></i>
                 </td>
             </tr>
+            {% if entry.reddit_created_utc is not none %}
+                <tr>
+                    <th scope="row"><strong>Upvotes:</strong></th>
+                    <td>
+                        <div>
+                            <i style="color: #6ec0ff;" class="fas fa-thumbs-up"></i>
+                            <span style="vertical-align: middle;">{{ entry.reddit_upvotes or "N/A" }}</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><strong>Flair:</strong></th>
+                    <td>
+                        <div class="flair">{{ entry.reddit_flair or "N/A" }}</div>
+                    </td>
+                </tr>
+            {% endif %}
             <tr>
                 <th scope="row"><strong>Local filename:</strong></th>
                 <td>{{ (audio_path.subpath + '/' + entry.filename) if entry.filename else 'Missing!' }}</td>
             </tr>
+            {% if entry.reddit_created_utc is not none %}
+                <tr>
+                    <th valign="top" scope="row"><strong>Selftext:</strong></th>
+                    <td>
+                    {% if entry.reddit_selftext %}
+                        {% for ln in entry.reddit_selftext.strip().splitlines() %}
+                            {{ ln }}<br/>
+                        {% endfor %}
+                    {% else %}
+                        Empty or not in DB!<br/>
+                    {% endif %}
+                    </td>
+                </tr>
+            {% endif %}
             <tr>
-                <th scope="row"><strong>Description:</strong></th>
+                <th valign="top" scope="row"><strong>Description:</strong></th>
                 <td>
                 {% if entry.description %}
                     {% for ln in entry.description.splitlines() %}
