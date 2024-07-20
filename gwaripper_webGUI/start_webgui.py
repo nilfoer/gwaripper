@@ -30,7 +30,7 @@ def main(args: Optional[List[str]] = None):
     if 'open' in args:
         app.run(threaded=True, host='0.0.0.0', port=port)
     else:
-        app.run(threaded=True, port=port)
+        app.run(threaded=True, port=port, debug=True)
 
 
 if __name__ == "__main__":

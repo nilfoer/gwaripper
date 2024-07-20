@@ -1,6 +1,8 @@
 import setuptools
 import os
 
+from gwaripper.gwaripper import GWARipper
+
 with open("README.md", "r", encoding="UTF-8") as fh:
     long_description = fh.read()
 
@@ -19,7 +21,7 @@ for dirpath, dirnames, filenames in os.walk(os.path.abspath('gwaripper_webGUI'))
 
 setuptools.setup(
     name="GWARipper",
-    version="0.9.0",
+    version=GWARipper.VERSION,
     description="A script that downloads audio files from the gonewildaudio subreddit.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -45,7 +47,7 @@ setuptools.setup(
     # copied into the package
     package_data={
         'gwaripper_webGUI': webgui_data,
-        'gwaripper': 'migrations/*.py',
+        'gwaripper': ['migrations/*.py'],
     },
     entry_points={
         'console_scripts': [

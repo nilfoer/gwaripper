@@ -37,6 +37,8 @@ def main():
             epilog="NOTE: arguments that are shared over all subcommands need to be put in front of the "
                  "subcommand itself: e.g. gwaripper --ignore-banned links URL URL ...")
 
+    parser.add_argument('--version', action='store_true',
+                        help="Print the GWARipper version")
     parser.add_argument('--ignore-banned', action='store_true',
                         help="Ignores banned tags in titles and in link text!")
     parser.add_argument('--download-duplicates', action='store_true',
@@ -273,6 +275,10 @@ def main():
         # parse_args() will only contain attributes for the main parser and the
         # subparser that was selected
         args = parser.parse_args()
+
+    if args.version:
+        print(GWARipper.VERSION)
+        return
 
     if root_dir:
         setup_cacerts()
