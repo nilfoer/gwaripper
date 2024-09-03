@@ -118,7 +118,7 @@ jobs:
     #         ./gwaripper-bundle-windows
     #           ./GWARipper-..._win-x64.zip
     - name: Download builds
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4.1.7
       with:
         path: dist/
 
